@@ -1,0 +1,164 @@
+app:
+  notification:
+    cleanup:
+      enabled: true
+      retain-days: 7
+      batch-size: 100
+
+  email:
+    enabled: true
+    from-address: mas@systems.gov.bt
+    from-name: Mines Administrative System
+    support-email: mas@systems.gov.bt
+    retry-attempts: 3
+
+server:
+  port: 8081
+  address: 0.0.0.0
+  tomcat:
+    relaxed-query-chars: "|,{,},[,],^,@,$,&,+,="
+
+spring:
+  jackson:
+    time-zone: Asia/Thimphu
+
+  application:
+    name: mas
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/postgres
+#    url: jdbc:postgresql://172.30.3.10:5432/mas_db
+    username: postgres
+    password: root
+    driver-class-name: org.postgresql.Driver
+    type: com.zaxxer.hikari.HikariDataSource
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 30000
+      max-lifetime: 1800000
+      connection-timeout: 30000
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        show_sql: true
+        format_sql: true
+        default_schema: mas_db
+#        physical_naming_strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+
+  file:
+    upload-dir: /opt/Storage
+
+  qr:
+    qr-link: https://drugrims.systems.gov.bt/QrDetails
+
+  mail:
+    host: mail.systems.gov.bt
+    port: 587
+    username: mas@systems.gov.bt
+    password: 5xk5ZtSAyRcB
+    protocol: smtp
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+          ssl:
+            trust: mail.systems.gov.bt
+            protocols: TLSv1.2
+
+  # Redis Cache Configuration
+  # To enable Redis caching:
+  # 1. Install Redis (Docker: docker run -d -p 6379:6379 redis:latest)
+  # 2. Change cache.type from 'none' to 'redis'
+#  data:
+#    redis:
+#      host: localhost
+#      port: 6379
+#      password:
+#      timeout: 60000
+#      jedis:
+#        pool:
+#          max-active: 20
+#          max-idle: 10
+#          min-idle: 5
+#          max-wait: -1ms
+
+  cache:
+    type: none  # Using in-memory token blacklist instead of Redis
+    redis:
+      time-to-live: 3600000
+      cache-null-values: false
+      use-key-prefix: true
+      key-prefix: "mas::"
+
+  jwt:
+    secret: WFdz6u8hOXJD0ihDuRaZ+2dfkpWiDSlodyi78lBRJKpQwnMTwJCNiVCk2RW7mSzgeJdEHFsowE2CeutQvot9NQ==
+#    access-token-expiration: 1800000  # 30 minutes for access token
+    access-token-expiration: 86400000  # 1 day for access token
+    refresh-token-expiration: 604800000  # 7 days for refresh token
+    expiration: 432000000  # Keeping for backward compatibility
+
+# BIRMS MOENR Service Configuration (Ministry of Energy and Natural Resources)
+birms:
+  login:
+    url: https://birmsstagging.drc.gov.bt/api-services/core-module/api/v1/auth/external-users/logMeIn
+  moenr:
+    username: moenr
+    password: Admin@123
+    login:
+      url: https://birmsstagging.drc.gov.bt/api-services/core-module/api/v1/auth/external-users/logMeIn
+    payment-advice:
+      url: https://birmsstagging.drc.gov.bt/api-services/moenr-service/api/v1/paymentdetails/create
+    payment-detail-advice-no:
+      url: https://birmsstagging.drc.gov.bt/api-services/moenr-service/api/v1/paymentdetails/paymentAdviceNumber
+    payment-detail-reference-no:
+      url: https://birmsstagging.drc.gov.bt/api-services/moenr-service/api/v1/paymentdetails/referenceNumber
+    cancel-payment-advice:
+      url: https://birmsstagging.drc.gov.bt/api-services/moenr-service/api/v1/paymentdetails/cancel
+    get-receipt-ref-no:
+      url: https://birmsstagging.drc.gov.bt/api-services/moenr-service/api/v1/paymentdetails/receipt-details
+    get-receipt-base64:
+      url: https://birmsstagging.drc.gov.bt/api-services/moenr-service/api/v1/paymentdetails/receipt-details
+
+data-hub:
+  get-access-token:
+    url: https://stg-sso.tech.gov.bt/oauth2/token?grant_type=client_credentials
+    client-id: wz_hmjRfUWx4ZGyUfL1KfQrAReka
+    client-secret: qIAoW01LGvU7XW5tHF_ZuuSNSGUa
+  citizen-details:
+    url: https://staging-datahub-apim.tech.gov.bt/dcrc_allcitizendetailsapi/1.0.0/allcitizendetails
+  rbp-scs-details:
+    url: https://staging-datahub-apim.tech.gov.bt/rbp_scs_details_api/1.0.0/latestscsdetailsbycid
+  ibls-business-license:
+    url: https://staging-datahub-apim.tech.gov.bt/moea_businessinformationapi/1.0.0/businesslicensedetails
+
+# Swagger/OpenAPI Configuration
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    doc-expansion: none
+    default-models-expand-depth: -1
+    persist-authorization: true
+    filter: true
+    try-it-out-enabled: true
+    display-request-duration: true
+    deep-linking: true
+    custom-javascript: /swagger-custom.js
+  show-actuator: false
+  packages-to-scan: com.mas.gov.bt.mas.primary.controller
+  paths-to-match: /api/**
