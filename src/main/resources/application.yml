@@ -13,7 +13,7 @@ app:
     retry-attempts: 3
 
 server:
-  port: 8081
+  port: 8085
   address: 0.0.0.0
   tomcat:
     relaxed-query-chars: "|,{,},[,],^,@,$,&,+,="
