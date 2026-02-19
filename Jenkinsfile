@@ -12,8 +12,8 @@ pipeline {
         // Kubernetes
         KUBECONFIG_CREDENTIALS_ID = 'kubeconfig-mas'
         NAMESPACE       = 'mas'
-        DEPLOYMENT_NAME = 'springboot-app'   // kubectl get deployments -n mas
-        CONTAINER_NAME  = 'springboot'        // container name in deployment
+        DEPLOYMENT_NAME = 'mas-backend-mining-lease'   // kubectl get deployments -n mas
+        CONTAINER_NAME  = 'mas-backend-mining-lease'        // container name in deployment
     }
 
     stages {
@@ -56,7 +56,7 @@ pipeline {
                         sh """
                             echo "Updating image in Kubernetes..."
                             kubectl set image deployment/${DEPLOYMENT_NAME} \
-                              ${CONTAINER_NAME}=${SPRINGBOOT_IMAGE}:${IMAGE_TAG} \
+                              ${CONTAINER_NAME}=${SPRINGBOOT_IMAGE}:latest \
                               -n ${NAMESPACE}
 
                             echo "Waiting for rollout to complete..."
@@ -74,7 +74,7 @@ pipeline {
 
     post {
         success {
-            echo "✅ Deployment successful: ${SPRINGBOOT_IMAGE}:${IMAGE_TAG}"
+            echo "✅ Deployment successful: ${SPRINGBOOT_IMAGE}:latest"
         }
         failure {
             echo "❌ Deployment failed"
