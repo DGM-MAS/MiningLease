@@ -23,7 +23,7 @@ spring:
     time-zone: Asia/Thimphu
 
   application:
-    name: mas
+    name: mas-backend-mining-lease
 
   datasource:
     url: jdbc:postgresql://localhost:5432/postgres
@@ -162,3 +162,13 @@ springdoc:
   show-actuator: false
   packages-to-scan: com.mas.gov.bt.mas.primary.controller
   paths-to-match: /api/**
+
+# Eureka Client
+eureka:
+  client:
+    service-url:
+      defaultZone: http://mas-eureka-server-service:8081/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
