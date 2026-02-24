@@ -26,10 +26,11 @@ spring:
     name: mas-backend-mining-lease
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/postgres
-#    url: jdbc:postgresql://172.30.3.10:5432/mas_db
+#    url: jdbc:postgresql://localhost:5432/postgres
+    url: jdbc:postgresql://172.30.3.10:30432/mas_db
     username: postgres
-    password: root
+    password: 4GbRIVm8KuYXzEJB
+#    password: root
     driver-class-name: org.postgresql.Driver
     type: com.zaxxer.hikari.HikariDataSource
     hikari:
@@ -164,11 +165,11 @@ springdoc:
   paths-to-match: /api/**
 
 # Eureka Client
-eureka:
-  client:
-    service-url:
-      defaultZone: http://mas-eureka-server-service:8081/eureka/
-    register-with-eureka: true
-    fetch-registry: true
-  instance:
-    prefer-ip-address: true
+#eureka:
+#  client:
+#    service-url:
+#      defaultZone: http://mas-eureka-server-service:8081/eureka/
+#    register-with-eureka: true
+#    fetch-registry: true
+#  instance:
+#    prefer-ip-address: true
