@@ -1,6 +1,7 @@
 package com.mas.gov.bt.mas.primary.mapper;
 
 import com.mas.gov.bt.mas.primary.dto.request.MiningLeaseApplicationRequest;
+import com.mas.gov.bt.mas.primary.dto.response.ApplicationListResponse;
 import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
 import com.mas.gov.bt.mas.primary.entity.MiningLeaseApplication;
 import org.mapstruct.*;
@@ -48,4 +49,9 @@ public interface MiningLeaseMapper {
             default -> status.replace("_", " ");
         };
     }
+
+    @Mapping(target = "currentStatusDisplayName", expression = "java(getStatusDisplayName(miningLeaseApplication.getCurrentStatus()))")
+    @Mapping(target = "gewog", ignore = true)
+    @Mapping(target = "nearestVillage", ignore = true)
+    ApplicationListResponse toListResponse(MiningLeaseApplication miningLeaseApplication);
 }

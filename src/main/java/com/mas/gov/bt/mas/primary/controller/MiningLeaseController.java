@@ -3,8 +3,10 @@ package com.mas.gov.bt.mas.primary.controller;
 import com.mas.gov.bt.mas.primary.config.UserContext;
 import com.mas.gov.bt.mas.primary.dto.request.MiningLeaseApplicationRequest;
 import com.mas.gov.bt.mas.primary.dto.request.MiningLeaseGRRequest;
+import com.mas.gov.bt.mas.primary.dto.response.ApplicationListResponse;
 import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
 import com.mas.gov.bt.mas.primary.services.MiningLeaseService;
+import com.mas.gov.bt.mas.primary.utility.PageRequest1Based;
 import com.mas.gov.bt.mas.primary.utility.SuccessResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -12,12 +14,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * REST Controller for Mining Lease Application management.
@@ -60,6 +64,31 @@ public class MiningLeaseController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new SuccessResponse<>("Application created successfully", response));
     }
+
+    @GetMapping("/my-applications")
+    @Operation(summary = "Get my applications", description = "Get list of applications. Agency users get all applications, others get only their own.")
+    public ResponseEntity<SuccessResponse<List<ApplicationListResponse>>> getMyApplications(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection) {
+
+        Pageable pageable = PageRequest1Based.of(page, size,
+                Sort.Direction.fromString(sortDirection), sortBy);
+
+        Page<ApplicationListResponse> applications;
+        if (userContext.isAgencyUser()) {
+            // Agency users can see all applications
+            applications = miningLeaseService.getAllApplications(userContext.getCurrentUserId(), pageable);
+        } else {
+            // Regular users can only see their own applications
+            Long userId = userContext.getCurrentUserId();
+            applications = miningLeaseService.getMyApplications(userId, pageable);
+        }
+
+        return ResponseEntity.ok(SuccessResponse.fromPage("Applications retrieved successfully", applications));
+    }
+
 
 
 
