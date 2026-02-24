@@ -3,6 +3,7 @@ package com.mas.gov.bt.mas.primary.services;
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
 import com.mas.gov.bt.mas.primary.dto.request.MiningLeaseApplicationRequest;
 import com.mas.gov.bt.mas.primary.dto.request.MiningLeaseGRRequest;
+import com.mas.gov.bt.mas.primary.dto.response.ApplicationListResponse;
 import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
 import com.mas.gov.bt.mas.primary.entity.*;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
@@ -14,6 +15,8 @@ import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -354,5 +357,51 @@ public class MiningLeaseService {
         }
 
         return mapper.toResponse(miningLeaseApplication);
+    }
+
+    /**
+     * Get all applications (for Agency users).
+     */
+    @Transactional(readOnly = true)
+    public Page<ApplicationListResponse> getAllApplications(
+            Long currentUserId,
+            Pageable pageable) {
+
+        Page<MiningLeaseApplication> applications =
+                miningLeaseApplicationRepository.findApplicationsAssignedToUser(currentUserId, pageable);
+
+        return applications.map(mapper::toListResponse);
+    }
+
+    /**
+     * Get applications for an applicant.
+     */
+    @Transactional(readOnly = true)
+    public Page<ApplicationListResponse> getMyApplications(Long userId, Pageable pageable) {
+        List<String> ApplicationStatus = List.of(
+                "GR SUBMITTED",
+                "ASSIGNED",
+                "DRAFT",
+                "PAYMENT PENDING",
+                "GEOLOGIST_REVIEW",
+                "ACCEPTED PFS",
+                "ADDITIONAL DATA NEEDED",
+                "MA SUBMITTED",
+                "PA/FC SUBMITTED",
+                "APPROVED GR",
+                "NOTE SHEET UPLOADED",
+                "GR SUBMITTED",
+                "FMFS SUBMITTED",
+                "MLA SUBMITTED",
+                "APPROVED BY DIRECTOR",
+                "BG SUBMITTED",
+                "RESUBMIT PFS",
+                "RESUBMITTED PFS",
+                "RESUBMIT GR",
+                "RESUBMITTED GR",
+                "RESUBMIT FMFS",
+                "PAID");
+        Page<MiningLeaseApplication> applications = miningLeaseApplicationRepository.findByApplicantUserIdAndStatusIn(userId,ApplicationStatus, pageable);
+        return applications.map(mapper::toListResponse);
     }
 }
