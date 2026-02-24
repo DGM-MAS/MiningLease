@@ -2,11 +2,14 @@ package com.mas.gov.bt.mas.primary.repository;
 
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
 import com.mas.gov.bt.mas.primary.entity.MiningLeaseApplication;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -48,4 +51,15 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     LIMIT 1
     """, nativeQuery = true)
     UserWorkloadProjection findDirectorQuarrying();
+
+    @Query("""
+    SELECT a FROM MiningLeaseApplication a
+    JOIN TaskManagement t
+      ON a.applicationNumber = t.applicationNumber
+    WHERE t.assignedToUserId = :userId
+""")
+    Page<MiningLeaseApplication> findApplicationsAssignedToUser(Long currentUserId, Pageable pageable);
+
+    @Query("SELECT a FROM MiningLeaseApplication a WHERE a.applicantUserId = :userId AND a.currentStatus IN :statuses")
+    Page<MiningLeaseApplication> findByApplicantUserIdAndStatusIn(Long userId, List<String> applicationStatus, Pageable pageable);
 }
