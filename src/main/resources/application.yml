@@ -103,13 +103,6 @@ spring:
       use-key-prefix: true
       key-prefix: "mas::"
 
-  jwt:
-    secret: WFdz6u8hOXJD0ihDuRaZ+2dfkpWiDSlodyi78lBRJKpQwnMTwJCNiVCk2RW7mSzgeJdEHFsowE2CeutQvot9NQ==
-#    access-token-expiration: 1800000  # 30 minutes for access token
-    access-token-expiration: 86400000  # 1 day for access token
-    refresh-token-expiration: 604800000  # 7 days for refresh token
-    expiration: 432000000  # Keeping for backward compatibility
-
 # BIRMS MOENR Service Configuration (Ministry of Energy and Natural Resources)
 birms:
   login:
