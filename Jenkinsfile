@@ -43,7 +43,6 @@ pipeline {
                 script {
                     docker.withRegistry('', DOCKER_CREDENTIALS_ID) {
                         dockerImage.push("${IMAGE_TAG}")
-                        dockerImage.push("latest")
                     }
                 }
             }
@@ -56,7 +55,7 @@ pipeline {
                         sh """
                             echo "Updating image in Kubernetes..."
                             kubectl set image deployment/${DEPLOYMENT_NAME} \
-                              ${CONTAINER_NAME}=${SPRINGBOOT_IMAGE}:latest \
+                              ${CONTAINER_NAME}=${SPRINGBOOT_IMAGE}:"${IMAGE_TAG}" \
                               -n ${NAMESPACE}
 
                             echo "Waiting for rollout to complete..."
