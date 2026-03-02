@@ -1,63 +1,127 @@
 package com.mas.gov.bt.mas.primary.config;
 
+
 import com.mas.gov.bt.mas.primary.exception.UnauthorizedOperationException;
-import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
- * Utility component to extract user information from request headers
- * set by the master service after JWT validation.
- *
- * Expected headers:
- *   X-User-Id      — numeric user ID
- *   X-User-Name    — username / subject
- *   X-User-Email   — email address
- *   X-User-Type    — user type (e.g. "Agency")
+ * Utility component to extract user information from the JWT token
+ * in the current security context.
  */
 @Component
 public class UserContext {
 
+    /**
+     * Get the current authenticated user's ID from the JWT token.
+     * Looks for 'userId' claim.
+     *
+     * @return the user ID
+     * @throws UnauthorizedOperationException if user is not authenticated
+     */
     public Long getCurrentUserId() {
-        String value = getHeader("X-User-Id");
-        if (value == null) {
-            throw new UnauthorizedOperationException("X-User-Id header missing");
+        Jwt jwt = getJwt();
+
+        // Get 'userId' claim from token
+        Object userId = jwt.getClaim("userId");
+        if (userId != null) {
+            return convertToLong(userId);
         }
-        try {
-            return Long.parseLong(value);
-        } catch (NumberFormatException e) {
-            throw new UnauthorizedOperationException("Invalid X-User-Id header value");
-        }
+
+        throw new UnauthorizedOperationException("User ID not found in token");
     }
 
+    /**
+     * Get the current authenticated user's username from the JWT token.
+     * The username is stored in the 'sub' (subject) claim.
+     *
+     * @return the username
+     * @throws UnauthorizedOperationException if user is not authenticated
+     */
     public String getCurrentUsername() {
-        String value = getHeader("X-User-Name");
-        if (value == null) {
-            throw new UnauthorizedOperationException("X-User-Name header missing");
-        }
-        return value;
+        Jwt jwt = getJwt();
+        return jwt.getSubject();
     }
 
+    /**
+     * Get the current authenticated user's email from the JWT token.
+     *
+     * @return the email, or null if not present
+     */
     public String getCurrentUserEmail() {
-        return getHeader("X-User-Email");
+        Jwt jwt = getJwt();
+        return jwt.getClaim("email");
     }
 
+    /**
+     * Get the current authenticated user's type from the JWT token.
+     *
+     * @return the user type, or null if not present
+     */
     public String getCurrentUserType() {
-        return getHeader("X-User-Type");
+        Jwt jwt = getJwt();
+        return jwt.getClaim("userType");
     }
 
+    /**
+     * Check if the current user is an Agency user.
+     *
+     * @return true if userType is "Agency", false otherwise
+     */
     public boolean isAgencyUser() {
-        return "Agency".equalsIgnoreCase(getCurrentUserType());
+        String userType = getCurrentUserType();
+        return "Agency".equalsIgnoreCase(userType);
     }
 
-    private String getHeader(String name) {
-        ServletRequestAttributes attrs =
-                (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-        if (attrs == null) {
-            throw new UnauthorizedOperationException("No request context available");
+    /**
+     * Get a specific claim from the JWT token.
+     *
+     * @param claimName the name of the claim
+     * @param <T> the type of the claim value
+     * @return the claim value, or null if not present
+     */
+    public <T> T getClaim(String claimName) {
+        Jwt jwt = getJwt();
+        return jwt.getClaim(claimName);
+    }
+
+    /**
+     * Get the raw JWT token.
+     *
+     * @return the JWT
+     * @throws UnauthorizedOperationException if user is not authenticated
+     */
+    public Jwt getJwt() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new UnauthorizedOperationException("User not authenticated");
         }
-        HttpServletRequest request = attrs.getRequest();
-        return request.getHeader(name);
+
+        Object principal = auth.getPrincipal();
+        if (principal instanceof Jwt jwt) {
+            return jwt;
+        }
+
+        throw new UnauthorizedOperationException("Invalid authentication type");
+    }
+
+    private Long convertToLong(Object value) {
+        if (value instanceof Long l) {
+            return l;
+        }
+        if (value instanceof Integer i) {
+            return i.longValue();
+        }
+        if (value instanceof String s) {
+            try {
+                return Long.parseLong(s);
+            } catch (NumberFormatException e) {
+                throw new UnauthorizedOperationException("Invalid user ID format in token");
+            }
+        }
+        throw new UnauthorizedOperationException("Cannot convert user ID from token");
     }
 }
