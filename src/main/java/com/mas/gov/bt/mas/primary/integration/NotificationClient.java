@@ -36,7 +36,7 @@ public class NotificationClient {
 
     private static final Logger logger = LoggerFactory.getLogger(NotificationClient.class);
 
-    private static final String NOTIFICATION_API_URL =  "http://localhost:8081/api/notifications";
+    private static final String NOTIFICATION_API_URL =  "http://localhost:8082/api/notifications";
     private final RestTemplate restTemplate;
 
     public NotificationClient(JavaMailSender mailSender, RestTemplate restTemplate) {
