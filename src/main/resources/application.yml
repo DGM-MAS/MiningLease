@@ -157,6 +157,10 @@ springdoc:
   packages-to-scan: com.mas.gov.bt.mas.primary.controller
   paths-to-match: /api/**
 
+# JWT Configuration (HS512 symmetric key) - must match auth server
+jwt:
+  secret: WFdz6u8hOXJD0ihDuRaZ+2dfkpWiDSlodyi78lBRJKpQwnMTwJCNiVCk2RW7mSzgeJdEHFsowE2CeutQvot9NQ==
+
 # Eureka Client
 #eureka:
 #  client:
