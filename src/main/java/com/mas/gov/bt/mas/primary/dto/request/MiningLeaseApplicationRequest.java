@@ -8,7 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Request DTO for creating/updating a Quarry Lease Application.
+ * Request DTO for creating/updating a Mining Lease Application.
  */
 @Data
 @NoArgsConstructor
