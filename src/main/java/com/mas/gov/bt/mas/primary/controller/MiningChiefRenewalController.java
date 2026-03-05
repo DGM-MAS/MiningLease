@@ -1,9 +1,9 @@
 package com.mas.gov.bt.mas.primary.controller;
 
-
 import com.mas.gov.bt.mas.primary.config.UserContext;
-import com.mas.gov.bt.mas.primary.dto.request.ReviewMiningLeaseApplicationGeologist;
+import com.mas.gov.bt.mas.primary.dto.request.ReviewMiningLeaseApplicationChief;
 import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
+import com.mas.gov.bt.mas.primary.services.MiningLeaseRenewalService;
 import com.mas.gov.bt.mas.primary.services.MiningLeaseService;
 import com.mas.gov.bt.mas.primary.utility.SuccessResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,38 +19,38 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@RestController
+@RequestMapping("/api/mining-lease-renewal/mining-chief")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Mining Lease - Geologist", description = "Geologist Review APIs")
+@Tag(name = "Mining Lease renewal - Mining Chief", description = "Mining Chief renewal Review APIs")
 @SecurityRequirement(name = "bearerAuth")
-@RestController
-@RequestMapping("/api/mining-lease/geologist")
-public class GeologistController {
+public class MiningChiefRenewalController {
 
-    private final MiningLeaseService miningLeaseService;
+    private final MiningLeaseRenewalService miningLeaseRenewalService;
     private final UserContext userContext;
 
     @PostMapping("/review")
-    @Operation(summary = "Review new application", description = "Review new mining lease application by MPCD")
-    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> createApplication(
-            @Valid @RequestBody ReviewMiningLeaseApplicationGeologist reviewQuarryLeaseApplicationGeologist) {
+    @Operation(summary = "Review application", description = "Review quarry lease application by Mining Chief")
+    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> reviewApplication(
+            @Valid @RequestBody ReviewMiningLeaseApplicationChief request) {
 
         Long userId = userContext.getCurrentUserId();
-        MiningLeaseResponse response = miningLeaseService.reviewApplicationGeologist(reviewQuarryLeaseApplicationGeologist, userId);
+        MiningLeaseResponse response = miningLeaseRenewalService.reviewApplicationChief(request, userId);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new SuccessResponse<>("Application reviewed successfully", response));
     }
 
-    // ** Dashboard information for RC application assigned to particular RC ** //
     @GetMapping("/assigned")
-    public ResponseEntity<SuccessResponse<List<MiningLeaseResponse>>> assignedToGeologist(
+    public ResponseEntity<SuccessResponse<List<MiningLeaseResponse>>> assignedToMiningChief(
             @RequestParam(required = false) String search,
             Pageable pageable) {
 
         Long userId = userContext.getCurrentUserId();
         return ResponseEntity.ok(
-                miningLeaseService.getAssignedToGeologist(userId, pageable, search)
+                miningLeaseRenewalService.getAssignedToMiningChief(userId, pageable, search)
         );
     }
+
 }
