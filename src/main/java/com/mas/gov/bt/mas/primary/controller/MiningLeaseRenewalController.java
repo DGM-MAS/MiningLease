@@ -2,6 +2,7 @@ package com.mas.gov.bt.mas.primary.controller;
 
 import com.mas.gov.bt.mas.primary.config.UserContext;
 import com.mas.gov.bt.mas.primary.dto.request.MiningLeaseApplicationRequest;
+import com.mas.gov.bt.mas.primary.dto.request.MiningLeaseFMFSRequest;
 import com.mas.gov.bt.mas.primary.dto.request.RenewalMiningLeaseRequest;
 import com.mas.gov.bt.mas.primary.dto.response.ApplicationListResponse;
 import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
@@ -67,6 +68,22 @@ public class MiningLeaseRenewalController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new SuccessResponse<>("Application created successfully", response));
     }
+
+
+    // Used by user to submit FMFS
+    @PostMapping("/applicationsFMFS")
+    @Operation(summary = "Submit FMFS file application", description = "Submit FMFS file for mining lease application")
+    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> submitFMFSFile(
+            @Valid @RequestBody MiningLeaseFMFSRequest request) {
+
+        Long userId = userContext.getCurrentUserId();
+        MiningLeaseResponse response = miningLeaseRenewalService.submitFMFS(request, userId);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new SuccessResponse<>("Application created successfully", response));
+    }
+
+
 
 
 }
