@@ -106,10 +106,16 @@ public class MiningLeaseRenewalApplication {
     private LocalDateTime meReviewedAt;
 
     @Column(name = "llc_mine_engineer_doc_id")
-    private Long llcMineEngineerDocId;
+    private String llcMineEngineerDocId;
 
     @Column(name = "notesheet_doc_id", length = 100)
     private String noteSheetDocId;
+
+    @Column(name = "work_order_doc_id")
+    private Long workOrderDocId;
+
+    @Column(name = "work_order_remarks")
+    private String workOrderRemarks;
 
     @Column(name = "mla_doc_id", length = 100)
     private String mlaDocId;
@@ -126,6 +132,26 @@ public class MiningLeaseRenewalApplication {
 
     @Column(name = "director_reviewed_at")
     private LocalDateTime directorReviewedAt;
+
+    // ========== GEOLOGIST FOCAL =============== //
+
+    @Column(name = "remarks_geologist")
+    private String remarksGeologist;
+
+    @Column(name = "geologist_reviewed_at")
+    private LocalDateTime geologistReviewedAt;
+
+    @Column(name = "geological_report_status", length = 30)
+    private String geologicalReportStatus;
+
+    // =========== MINING CHIEF ================== //
+
+    @Column(name = "remarks_chief", columnDefinition = "TEXT")
+    private String remarksChief;
+
+    @Column(name = "chief_reviewed_at")
+    private LocalDateTime chiefReviewedAt;
+
 
     // TASK status and application details
 
