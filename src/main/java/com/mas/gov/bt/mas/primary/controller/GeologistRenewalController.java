@@ -1,10 +1,9 @@
 package com.mas.gov.bt.mas.primary.controller;
 
-
 import com.mas.gov.bt.mas.primary.config.UserContext;
 import com.mas.gov.bt.mas.primary.dto.request.ReviewMiningLeaseApplicationGeologist;
 import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
-import com.mas.gov.bt.mas.primary.services.MiningLeaseService;
+import com.mas.gov.bt.mas.primary.services.MiningLeaseRenewalService;
 import com.mas.gov.bt.mas.primary.utility.SuccessResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -24,10 +23,10 @@ import java.util.List;
 @Tag(name = "Mining Lease - Geologist", description = "Geologist Review APIs")
 @SecurityRequirement(name = "bearerAuth")
 @RestController
-@RequestMapping("/api/mining-lease/geologist")
-public class GeologistController {
+@RequestMapping("/api/mining-lease-renewal/geologist")
+public class GeologistRenewalController {
 
-    private final MiningLeaseService miningLeaseService;
+    private final MiningLeaseRenewalService miningLeaseRenewalService;
     private final UserContext userContext;
 
     @PostMapping("/review")
@@ -36,13 +35,13 @@ public class GeologistController {
             @Valid @RequestBody ReviewMiningLeaseApplicationGeologist reviewQuarryLeaseApplicationGeologist) {
 
         Long userId = userContext.getCurrentUserId();
-        MiningLeaseResponse response = miningLeaseService.reviewApplicationGeologist(reviewQuarryLeaseApplicationGeologist, userId);
+        MiningLeaseResponse response = miningLeaseRenewalService.reviewApplicationGeologist(reviewQuarryLeaseApplicationGeologist, userId);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new SuccessResponse<>("Application reviewed successfully", response));
     }
 
-    // ** Dashboard information for RC application assigned to particular RC ** //
+    // ** Dashboard information for geologist application assigned to particular geologist ** //
     @GetMapping("/assigned")
     public ResponseEntity<SuccessResponse<List<MiningLeaseResponse>>> assignedToGeologist(
             @RequestParam(required = false) String search,
@@ -50,7 +49,7 @@ public class GeologistController {
 
         Long userId = userContext.getCurrentUserId();
         return ResponseEntity.ok(
-                miningLeaseService.getAssignedToGeologist(userId, pageable, search)
+                miningLeaseRenewalService.getAssignedToGeologist(userId, pageable, search)
         );
     }
 }
