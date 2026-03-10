@@ -328,7 +328,9 @@ public class MiningLeaseService {
         // ======== SAVE MINING LEASE GR SUBMITTED BY APPLICANT ====== //
         MiningLeaseApplication miningLeaseApplication = new MiningLeaseApplication();
 
+        miningLeaseApplication.setExpPermitNo(request.getExpPermitNo());
         miningLeaseApplication.setFileUploadIdGr(request.getGRDocId());
+        miningLeaseApplication.setFileUploadIdKmz(request.getKmzDocId());
         miningLeaseApplication.setApplicationType(request.getApplicationType());
         miningLeaseApplication.setApplicationNumber(generateApplicationNumber());
         miningLeaseApplication.setApplicantCid(request.getApplicantCid());
@@ -416,6 +418,7 @@ public class MiningLeaseService {
                 "RESUBMIT GR",
                 "RESUBMITTED GR",
                 "RESUBMIT FMFS",
+                "MPCD ASSIGNED",
                 "RESUBMITTED FMFS");
         Page<MiningLeaseApplication> applications = miningLeaseApplicationRepository.findByApplicantUserIdAndStatusIn(userId,ApplicationStatus, pageable);
         return applications.map(mapper::toListResponse);
