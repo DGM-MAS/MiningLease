@@ -3,6 +3,7 @@ package com.mas.gov.bt.mas.primary.controller;
 import com.mas.gov.bt.mas.primary.config.UserContext;
 import com.mas.gov.bt.mas.primary.dto.request.*;
 import com.mas.gov.bt.mas.primary.dto.response.ApplicationListResponse;
+import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseRenewalApplicationResponse;
 import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
 import com.mas.gov.bt.mas.primary.services.MiningLeaseRenewalService;
 import com.mas.gov.bt.mas.primary.utility.PageRequest1Based;
@@ -133,6 +134,15 @@ public class MiningLeaseRenewalController {
 
         Long userId = userContext.getCurrentUserId();
         return ResponseEntity.ok(miningLeaseRenewalService.getMyApplications(userId, pageable, search));
+    }
+
+    @GetMapping("/{applicationNumber}")
+    @Operation(summary = "Get renewal application by application number", description = "Returns all fields of the renewal application")
+    public ResponseEntity<SuccessResponse<MiningLeaseRenewalApplicationResponse>> getByApplicationNumber(
+            @PathVariable String applicationNumber) {
+
+        MiningLeaseRenewalApplicationResponse response = miningLeaseRenewalService.getByApplicationNumber(applicationNumber);
+        return ResponseEntity.ok(new SuccessResponse<>("Application retrieved successfully", response));
     }
 
     @GetMapping("/all")
