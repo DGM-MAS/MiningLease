@@ -11,7 +11,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "t_mine_restoration_application")
+@Table(name = "t_mine_restoration_application", schema = "mas_db")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
