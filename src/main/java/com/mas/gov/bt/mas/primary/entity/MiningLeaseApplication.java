@@ -23,6 +23,9 @@ public class MiningLeaseApplication {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "permit_number")
+    private String expPermitNo;
+
     @Column(name = "application_number", unique = true, nullable = false, length = 30)
     private String applicationNumber;
 
@@ -128,6 +131,9 @@ public class MiningLeaseApplication {
     // =========== Client file uplaod =========== //
     @Column(name = "file_upload_id_gr")
     private Long fileUploadIdGr;
+
+    @Column(name = "file_upload_id_kmz")
+    private Long fileUploadIdKmz;
 
     @Column(name = "file_upload_id_pa")
     private String fileUploadIdPA;
