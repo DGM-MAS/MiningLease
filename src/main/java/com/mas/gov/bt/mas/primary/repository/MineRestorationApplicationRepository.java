@@ -66,7 +66,7 @@ public interface MineRestorationApplicationRepository extends JpaRepository<Mine
             COUNT(r.id) AS workload
         FROM mas_db.users u
         JOIN mas_db.user_roles ur ON u.id = ur.user_id
-        LEFT JOIN t_mine_restoration_application r
+        LEFT JOIN mas_db.t_mine_restoration_application r
             ON r.assigned_me_user_id = u.id
             AND r.current_status NOT IN ('ERB_RELEASED', 'ERB_UTILIZED', 'MRP_REJECTED')
         WHERE ur.role_id = 21
