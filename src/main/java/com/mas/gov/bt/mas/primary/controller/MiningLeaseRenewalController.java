@@ -1,10 +1,9 @@
 package com.mas.gov.bt.mas.primary.controller;
 
 import com.mas.gov.bt.mas.primary.config.UserContext;
-import com.mas.gov.bt.mas.primary.dto.request.MiningLeaseApplicationRequest;
-import com.mas.gov.bt.mas.primary.dto.request.MiningLeaseFMFSRequest;
-import com.mas.gov.bt.mas.primary.dto.request.RenewalMiningLeaseRequest;
+import com.mas.gov.bt.mas.primary.dto.request.*;
 import com.mas.gov.bt.mas.primary.dto.response.ApplicationListResponse;
+import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseRenewalApplicationResponse;
 import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
 import com.mas.gov.bt.mas.primary.services.MiningLeaseRenewalService;
 import com.mas.gov.bt.mas.primary.utility.PageRequest1Based;
@@ -42,7 +41,7 @@ public class MiningLeaseRenewalController {
     public ResponseEntity<SuccessResponse<List<ApplicationListResponse>>> getApplicationByNumber(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "createdOn") String sortBy,
             @RequestParam(defaultValue = "DESC") String sortDirection
     ) {
         Pageable pageable = PageRequest1Based.of(page, size,
@@ -83,7 +82,75 @@ public class MiningLeaseRenewalController {
                 .body(new SuccessResponse<>("Application created successfully", response));
     }
 
+    @PostMapping("/draft")
+    @Operation(summary = "Save renewal application as draft", description = "Save renewal mining lease application as draft")
+    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> saveDraft(
+            @Valid @RequestBody RenewalMiningLeaseRequest request) {
 
+        Long userId = userContext.getCurrentUserId();
+        MiningLeaseResponse response = miningLeaseRenewalService.saveDraft(request, userId);
 
+        return ResponseEntity.ok(new SuccessResponse<>("Draft saved successfully", response));
+    }
 
+    @PostMapping("/resubmit")
+    @Operation(summary = "Resubmit renewal application", description = "Resubmit renewal application after ME sends it back for revision")
+    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> resubmitApplication(
+            @Valid @RequestBody RenewalApplicationResubmitRequest request) {
+
+        Long userId = userContext.getCurrentUserId();
+        MiningLeaseResponse response = miningLeaseRenewalService.resubmitApplication(request, userId);
+
+        return ResponseEntity.ok(new SuccessResponse<>("Application resubmitted successfully", response));
+    }
+
+    @PostMapping("/resubmitFMFS")
+    @Operation(summary = "Resubmit FMFS", description = "Resubmit FMFS after ME sends it back for revision")
+    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> resubmitFMFS(
+            @Valid @RequestBody MiningLeaseFMFSRequest request) {
+
+        Long userId = userContext.getCurrentUserId();
+        MiningLeaseResponse response = miningLeaseRenewalService.resubmitFMFS(request, userId);
+
+        return ResponseEntity.ok(new SuccessResponse<>("FMFS resubmitted successfully", response));
+    }
+
+    @PostMapping("/signMLA")
+    @Operation(summary = "Applicant sign MLA", description = "Applicant digitally signs the Mining Lease Agreement")
+    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> signMLA(
+            @Valid @RequestBody MiningLeaseMLARequest request) {
+
+        Long userId = userContext.getCurrentUserId();
+        MiningLeaseResponse response = miningLeaseRenewalService.applicantSignMLA(request, userId);
+
+        return ResponseEntity.ok(new SuccessResponse<>("MLA signed successfully", response));
+    }
+
+    @GetMapping("/my-applications")
+    @Operation(summary = "Get my renewal applications", description = "Get paginated list of applicant's own renewal applications")
+    public ResponseEntity<SuccessResponse<List<MiningLeaseResponse>>> getMyApplications(
+            @RequestParam(required = false) String search,
+            Pageable pageable) {
+
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(miningLeaseRenewalService.getMyApplications(userId, pageable, search));
+    }
+
+    @GetMapping("/{applicationNumber}")
+    @Operation(summary = "Get renewal application by application number", description = "Returns all fields of the renewal application")
+    public ResponseEntity<SuccessResponse<MiningLeaseRenewalApplicationResponse>> getByApplicationNumber(
+            @PathVariable String applicationNumber) {
+
+        MiningLeaseRenewalApplicationResponse response = miningLeaseRenewalService.getByApplicationNumber(applicationNumber);
+        return ResponseEntity.ok(new SuccessResponse<>("Application retrieved successfully", response));
+    }
+
+    @GetMapping("/all")
+    @Operation(summary = "Get all renewal applications", description = "Get paginated list of all renewal applications (admin view)")
+    public ResponseEntity<SuccessResponse<List<MiningLeaseResponse>>> getAllApplications(
+            @RequestParam(required = false) String search,
+            Pageable pageable) {
+
+        return ResponseEntity.ok(miningLeaseRenewalService.getAllApplications(pageable, search));
+    }
 }

@@ -11,6 +11,8 @@ import lombok.Setter;
 public class MiningLeaseGRRequest {
     private String applicantType;
 
+    private String expPermitNo;
+
     private String applicationType;
 
     private String applicantCid;
@@ -31,4 +33,6 @@ public class MiningLeaseGRRequest {
     private String companyName;
 
     private Long gRDocId;
+
+    private Long KmzDocId;
 }
