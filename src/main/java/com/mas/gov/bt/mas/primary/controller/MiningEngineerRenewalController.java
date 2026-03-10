@@ -103,4 +103,22 @@ public class MiningEngineerRenewalController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new SuccessResponse<>("Application created successfully", response));
     }
+
+    @PostMapping("/notesheet")
+    @Operation(summary = "Upload signed notesheet", description = "Upload signed notesheet for mining lease renewal application")
+    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> uploadNoteSheet(
+            @Valid @RequestBody MiningLeaseNoteSheetRequest request) {
+
+        MiningLeaseResponse response = miningLeaseRenewalService.submitNoteSheet(request);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new SuccessResponse<>("Notesheet uploaded successfully", response));
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Get application by ID", description = "Get renewal application details by ID")
+    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> getApplicationById(@PathVariable Long id) {
+        return ResponseEntity.ok(new SuccessResponse<>("Application fetched successfully",
+                miningLeaseRenewalService.getApplicationById(id)));
+    }
 }

@@ -145,4 +145,8 @@ public class MiningLeaseResponse {
     private Long workOrderDocId;
 
     private String workOrderRemarks;
+
+    private String expPermitNo;
+
+    private Long fileUploadIdKmz;
 }
