@@ -136,4 +136,8 @@ public class ApplicationListResponse {
     private Long workOrderDocId;
 
     private String workOrderRemarks;
+
+    private String expPermitNo;
+
+    private Long fileUploadIdKmz;
 }
