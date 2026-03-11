@@ -103,4 +103,32 @@ public class MiningEngineerRenewalController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new SuccessResponse<>("Application created successfully", response));
     }
+
+    @PostMapping("/notesheet")
+    @Operation(summary = "Upload signed notesheet", description = "Upload signed notesheet for mining lease renewal application")
+    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> uploadNoteSheet(
+            @Valid @RequestBody MiningLeaseNoteSheetRequest request) {
+
+        MiningLeaseResponse response = miningLeaseRenewalService.submitNoteSheet(request);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new SuccessResponse<>("Notesheet uploaded successfully", response));
+    }
+
+    @PostMapping("/submitNotesheetMLA")
+    @Operation(summary = "ME submits notesheet and MLA", description = "Mining Engineer submits notesheet and MLA after Director approval. Sets status to PAYMENT PENDING if ERB regularization required, otherwise APPROVED BY DIRECTOR.")
+    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> submitNotesheetAndMLA(
+            @Valid @RequestBody RenewalNotesheetMlaRequest request) {
+
+        Long userId = userContext.getCurrentUserId();
+        MiningLeaseResponse response = miningLeaseRenewalService.submitNotesheetAndMLA(request, userId);
+        return ResponseEntity.ok(new SuccessResponse<>("Submitted successfully", response));
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Get application by ID", description = "Get renewal application details by ID")
+    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> getApplicationById(@PathVariable Long id) {
+        return ResponseEntity.ok(new SuccessResponse<>("Application fetched successfully",
+                miningLeaseRenewalService.getApplicationById(id)));
+    }
 }

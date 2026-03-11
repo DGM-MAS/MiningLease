@@ -2,6 +2,7 @@ package com.mas.gov.bt.mas.primary.mapper;
 
 import com.mas.gov.bt.mas.primary.dto.request.MiningLeaseApplicationRequest;
 import com.mas.gov.bt.mas.primary.dto.response.ApplicationListResponse;
+import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseRenewalApplicationResponse;
 import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
 import com.mas.gov.bt.mas.primary.entity.MiningLeaseApplication;
 import com.mas.gov.bt.mas.primary.entity.MiningLeaseRenewalApplication;
@@ -62,5 +63,15 @@ public interface MiningLeaseMapper {
     @Mapping(target = "gewogId", source = "gewog.gewogId")
     @Mapping(target = "nearestVillage", source = "nearestVillage.villageName")
     @Mapping(target = "nearestVillageId", source = "nearestVillage.villageSerialNo")
+    @Mapping(target = "notesheetDocId", source = "noteSheetDocId")
     MiningLeaseResponse toRenewalResponse(MiningLeaseRenewalApplication miningLeaseRenewalApplication);
+
+    @Mapping(target = "dzongkhag", source = "dzongkhag.dzongkhagName")
+    @Mapping(target = "dzongkhagId", source = "dzongkhag.id")
+    @Mapping(target = "gewog", source = "gewog.gewogName")
+    @Mapping(target = "gewogId", source = "gewog.gewogId")
+    @Mapping(target = "nearestVillage", source = "nearestVillage.villageName")
+    @Mapping(target = "nearestVillageId", source = "nearestVillage.villageSerialNo")
+    @Mapping(target = "depositAssessmentReportId", source = "depositAssessmentReportId")
+    MiningLeaseRenewalApplicationResponse toRenewalApplicationResponse(MiningLeaseRenewalApplication app);
 }

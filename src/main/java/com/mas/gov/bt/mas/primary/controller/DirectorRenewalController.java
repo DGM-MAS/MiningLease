@@ -41,7 +41,7 @@ public class DirectorRenewalController {
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "createdOn") String sortBy,
             @RequestParam(defaultValue = "DESC") String sortDirection) {
 
         Pageable pageable = PageRequest1Based.of(page, size,
@@ -73,5 +73,12 @@ public class DirectorRenewalController {
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new SuccessResponse<>("Application reviewed successfully", response));
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Get application by ID", description = "Get renewal application details by ID")
+    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> getApplicationById(@PathVariable Long id) {
+        return ResponseEntity.ok(new SuccessResponse<>("Application fetched successfully",
+                miningLeaseRenewalService.getApplicationById(id)));
     }
 }
