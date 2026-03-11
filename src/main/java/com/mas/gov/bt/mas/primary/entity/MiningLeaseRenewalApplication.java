@@ -155,6 +155,12 @@ public class MiningLeaseRenewalApplication {
 
     // TASK status and application details
 
+    @Column(name = "erb_regularization_required")
+    private Boolean erbRegularizationRequired;
+
+    @Column(name = "payable_amount", precision = 19, scale = 2)
+    private java.math.BigDecimal payableAmount;
+
     @Column(name = "current_status", length = 30)
     private String currentStatus;
 
