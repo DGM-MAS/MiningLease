@@ -77,6 +77,16 @@ public interface MineRestorationApplicationRepository extends JpaRepository<Mine
     """, nativeQuery = true)
     UserWorkloadProjection findMEWithLeastWorkload();
 
+    // All applications for Director (full oversight)
+    @Query("""
+        SELECT r FROM MineRestorationApplication r
+        WHERE LOWER(r.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
+        OR LOWER(r.applicantName) LIKE LOWER(CONCAT('%', :search, '%'))
+    """)
+    Page<MineRestorationApplication> findAllWithSearch(
+            @Param("search") String search,
+            Pageable pageable);
+
     // Sequence generation
     @Query("""
         SELECT MAX(

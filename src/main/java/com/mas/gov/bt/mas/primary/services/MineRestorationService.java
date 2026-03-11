@@ -518,6 +518,22 @@ public class MineRestorationService {
     }
 
     // =====================================================
+    // DIRECTOR — Queries
+    // =====================================================
+
+    public SuccessResponse<List<MineRestorationResponse>> getAllApplicationsForDirector(
+            String search, Pageable pageable) {
+        Page<MineRestorationApplication> page;
+        if (search != null && !search.isBlank()) {
+            page = restorationApplicationRepository.findAllWithSearch(search, pageable);
+        } else {
+            page = restorationApplicationRepository.findAll(pageable);
+        }
+        return SuccessResponse.fromPage("Applications retrieved successfully",
+                page.map(this::toResponse));
+    }
+
+    // =====================================================
     // RC/MI — Verification Report
     // =====================================================
 
