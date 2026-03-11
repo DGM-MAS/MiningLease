@@ -87,6 +87,20 @@ public interface MineRestorationApplicationRepository extends JpaRepository<Mine
             @Param("search") String search,
             Pageable pageable);
 
+    // Lookup user details by ID (for Director assign notification)
+    @Query(value = """
+        SELECT
+            u.id AS userId,
+            u.email AS email,
+            u.username AS userName
+        FROM mas_db.users u
+        WHERE u.id = :userId
+          AND u.account_status = 'ACTIVE'
+        GROUP BY u.id, u.email, u.username
+        LIMIT 1
+    """, nativeQuery = true)
+    UserWorkloadProjection findUserDetailsById(@Param("userId") Long userId);
+
     // Sequence generation
     @Query("""
         SELECT MAX(
