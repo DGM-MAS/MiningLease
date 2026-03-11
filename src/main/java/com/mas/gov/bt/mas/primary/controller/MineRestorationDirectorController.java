@@ -1,6 +1,7 @@
 package com.mas.gov.bt.mas.primary.controller;
 
 import com.mas.gov.bt.mas.primary.config.UserContext;
+import com.mas.gov.bt.mas.primary.dto.request.RestorationTaskAssignDirector;
 import com.mas.gov.bt.mas.primary.dto.request.ReviewMineRestorationCompletionRequest;
 import com.mas.gov.bt.mas.primary.dto.response.MineRestorationCompletionReportResponse;
 import com.mas.gov.bt.mas.primary.dto.response.MineRestorationResponse;
@@ -15,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -45,6 +47,16 @@ public class MineRestorationDirectorController {
                 Sort.Direction.fromString(sortDirection), sortBy);
 
         return ResponseEntity.ok(mineRestorationService.getAllApplicationsForDirector(search, pageable));
+    }
+
+    @PostMapping("/assignTask")
+    @Operation(summary = "Assign application", description = "Assign mine restoration application to a Mining Engineer")
+    public ResponseEntity<SuccessResponse<MineRestorationResponse>> assignApplication(
+            @Valid @RequestBody RestorationTaskAssignDirector request) {
+        Long userId = userContext.getCurrentUserId();
+        MineRestorationResponse response = mineRestorationService.assignApplicationDirector(request, userId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new SuccessResponse<>("Application assigned successfully", response));
     }
 
     @GetMapping("/applications/{id}")
