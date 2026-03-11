@@ -1095,6 +1095,33 @@ public class MiningLeaseRenewalService {
         return mapper.toRenewalResponse(miningLeaseRenewalApplication);
     }
 
+    public SuccessResponse<List<MiningLeaseResponse>> getAssignedToMiningChief(Long userId, Pageable pageable, String search) {
+        Page<MiningLeaseRenewalApplication> page;
+
+        if (search == null || search.isBlank()) {
+
+            page = miningLeaseRenewalApplicationRepository
+                    .findAssignedToUserMPCD(userId, pageable);
+
+        } else {
+
+            page = miningLeaseRenewalApplicationRepository
+                    .findAssignedToUserAndSearchMPCD(
+                            userId,
+                            search.trim(),
+                            pageable
+                    );
+        }
+
+        Page<MiningLeaseResponse> responsePage =
+                page.map(mapper::toRenewalResponse);
+
+        return SuccessResponse.fromPage(
+                "Assigned applications fetched successfully",
+                responsePage
+        );
+    }
+
 //    @Transactional
 //    public MiningLeaseResponse submitNoteSheetAndAdditionalDetails(@Valid MiningLeaseNoteSheetRequest request) {
 //        MiningLeaseRenewalApplication miningLeaseRenewalApplication = null;
