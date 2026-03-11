@@ -53,4 +53,10 @@ public class MiningChiefRenewalController {
         );
     }
 
+    @GetMapping("/{id}")
+    @Operation(summary = "Get application by ID", description = "Get renewal application details by ID")
+    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> getApplicationById(@PathVariable Long id) {
+        return ResponseEntity.ok(new SuccessResponse<>("Application fetched successfully",
+                miningLeaseRenewalService.getApplicationById(id)));
+    }
 }
