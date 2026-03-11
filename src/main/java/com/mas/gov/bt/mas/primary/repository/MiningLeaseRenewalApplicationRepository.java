@@ -77,7 +77,45 @@ public interface MiningLeaseRenewalApplicationRepository extends JpaRepository<M
 """)
     Page<MiningLeaseRenewalApplication> findAssignedToUserAndSearchGeologist(Long userId, String search, Pageable pageable);
 
+    @Query("""
+    SELECT q
+    FROM MiningLeaseRenewalApplication q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE t.assignedToUserId = :userId
+    AND t.taskStatus IN ('MINING_CHIEF', 'MINING_CHIEF_REVIEW')
+""")
+    Page<MiningLeaseRenewalApplication> findAssignedToUserMiningChief(Long userId, Pageable pageable);
+
+    @Query("""
+    SELECT q
+    FROM MiningLeaseRenewalApplication q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE t.assignedToUserId = :userId
+    AND t.taskStatus IN ('MINING_CHIEF', 'MINING_CHIEF_REVIEW')
+    AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
+""")
+    Page<MiningLeaseRenewalApplication> findAssignedToUserAndSearchMiningChief(Long userId, String search, Pageable pageable);
+
     Optional<MiningLeaseRenewalApplication> findByApplicationNumber(String applicationNo);
+
+    // Applicant's own renewal applications
+    Page<MiningLeaseRenewalApplication> findByCreatedBy(Long createdBy, Pageable pageable);
+
+    @Query("""
+    SELECT q FROM MiningLeaseRenewalApplication q
+    WHERE q.createdBy = :createdBy
+    AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
+""")
+    Page<MiningLeaseRenewalApplication> findByCreatedByAndSearch(Long createdBy, String search, Pageable pageable);
+
+    // All renewal applications (admin view)
+    @Query("""
+    SELECT q FROM MiningLeaseRenewalApplication q
+    WHERE LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
+""")
+    Page<MiningLeaseRenewalApplication> findAllBySearch(String search, Pageable pageable);
 
     @Query(value = """
     SELECT 
