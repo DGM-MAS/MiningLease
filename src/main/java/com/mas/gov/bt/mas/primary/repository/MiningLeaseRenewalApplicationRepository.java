@@ -91,4 +91,32 @@ public interface MiningLeaseRenewalApplicationRepository extends JpaRepository<M
     LIMIT 1
     """, nativeQuery = true)
     UserWorkloadProjection findUserDetailsME(Long mineEngineerFocalId);
+
+    @Query("""
+    SELECT q
+    FROM MiningLeaseRenewalApplication q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE t.assignedToUserId = :userId
+    AND t.taskStatus IN ('PENDING', 'ASSIGNED', 'APPROVED', 'ACCEPTED PFS', 'MINING_CHIEF_REVIEW')
+""")
+    Page<MiningLeaseRenewalApplication> findAssignedToUserMPCD(
+            Long userId,
+            Pageable pageable
+    );
+
+    @Query("""
+    SELECT q
+    FROM MiningLeaseRenewalApplication q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE t.assignedToUserId = :userId
+    AND t.taskStatus IN ("PENDING", "ASSIGNED", "APPROVED", "ACCEPTED PFS", 'MINING_CHIEF_REVIEW')
+    AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
+""")
+    Page<MiningLeaseRenewalApplication> findAssignedToUserAndSearchMPCD(
+            Long userId,
+            String search,
+            Pageable pageable
+    );
 }
