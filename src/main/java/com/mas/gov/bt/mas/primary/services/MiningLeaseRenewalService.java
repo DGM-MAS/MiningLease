@@ -327,7 +327,7 @@ public class MiningLeaseRenewalService {
                         String ecStatus = application.getECStatus();
                         Date ecExpiryDate = application.getECExpiryDate();
 
-                        if (ecStatus != null && ecStatus.equalsIgnoreCase("VALID") && ecExpiryDate != null) {
+                        if (ecStatus != null && (ecStatus.equalsIgnoreCase("VALID") || ecStatus.equalsIgnoreCase("Active")) && ecExpiryDate != null) {
 
                             // Convert Date → LocalDate
                             LocalDate expiryDate = ecExpiryDate.toInstant()
@@ -377,35 +377,63 @@ public class MiningLeaseRenewalService {
                 }
                 case "Approved" -> {
                     LocalDateTime now = LocalDateTime.now();
-                    app.setCurrentStatus("APPROVED BY DIRECTOR");
                     app.setRemarksDirector(request.getRemarks());
                     app.setMlaSignedAt(now);
                     app.setMlaStatus("SIGNED");
                     app.setDirectorReviewedAt(now);
                     app.setApprovedAt(now);
 
-                    if (master != null) {
-                        master.setCurrentStatus("APPROVED BY DIRECTOR");
-                        master.setApprovedAt(now);
-                        master.setCompletedAt(now);
-                        applicationMasterRepository.save(master);
-                    }
+                    Boolean erbRequired = app.getErbRegularizationRequired();
 
-                    if (app.getApplicantEmail() != null) {
-                        notificationClient.sendApprovalNotification(
-                                app.getApplicantEmail(),
-                                app.getApplicantName(),
-                                app.getApplicationNumber());
-                    }
+                    if (Boolean.TRUE.equals(erbRequired)) {
+                        app.setCurrentStatus("PAYMENT PENDING");
+                        if (master != null) {
+                            master.setCurrentStatus("PAYMENT PENDING");
+                            applicationMasterRepository.save(master);
+                        }
 
-                    if (app.getApplicantEmail() != null) {
-                        notificationClient.sendMLASigningNotification(
-                                app.getApplicantEmail(),
-                                app.getApplicantName(),
-                                app.getApplicationNumber());
+                        if (app.getApplicantEmail() != null) {
+                            notificationClient.sendStatusUpdateNotification(
+                                    app.getApplicantEmail(),
+                                    app.getApplicantName(),
+                                    app.getApplicationNumber(),
+                                    "Payment Required",
+                                    "ERB regularization payment is required to proceed with your mining lease renewal.");
+                        }
+                    } else {
+                        app.setCurrentStatus("APPROVED BY DIRECTOR");
+                        if (master != null) {
+                            master.setCurrentStatus("APPROVED BY DIRECTOR");
+                            master.setApprovedAt(now);
+                            applicationMasterRepository.save(master);
+                        }
+
+                        // Notify ME to upload work order
+                        List<TaskManagement> meTasks = taskManagementRepository
+                                .findByApplicationNumberAndTaskStatusAndAssignedToRole(
+                                        app.getApplicationNumber(), "FMFS SUBMITTED", "MINE ENGINEER");
+                        Long meId = (meTasks != null && !meTasks.isEmpty()) ? meTasks.getFirst().getAssignedToUserId() : null;
+
+                        assert master != null;
+                        createTask(master, app, "MINE ENGINEER", userId, meId);
+
+                        if (meId != null) {
+                            UserWorkloadProjection me = miningLeaseRenewalApplicationRepository.findUserDetailsME(meId);
+                            if (me != null && me.getUserId() != null) {
+                                notificationClient.sendUserNotification(
+                                        "Director has given final approval.",
+                                        "Please upload the work order for application " + app.getApplicationNumber() + ".",
+                                        me.getUserId(), "85");
+                            }
+                        }
+
+                        if (app.getApplicantEmail() != null) {
+                            notificationClient.sendApprovalNotification(
+                                    app.getApplicantEmail(),
+                                    app.getApplicantName(),
+                                    app.getApplicationNumber());
+                        }
                     }
-                    assert master != null;
-                    createTask(master, app, "DIRECTOR", userId, userId);
                 }
                 case "Rejected" -> {
                     app.setCurrentStatus("REJECTED");
@@ -1159,10 +1187,10 @@ public class MiningLeaseRenewalService {
             if (miningLeaseRenewalApplication1.isPresent()) {
                 miningLeaseRenewalApplication = miningLeaseRenewalApplication1.get();
                 ApplicationMaster applicationMaster = miningLeaseRenewalApplication.getApplicationMaster();
-                applicationMaster.setCurrentStatus("MINING LEASE APPROVED");
+                applicationMaster.setCurrentStatus("MINING RENEWAL APPROVED");
                 miningLeaseRenewalApplication.setWorkOrderDocId(request.getWorkOrderDocId());
                 miningLeaseRenewalApplication.setWorkOrderRemarks(request.getRemarks());
-                miningLeaseRenewalApplication.setCurrentStatus("MINING LEASE APPROVED");
+                miningLeaseRenewalApplication.setCurrentStatus("MINING RENEWAL APPROVED");
                 applicationMasterRepository.save(applicationMaster);
                 miningLeaseRenewalApplicationRepository.save(miningLeaseRenewalApplication);
 
@@ -1220,6 +1248,48 @@ public class MiningLeaseRenewalService {
             }
         }
         return mapper.toRenewalResponse(miningLeaseRenewalApplication);
+    }
+
+    @Transactional
+    public MiningLeaseResponse submitNotesheetAndMLA(@Valid RenewalNotesheetMlaRequest request, Long userId) {
+        MiningLeaseRenewalApplication app = miningLeaseRenewalApplicationRepository
+                .findByApplicationNumber(request.getApplicationNo())
+                .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
+
+        String currentStatus = app.getCurrentStatus();
+        if (!"DIRECTOR APPROVED FMFS".equals(currentStatus) && !"NOTE SHEET UPLOADED".equals(currentStatus)) {
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
+        }
+
+        ApplicationMaster master = app.getApplicationMaster();
+
+        app.setNoteSheetDocId(request.getNoteSheetDocId());
+        app.setMlaDocId(request.getMlaDocId());
+        app.setMlaStatus("SUBMITTED");
+        app.setErbRegularizationRequired(request.isErbRegularizationRequired());
+        app.setPayableAmount(request.getPayableAmount());
+        app.setCurrentStatus("MLA SUBMITTED");
+
+        if (master != null) {
+            master.setCurrentStatus("MLA SUBMITTED");
+            applicationMasterRepository.save(master);
+        }
+
+        // Route to Director for final approval
+        UserWorkloadProjection director = assignDirector();
+        assert master != null;
+        createTask(master, app, "DIRECTOR", userId, director.getUserId());
+
+        if (director.getEmail() != null) {
+            notificationClient.sendAssignmentNotification(
+                    director.getEmail(),
+                    director.getUsername(),
+                    app.getApplicationNumber(),
+                    "Final Approval - MLA Review");
+        }
+
+        miningLeaseRenewalApplicationRepository.save(app);
+        return mapper.toRenewalResponse(app);
     }
 
     @Transactional

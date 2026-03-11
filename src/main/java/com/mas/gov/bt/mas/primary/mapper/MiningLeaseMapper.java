@@ -63,6 +63,7 @@ public interface MiningLeaseMapper {
     @Mapping(target = "gewogId", source = "gewog.gewogId")
     @Mapping(target = "nearestVillage", source = "nearestVillage.villageName")
     @Mapping(target = "nearestVillageId", source = "nearestVillage.villageSerialNo")
+    @Mapping(target = "notesheetDocId", source = "noteSheetDocId")
     MiningLeaseResponse toRenewalResponse(MiningLeaseRenewalApplication miningLeaseRenewalApplication);
 
     @Mapping(target = "dzongkhag", source = "dzongkhag.dzongkhagName")
