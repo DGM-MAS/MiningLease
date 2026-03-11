@@ -146,6 +146,10 @@ public class MiningLeaseResponse {
 
     private String workOrderRemarks;
 
+    private Boolean erbRegularizationRequired;
+
+    private BigDecimal payableAmount;
+
     private String expPermitNo;
 
     private Long fileUploadIdKmz;

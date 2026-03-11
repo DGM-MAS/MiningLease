@@ -70,7 +70,9 @@ public class MiningLeaseRenewalApplicationResponse {
     private String remarksChief;
     private LocalDateTime chiefReviewedAt;
 
-    // Status & Audit
+    // ERB & Status
+    private Boolean erbRegularizationRequired;
+    private java.math.BigDecimal payableAmount;
     private String currentStatus;
     private Long createdBy;
     private LocalDateTime createdOn;
