@@ -518,8 +518,42 @@ public class MineRestorationService {
     }
 
     // =====================================================
-    // DIRECTOR — Queries
+    // DIRECTOR — Assign & Queries
     // =====================================================
+
+    @Transactional
+    public MineRestorationResponse assignApplicationDirector(RestorationTaskAssignDirector request, Long userId) {
+        MineRestorationApplication restoration = findById(request.getApplicationId());
+
+        if (request.getMiningEngineerId() == null) {
+            throw new BusinessException(ErrorCodes.INVALID_INPUT_DATA);
+        }
+
+        restoration.setAssignedMeUserId(request.getMiningEngineerId());
+        restoration.setUpdatedBy(userId);
+        restorationApplicationRepository.save(restoration);
+
+        UserWorkloadProjection me = restorationApplicationRepository
+                .findUserDetailsById(request.getMiningEngineerId());
+
+        if (me != null) {
+            notificationClient.sendAssignmentNotification(
+                    me.getEmail(),
+                    me.getUsername(),
+                    restoration.getApplicationNumber(),
+                    "Mine Restoration Plan Review"
+            );
+            notificationClient.sendUserNotification(
+                    "Mine Restoration Application Assigned",
+                    "A Mine Restoration application " + restoration.getApplicationNumber()
+                            + " has been assigned to you for review.",
+                    request.getMiningEngineerId(),
+                    SERVICE_CODE
+            );
+        }
+
+        return toResponse(restoration);
+    }
 
     public SuccessResponse<List<MineRestorationResponse>> getAllApplicationsForDirector(
             String search, Pageable pageable) {
