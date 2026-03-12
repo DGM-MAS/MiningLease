@@ -44,13 +44,13 @@ public interface MineRestorationApplicationRepository extends JpaRepository<Mine
     // All active applications for RC/MI (not assigned to specific user, based on role)
     @Query("""
         SELECT r FROM MineRestorationApplication r
-        WHERE r.currentStatus IN ('RESTORATION_IN_PROGRESS', 'PROGRESS_REPORT_SUBMITTED')
+        WHERE r.currentStatus IN ('RESTORATION_IN_PROGRESS', 'PROGRESS_REPORT_SUBMITTED','VERIFICATION_SUBMITTED')
     """)
     Page<MineRestorationApplication> findActiveForRC(Pageable pageable);
 
     @Query("""
         SELECT r FROM MineRestorationApplication r
-        WHERE r.currentStatus IN ('RESTORATION_IN_PROGRESS', 'PROGRESS_REPORT_SUBMITTED')
+        WHERE r.currentStatus IN ('RESTORATION_IN_PROGRESS', 'PROGRESS_REPORT_SUBMITTED','VERIFICATION_SUBMITTED')
         AND LOWER(r.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
     """)
     Page<MineRestorationApplication> findActiveForRCWithSearch(
