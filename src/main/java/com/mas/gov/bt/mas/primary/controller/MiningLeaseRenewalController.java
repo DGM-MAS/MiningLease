@@ -34,14 +34,16 @@ public class MiningLeaseRenewalController {
     private final UserContext userContext;
     private final MiningLeaseRenewalService miningLeaseRenewalService;
 
+    // 1. First step where data from mining lease application is retrieved
     // Get all approved mining lease application for particular applicant id
     // Pagination added start from 1
     @GetMapping("/application")
     @Operation(summary = "Get application by number", description = "Get application details by application number. Agency users can view any application, others can only view their own.")
     public ResponseEntity<SuccessResponse<List<ApplicationListResponse>>> getApplicationByNumber(
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "createdOn") String sortBy,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "DESC") String sortDirection
     ) {
         Pageable pageable = PageRequest1Based.of(page, size,
@@ -51,11 +53,13 @@ public class MiningLeaseRenewalController {
 
         Long userId = userContext.getCurrentUserId();
 
-        applications = miningLeaseRenewalService.getApplicationByApplicantId(userId , pageable);
+        applications = miningLeaseRenewalService.getApplicationByApplicantId(userId , pageable, search);
 
         return ResponseEntity.ok(SuccessResponse.fromPage("Applications retrieved successfully", applications));
     }
 
+    // 2.
+    // Submit application for mining lease renewal
     @PostMapping("/applications")
     @Operation(summary = "Create renewal application", description = "Create a renewal mining lease application")
     public ResponseEntity<SuccessResponse<MiningLeaseResponse>> createApplication(
@@ -69,7 +73,29 @@ public class MiningLeaseRenewalController {
     }
 
 
+    // ** Dashboard information for mining lease renewal application ** //
+    // ** End of process flow MINING LEASE APPROVED application only ** //
+    @GetMapping("/archived")
+    public ResponseEntity<SuccessResponse<List<MiningLeaseResponse>>> archived(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection
+            ) {
+
+        Pageable pageable = PageRequest1Based.of(page, size,
+                Sort.Direction.fromString(sortDirection), sortBy);
+
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(
+                miningLeaseRenewalService.getArchivedApplication(userId, pageable, search)
+        );
+    }
+
+
     // Used by user to submit FMFS
+    // Used for submitting FMFS by client or promoter
     @PostMapping("/applicationsFMFS")
     @Operation(summary = "Submit FMFS file application", description = "Submit FMFS file for mining lease application")
     public ResponseEntity<SuccessResponse<MiningLeaseResponse>> submitFMFSFile(
@@ -82,6 +108,8 @@ public class MiningLeaseRenewalController {
                 .body(new SuccessResponse<>("Application created successfully", response));
     }
 
+    // Used to save application in draft
+    // These application will not be saved in task management or application master
     @PostMapping("/draft")
     @Operation(summary = "Save renewal application as draft", description = "Save renewal mining lease application as draft")
     public ResponseEntity<SuccessResponse<MiningLeaseResponse>> saveDraft(
@@ -93,6 +121,7 @@ public class MiningLeaseRenewalController {
         return ResponseEntity.ok(new SuccessResponse<>("Draft saved successfully", response));
     }
 
+    // Resubmit
     @PostMapping("/resubmit")
     @Operation(summary = "Resubmit renewal application", description = "Resubmit renewal application after ME sends it back for revision")
     public ResponseEntity<SuccessResponse<MiningLeaseResponse>> resubmitApplication(
@@ -130,7 +159,13 @@ public class MiningLeaseRenewalController {
     @Operation(summary = "Get my renewal applications", description = "Get paginated list of applicant's own renewal applications")
     public ResponseEntity<SuccessResponse<List<MiningLeaseResponse>>> getMyApplications(
             @RequestParam(required = false) String search,
-            Pageable pageable) {
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdBy") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection) {
+
+        Pageable pageable = PageRequest1Based.of(page, size,
+                Sort.Direction.fromString(sortDirection), sortBy);
 
         Long userId = userContext.getCurrentUserId();
         return ResponseEntity.ok(miningLeaseRenewalService.getMyApplications(userId, pageable, search));
@@ -152,5 +187,49 @@ public class MiningLeaseRenewalController {
             Pageable pageable) {
 
         return ResponseEntity.ok(miningLeaseRenewalService.getAllApplications(pageable, search));
+    }
+
+    @PostMapping("/deleteFileUpload")
+    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> deleteFileUploadFMFS(
+            @RequestBody DeleteFileRequest request
+    ){
+        MiningLeaseResponse response = miningLeaseRenewalService.deleteFileUpload(request);
+        return  ResponseEntity.status(HttpStatus.CREATED)
+                .body(new SuccessResponse<>("FILE SUCCESSFULLY DELETED",response));
+    }
+
+    // ========== Task Reassignment ==========
+
+    @PutMapping("/tasks/reassignGeologist")
+    @Operation(summary = "Reassign task", description = "Reassign a pending task to another user")
+    public ResponseEntity<SuccessResponse<Void>> reassignTaskGeologist(
+            @Valid @RequestBody ReassignTaskRequest request) {
+
+        Long userId = userContext.getCurrentUserId();
+        miningLeaseRenewalService.reassignTaskGeologist(request, userId);
+
+        return SuccessResponse.buildSuccessResponse("Task reassigned successfully");
+    }
+
+    @PutMapping("/tasks/reassignME")
+    @Operation(summary = "Reassign task", description = "Reassign a pending task to another user")
+    public ResponseEntity<SuccessResponse<Void>> reassignTaskME(
+            @Valid @RequestBody ReassignTaskRequest request) {
+
+        Long userId = userContext.getCurrentUserId();
+        miningLeaseRenewalService.reassignTaskME(request, userId);
+
+        return SuccessResponse.buildSuccessResponse("Task reassigned successfully");
+    }
+
+    @PutMapping("/tasks/reassignMineChief")
+    @Operation(summary = "Reassign task", description = "Reassign a pending task to another user")
+    public ResponseEntity<SuccessResponse<Void>> reassignTaskMineChief(
+            @Valid @RequestBody ReassignTaskRequest request) {
+
+        Long userId = userContext.getCurrentUserId();
+        miningLeaseRenewalService.reassignTaskMineChief(request, userId);
+
+        return SuccessResponse.buildSuccessResponse("Task reassigned successfully");
     }
 }

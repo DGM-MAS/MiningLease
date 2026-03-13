@@ -55,11 +55,24 @@ public class MiningLeaseRenewalService {
 
     private final MiningLeaseRenewalApplicationRepository  miningLeaseRenewalApplicationRepository;
 
-    public Page<ApplicationListResponse> getApplicationByApplicantId(Long userId, Pageable pageable) {
+    public Page<ApplicationListResponse> getApplicationByApplicantId(Long userId, Pageable pageable, String search) {
         List<String> statusIns = new ArrayList<>();
         statusIns.add("MINING LEASE APPROVED");
         Page<MiningLeaseApplication> applications;
-        applications = miningLeaseApplicationRepository.findByApplicantUserIdAndStatusIn(userId, statusIns, pageable);
+        if (search == null || search.isBlank()) {
+            applications = miningLeaseApplicationRepository.findByApplicantUserIdAndStatusIn(
+                    userId,
+                    statusIns,
+                    pageable);
+        }
+        else {
+
+            applications = miningLeaseApplicationRepository.findArchivedAssignedToUserAndSearch(
+                            userId,
+                            search.trim(),
+                            pageable
+                    );
+        }
         return applications.map(mapper::toListResponse);
     }
 
@@ -89,6 +102,7 @@ public class MiningLeaseRenewalService {
             miningLeaseRenewalApplication.setLeaseEndDate(request.getLeaseEndDate());
             miningLeaseRenewalApplication.setLeasePeriodYears(request.getLeasePeriodYears());
             miningLeaseRenewalApplication.setProposedLeaseRenewalPeriod(request.getProposedLeaseRenewalPeriod());
+            miningLeaseRenewalApplication.setCreatedBy(userId);
             // Application master
             ApplicationMaster applicationMaster = miningLeaseApplication.get().getApplicationMaster();
             miningLeaseRenewalApplication.setApplicationMaster(applicationMaster);
@@ -475,7 +489,7 @@ public class MiningLeaseRenewalService {
         if (request.getStatus() != null) {
             switch (request.getStatus()) {
                 case "Approved" -> {
-                    // ME approves the renewal application (after app + DAR both reviewed)
+                    // The ME approves the renewal application (after app + DAR both reviewed)
                     // Next step: applicant must submit updated FMFS
                     app.setCurrentStatus("APPLICATION-APPROVED");
                     app.setRemarksME(request.getRemarks());
@@ -909,6 +923,7 @@ public class MiningLeaseRenewalService {
                     }
 
                     createRevisionRecord(miningLeaseRenewalApplication, "GEOLOGIST_REVIEW", reviewQuarryLeaseApplicationGeologist.getGeologistRemarks(), userId);
+                    assert applicationMaster != null;
                     createTask(applicationMaster, miningLeaseRenewalApplication, "APPLICANT", userId, miningLeaseRenewalApplication.getCreatedBy());
 
                     if (miningLeaseRenewalApplication.getApplicantEmail() != null) {
@@ -1395,9 +1410,9 @@ public class MiningLeaseRenewalService {
 
         if ("RESUBMIT-RENEWAL".equals(currentStatus)) {
             // Resubmission after Geologist sent back → re-assign to Geologist
-            app.setCurrentStatus("RENEWAL APPLICATION");
+            app.setCurrentStatus("RESUBMITTED APPLICATION");
             if (master != null) {
-                master.setCurrentStatus("RENEWAL APPLICATION");
+                master.setCurrentStatus("RESUBMITTED APPLICATION");
                 applicationMasterRepository.save(master);
             }
 
@@ -1419,9 +1434,9 @@ public class MiningLeaseRenewalService {
             }
         } else {
             // Resubmission after ME sent back → re-assign to ME
-            app.setCurrentStatus("RENEWAL APPLICATION");
+            app.setCurrentStatus("RESUBMITTED APPLICATION");
             if (master != null) {
-                master.setCurrentStatus("RENEWAL APPLICATION");
+                master.setCurrentStatus("RESUBMITTED APPLICATION");
                 applicationMasterRepository.save(master);
             }
 
@@ -1605,5 +1620,184 @@ public class MiningLeaseRenewalService {
                     .orElseThrow(() -> new RuntimeException("Invalid Village ID"));
             app.setNearestVillage(village);
         }
+    }
+
+    public SuccessResponse<List<MiningLeaseResponse>> getArchivedApplication(Long userId, Pageable pageable, String search) {
+        Page<MiningLeaseRenewalApplication> page;
+
+        if (search == null || search.isBlank()) {
+
+            page = miningLeaseRenewalApplicationRepository
+                    .findArchivedAssignedToUserMPCD(userId, pageable);
+
+        } else {
+
+            page = miningLeaseRenewalApplicationRepository
+                    .findArchivedAssignedToUserAndSearchMPCD(
+                            userId,
+                            search.trim(),
+                            pageable
+                    );
+        }
+
+        Page<MiningLeaseResponse> responsePage =
+                page.map(mapper::toRenewalResponse);
+
+        return SuccessResponse.fromPage(
+                "Assigned applications fetched successfully",
+                responsePage
+        );
+    }
+
+    @Transactional
+    public MiningLeaseResponse deleteFileUpload(DeleteFileRequest request) {
+
+        MiningLeaseRenewalApplication application =
+                miningLeaseRenewalApplicationRepository
+                        .findByApplicationNumber(request.getApplicationNumber())
+                        .orElseThrow();
+
+        String fmfsDocIds = application.getFmfsDocId();
+
+        if (fmfsDocIds != null && !fmfsDocIds.isEmpty()) {
+
+            List<String> ids = new ArrayList<>(Arrays.asList(fmfsDocIds.split(",")));
+
+            // remove the requested id
+            ids.remove(request.getFileType());
+
+            // join remaining ids
+            String updatedIds = ids.isEmpty() ? null : String.join(",", ids);
+
+            application.setFmfsDocId(updatedIds);
+        }
+
+        miningLeaseRenewalApplicationRepository.save(application);
+
+        return mapper.toRenewalResponse(application);
+    }
+
+    @Transactional
+    public void reassignTaskGeologist(@Valid ReassignTaskRequest request, Long userId) {
+        List<String> assignedRoles = new ArrayList<>();
+        assignedRoles.add("GEOLOGIST");
+        List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleInAndServiceCode(request.getApplicationNumber(),"ASSIGNED",assignedRoles, SERVICE_CODE );
+
+        if (task.isEmpty()) {
+            throw new RuntimeException("No tasks found");
+        }
+
+        for (TaskManagement taskManagement : task) {
+            taskManagement.setAssignedToUserId(request.getNewAssigneeUserId());
+            taskManagement.setAssignedByUserId(userId);
+            taskManagement.setAssignedAt(LocalDateTime.now());
+            taskManagement.setReassignmentCount(taskManagement.getReassignmentCount() + 1);
+            taskManagement.setActionRemarks(request.getRemarks());
+        }
+
+        taskManagementRepository.saveAll(task);
+
+        TaskManagement firstTask = task.getFirst();
+
+        UserWorkloadProjection userDetails = miningLeaseApplicationRepository.findUserDetails(request.getNewAssigneeUserId());
+        notificationClient.sendTaskReassignmentNotification(
+                userDetails.getEmail(), userDetails.getUsername(),
+                firstTask.getApplicationNumber(),
+                firstTask.getAssignedToRole());
+
+        if(userDetails.getUserId()!= null) {
+            String title = "An new application has been reassigned.";
+            String message = "An application for mining lease renewal has been assigned for review. Application No. "+request.getApplicationNumber()+" Please login in review the application";
+            String serviceId = "85";
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId);
+        }else {
+            throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+        }
+
+
+        log.info("Geologist task {} reassigned to user {}", firstTask.getId(), request.getNewAssigneeUserId());
+    }
+
+
+    @Transactional
+    public void reassignTaskME(@Valid ReassignTaskRequest request, Long userId) {
+        log.info("Reassigning task by mining engineer: {} by user: {}", request.getApplicationNumber(), userId);
+        List<TaskManagement> tasks = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(),"ASSIGNED","MINE ENGINEER", SERVICE_CODE);
+
+        if (tasks.isEmpty()) {
+            throw new RuntimeException("No tasks found");
+        }
+
+        for (TaskManagement taskManagement : tasks) {
+            taskManagement.setAssignedToUserId(request.getNewAssigneeUserId());
+            taskManagement.setAssignedByUserId(userId);
+            taskManagement.setAssignedAt(LocalDateTime.now());
+            taskManagement.setReassignmentCount(taskManagement.getReassignmentCount() + 1);
+            taskManagement.setActionRemarks(request.getRemarks());
+        }
+
+        taskManagementRepository.saveAll(tasks);
+
+        TaskManagement firstTask = tasks.getFirst();
+
+        UserWorkloadProjection userDetails = miningLeaseApplicationRepository.findUserDetails(request.getNewAssigneeUserId());
+        notificationClient.sendTaskReassignmentNotification(
+                userDetails.getEmail(), userDetails.getUsername(),
+                firstTask.getApplicationNumber(),
+                firstTask.getAssignedToRole());
+
+        if(userDetails.getUserId()!= null) {
+            String title = "An new application has been reassigned.";
+            String message = "An application for mining lease renewal has been assigned for review. Application No. "+request.getApplicationNumber()+" Please login in review the application";
+            String serviceId = "85";
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId);
+        }else {
+            throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+        }
+
+        log.info("Mining engineer task {} reassigned to user {}", request.getApplicationNumber(), request.getNewAssigneeUserId());
+
+    }
+
+
+    @Transactional
+    public void reassignTaskMineChief(@Valid ReassignTaskRequest request, Long userId) {
+        log.info("Mine chief reassigning task: {} by user: {}", request.getApplicationNumber(), userId);
+
+        List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(),"MINING_CHIEF_REVIEW","MINING_CHIEF_REVIEW", SERVICE_CODE);
+
+        if (task.isEmpty()) {
+            throw new RuntimeException("No tasks found");
+        }
+
+        for (TaskManagement taskManagement : task) {
+            taskManagement.setAssignedToUserId(request.getNewAssigneeUserId());
+            taskManagement.setAssignedByUserId(userId);
+            taskManagement.setAssignedAt(LocalDateTime.now());
+            taskManagement.setReassignmentCount(taskManagement.getReassignmentCount() + 1);
+            taskManagement.setActionRemarks(request.getRemarks());
+
+        }
+
+        taskManagementRepository.saveAll(task);
+
+        TaskManagement firstTask = task.getFirst();
+
+        UserWorkloadProjection userDetails = miningLeaseApplicationRepository.findUserDetails(request.getNewAssigneeUserId());
+        notificationClient.sendTaskReassignmentNotification(
+                userDetails.getEmail(), userDetails.getUsername(),
+                firstTask.getApplicationNumber(),
+                firstTask.getAssignedToRole());
+
+        if(userDetails.getUserId()!= null) {
+            String title = "An new application has been reassigned.";
+            String message = "An application for mining lease renewal has been assigned for review. Application No. "+request.getApplicationNumber()+" Please login in review the application";
+            String serviceId = "85";
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId);
+        }else {
+            throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+        }
+
+        log.info("Task {} reassigned to user {}", firstTask.getId(), request.getNewAssigneeUserId());
     }
 }
