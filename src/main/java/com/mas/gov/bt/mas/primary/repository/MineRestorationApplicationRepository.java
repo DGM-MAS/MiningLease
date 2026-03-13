@@ -44,13 +44,13 @@ public interface MineRestorationApplicationRepository extends JpaRepository<Mine
     // All active applications for RC/MI (not assigned to specific user, based on role)
     @Query("""
         SELECT r FROM MineRestorationApplication r
-        WHERE r.currentStatus IN ('RESTORATION_IN_PROGRESS', 'PROGRESS_REPORT_SUBMITTED')
+        WHERE r.currentStatus IN ('RESTORATION_IN_PROGRESS', 'PROGRESS_REPORT_SUBMITTED','VERIFICATION_SUBMITTED')
     """)
     Page<MineRestorationApplication> findActiveForRC(Pageable pageable);
 
     @Query("""
         SELECT r FROM MineRestorationApplication r
-        WHERE r.currentStatus IN ('RESTORATION_IN_PROGRESS', 'PROGRESS_REPORT_SUBMITTED')
+        WHERE r.currentStatus IN ('RESTORATION_IN_PROGRESS', 'PROGRESS_REPORT_SUBMITTED','VERIFICATION_SUBMITTED')
         AND LOWER(r.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
     """)
     Page<MineRestorationApplication> findActiveForRCWithSearch(
@@ -76,6 +76,30 @@ public interface MineRestorationApplicationRepository extends JpaRepository<Mine
         LIMIT 1
     """, nativeQuery = true)
     UserWorkloadProjection findMEWithLeastWorkload();
+
+    // All applications for Director (full oversight)
+    @Query("""
+        SELECT r FROM MineRestorationApplication r
+        WHERE LOWER(r.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
+        OR LOWER(r.applicantName) LIKE LOWER(CONCAT('%', :search, '%'))
+    """)
+    Page<MineRestorationApplication> findAllWithSearch(
+            @Param("search") String search,
+            Pageable pageable);
+
+    // Lookup user details by ID (for Director assign notification)
+    @Query(value = """
+        SELECT
+            u.id AS userId,
+            u.email AS email,
+            u.username AS userName
+        FROM mas_db.users u
+        WHERE u.id = :userId
+          AND u.account_status = 'ACTIVE'
+        GROUP BY u.id, u.email, u.username
+        LIMIT 1
+    """, nativeQuery = true)
+    UserWorkloadProjection findUserDetailsById(@Param("userId") Long userId);
 
     // Sequence generation
     @Query("""
