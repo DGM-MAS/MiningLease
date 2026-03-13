@@ -257,4 +257,19 @@ public class MiningLeaseController {
         return ResponseEntity.ok(new SuccessResponse<>("Assigned geologist retrieved successfully", response));
     }
 
+    @GetMapping("/all")
+    @Operation(summary = "Get all renewal applications", description = "Get paginated list of all renewal applications (admin view)")
+    public ResponseEntity<SuccessResponse<List<MiningLeaseResponse>>> getAllApplications(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection) {
+
+        Pageable pageable = PageRequest1Based.of(page, size,
+                Sort.Direction.fromString(sortDirection), sortBy);
+
+        return ResponseEntity.ok(miningLeaseService.getAllApplicationAdmin(pageable, search));
+    }
+
 }

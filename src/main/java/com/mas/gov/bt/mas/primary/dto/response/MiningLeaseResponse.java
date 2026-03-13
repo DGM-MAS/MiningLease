@@ -32,6 +32,7 @@ public class MiningLeaseResponse {
     private String licenseNo;
     private String businessLicenseNo;
     private String companyName;
+    private String DepositAssessmentReportId;
 
     // Mining Details
     private String typeOfMines;
@@ -126,9 +127,10 @@ public class MiningLeaseResponse {
 
     // Audit fields
     private Long createdBy;
+    private LocalDateTime createdOn;
     private LocalDateTime createdAt;
     private Long updatedBy;
-    private LocalDateTime updatedAt;
+    private LocalDateTime updatedOn;
 
     private Long bankGuarantorDocId;
 

@@ -1330,8 +1330,26 @@ public class MiningLeaseService {
                                 reviewQuarryLeaseApplication.getMpcdRemarks());
                     }
                 }
+                case "Resubmit Application" -> {
+                    miningLeaseApplication.setCurrentStatus("RESUBMIT APPLICATION");
+                    miningLeaseApplication.setRemarksMPCD(reviewQuarryLeaseApplication.getMpcdRemarks());
+                    miningLeaseApplication.setMpcdReviewedAt(LocalDateTime.now());
+
+                    createRevisionRecord(miningLeaseApplication, "MPCD_REVIEW", reviewQuarryLeaseApplication.getMpcdRemarks(), userId);
+                    createTask(applicationMaster, miningLeaseApplication, "APPLICANT", userId, miningLeaseApplication.getApplicantUserId());
+
+                    if (miningLeaseApplication.getApplicantEmail() != null) {
+                        notificationClient.sendRevisionRequestNotification(
+                                miningLeaseApplication.getApplicantEmail(),
+                                miningLeaseApplication.getApplicantName(),
+                                miningLeaseApplication.getApplicationNumber(),
+                                "MPCD Review",
+                                reviewQuarryLeaseApplication.getMpcdRemarks());
+                    }
+                }
                 default -> throw new IllegalArgumentException("Application status not recognized");
             }
+
             miningLeaseApplicationRepository.save(miningLeaseApplication);
         }
         return mapper.toResponse(miningLeaseApplication);
@@ -1904,5 +1922,17 @@ public class MiningLeaseService {
 
         miningLeaseApplicationRepository.save(quarryLeaseApplication);
         return mapper.toResponse(quarryLeaseApplication);
+    }
+
+    public SuccessResponse<List<MiningLeaseResponse>> getAllApplicationAdmin(Pageable pageable, String search) {
+        Page<MiningLeaseApplication> page;
+
+        if (search == null || search.isBlank()) {
+            page = miningLeaseApplicationRepository.findAll(pageable);
+        } else {
+            page = miningLeaseApplicationRepository.findAllBySearch(search.trim(), pageable);
+        }
+
+        return SuccessResponse.fromPage("Applications fetched successfully", page.map(mapper::toResponse));
     }
 }

@@ -157,4 +157,27 @@ public interface MiningLeaseRenewalApplicationRepository extends JpaRepository<M
             String search,
             Pageable pageable
     );
+
+
+    @Query("""
+    SELECT q
+    FROM MiningLeaseRenewalApplication q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE t.assignedToUserId = :userId
+    AND t.taskStatus IN ('MINING LEASE APPROVED')
+""")
+    Page<MiningLeaseRenewalApplication> findArchivedAssignedToUserMPCD(Long userId, Pageable pageable);
+
+    @Query("""
+    SELECT q
+    FROM MiningLeaseRenewalApplication q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE t.assignedToUserId = :userId
+    AND t.taskStatus IN ('MINING LEASE APPROVED', 'REJECTED')
+    AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
+""")
+    Page<MiningLeaseRenewalApplication> findArchivedAssignedToUserAndSearchMPCD(Long userId, String search, Pageable pageable);
+
 }
