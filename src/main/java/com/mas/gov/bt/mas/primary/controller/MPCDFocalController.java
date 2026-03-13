@@ -5,6 +5,7 @@ import com.mas.gov.bt.mas.primary.dto.request.MiningLeaseMARequest;
 import com.mas.gov.bt.mas.primary.dto.request.ReviewMiningLeaseApplicationMPCD;
 import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
 import com.mas.gov.bt.mas.primary.services.MiningLeaseService;
+import com.mas.gov.bt.mas.primary.utility.PageRequest1Based;
 import com.mas.gov.bt.mas.primary.utility.SuccessResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -13,6 +14,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -50,7 +52,13 @@ public class MPCDFocalController {
     @GetMapping("/assigned")
     public ResponseEntity<SuccessResponse<List<MiningLeaseResponse>>> assignedToMPCD(
             @RequestParam(required = false) String search,
-            Pageable pageable) {
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection) {
+
+        Pageable pageable = PageRequest1Based.of(page, size,
+                Sort.Direction.fromString(sortDirection), sortBy);
 
         Long userId = userContext.getCurrentUserId();
         return ResponseEntity.ok(
@@ -76,7 +84,13 @@ public class MPCDFocalController {
     @GetMapping("/archivedMPCD")
     public ResponseEntity<SuccessResponse<List<MiningLeaseResponse>>> archivedMPCD(
             @RequestParam(required = false) String search,
-            Pageable pageable) {
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection) {
+
+        Pageable pageable = PageRequest1Based.of(page, size,
+                Sort.Direction.fromString(sortDirection), sortBy);
 
         Long userId = userContext.getCurrentUserId();
         return ResponseEntity.ok(
