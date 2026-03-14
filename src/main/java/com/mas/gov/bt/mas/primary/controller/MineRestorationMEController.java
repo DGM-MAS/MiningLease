@@ -118,4 +118,15 @@ public class MineRestorationMEController {
                 mineRestorationService.reviewCompletionReport(request, userId);
         return ResponseEntity.ok(new SuccessResponse<>("Completion report reviewed successfully", response));
     }
+
+    @PostMapping("/erb-release-letter")
+    @Operation(summary = "Issue ERB Release Letter",
+            description = "Upload and issue the ERB Release Letter after approving the completion report. Finalizes the restoration as ERB_RELEASED.")
+    public ResponseEntity<SuccessResponse<MineRestorationResponse>> issueERBReleaseLetter(
+            @Valid @RequestBody IssueERBReleaseLetterRequest request) {
+        Long userId = userContext.getCurrentUserId();
+        MineRestorationResponse response =
+                mineRestorationService.issueERBReleaseLetter(request.getRestorationApplicationId(), request.getErbReleaseLetterDocId(), userId);
+        return ResponseEntity.ok(new SuccessResponse<>("ERB Release Letter issued successfully", response));
+    }
 }
