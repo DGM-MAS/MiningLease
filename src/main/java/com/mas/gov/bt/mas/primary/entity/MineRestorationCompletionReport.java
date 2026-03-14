@@ -55,7 +55,7 @@ public class MineRestorationCompletionReport {
     private String otherDocId;
 
     // "DRAFT", "SUBMITTED", "ME_REVIEWED", "APPROVED", "REJECTED"
-    @Column(name = "status", length = 20)
+    @Column(name = "status", length = 200)
     private String status;
 
     @Column(name = "me_remarks", columnDefinition = "TEXT")
