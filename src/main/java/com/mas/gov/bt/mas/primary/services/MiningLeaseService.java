@@ -202,8 +202,8 @@ public class MiningLeaseService {
 
         // Resubmission of application to director after application submission from client
         List<TaskManagement> getAssignedDirector =
-                taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRole
-                        (application.getApplicationNumber(),"GR SUBMITTED", "DIRECTOR");
+                taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode
+                        (application.getApplicationNumber(),"GR SUBMITTED", "DIRECTOR", SERVICE_CODE);
         TaskManagement taskManagement = getAssignedDirector.getFirst();
         directorId = taskManagement.getAssignedToUserId();
 
@@ -386,7 +386,6 @@ public class MiningLeaseService {
 
         Page<MiningLeaseApplication> applications =
                 miningLeaseApplicationRepository.findApplicationsAssignedToUser(currentUserId, pageable);
-
         return applications.map(mapper::toListResponse);
     }
 
@@ -394,7 +393,7 @@ public class MiningLeaseService {
      * Get applications for an applicant.
      */
     @Transactional(readOnly = true)
-    public Page<ApplicationListResponse> getMyApplications(Long userId, Pageable pageable) {
+    public Page<ApplicationListResponse> getMyApplications(Long userId, Pageable pageable, String search) {
         List<String> ApplicationStatus = List.of(
                 "GR SUBMITTED",
                 "LLC UPLOADED",
@@ -413,14 +412,31 @@ public class MiningLeaseService {
                 "FMFS SUBMITTED",
                 "MLA SUBMITTED",
                 "APPROVED BY DIRECTOR",
-                "RESUBMIT PFS",
                 "RESUBMITTED PFS",
                 "RESUBMIT GR",
                 "RESUBMITTED GR",
                 "RESUBMIT FMFS",
                 "MPCD ASSIGNED",
-                "RESUBMITTED FMFS");
-        Page<MiningLeaseApplication> applications = miningLeaseApplicationRepository.findByApplicantUserIdAndStatusIn(userId,ApplicationStatus, pageable);
+                "RESUBMITTED FMFS",
+                "RESUBMIT APPLICATION",
+                "RESUBMIT PFS GEOLOGIST",
+                "RESUBMIT PFS MPCD");
+        Page<MiningLeaseApplication> applications;
+
+        if (search == null || search.isBlank()) {
+            applications = miningLeaseApplicationRepository.findByApplicantUserIdAndStatusIn(
+                    userId,
+                    ApplicationStatus,
+                    pageable);
+        }
+        else {
+
+            applications = miningLeaseApplicationRepository.findByAssignedToUserAndSearch(
+                    userId,
+                    search.trim(),
+                    pageable
+            );
+        }
         return applications.map(mapper::toListResponse);
     }
 
@@ -446,9 +462,24 @@ public class MiningLeaseService {
      * Get archived applications (APPROVED or REJECTED) for all users (Agency users).
      */
     @Transactional(readOnly = true)
-    public Page<ApplicationListResponse> getArchivedApplications(Pageable pageable) {
+    public Page<ApplicationListResponse> getArchivedApplications(Pageable pageable, String search, Long userId) {
         List<String> archivedStatuses = List.of("MINING LEASE APPROVED", "REJECTED");
-        Page<MiningLeaseApplication> applications = miningLeaseApplicationRepository.findByStatusIn(archivedStatuses, pageable);
+        Page<MiningLeaseApplication> applications;
+
+        if (search == null || search.isBlank()) {
+            applications = miningLeaseApplicationRepository.findByApplicantUserIdAndStatusIn(
+                    userId,
+                    archivedStatuses,
+                    pageable);
+        }
+        else {
+
+            applications = miningLeaseApplicationRepository.findArchivedAssignedToUserAndSearch(
+                    userId,
+                    search.trim(),
+                    pageable
+            );
+        }
         return applications.map(mapper::toListResponse);
     }
 
@@ -456,9 +487,16 @@ public class MiningLeaseService {
      * Get archived applications (APPROVED or REJECTED) for a specific user.
      */
     @Transactional(readOnly = true)
-    public Page<ApplicationListResponse> getMyArchivedApplications(Long userId, Pageable pageable) {
+    public Page<ApplicationListResponse> getMyArchivedApplications(Long userId, Pageable pageable, String search) {
         List<String> archivedStatuses = List.of("MINING LEASE APPROVED", "REJECTED", "PAID", "BG SUBMITTED");
-        Page<MiningLeaseApplication> applications = miningLeaseApplicationRepository.findByApplicantUserIdAndStatusIn(userId, archivedStatuses, pageable);
+        Page<MiningLeaseApplication> applications ;
+
+        if (search == null || search.isBlank()) {
+            applications =  miningLeaseApplicationRepository.findByApplicantUserIdAndStatusIn(userId, archivedStatuses, pageable);
+        } else {
+            applications = miningLeaseApplicationRepository.findByApplicantUserIdAndSearch(userId, archivedStatuses, search.trim(), pageable);
+        }
+
         return applications.map(mapper::toListResponse);
     }
 
@@ -532,7 +570,7 @@ public class MiningLeaseService {
 
     @Transactional
     public void reassignTaskMPCD(@Valid ReassignTaskRequest request, Long userId) {
-        List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRole(request.getApplicationNumber(),"MPCD ASSIGNED","MPCD_FOCAL");
+        List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(),"MPCD ASSIGNED","MPCD_FOCAL", SERVICE_CODE);
 
         TaskManagement taskManagement = new TaskManagement();
 
@@ -569,7 +607,7 @@ public class MiningLeaseService {
     @Transactional
     public void reassignTaskME(@Valid ReassignTaskRequest request, Long userId) {
         log.info("Reassigning task by mining engineer: {} by user: {}", request.getApplicationNumber(), userId);
-        List<TaskManagement> tasks = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRole(request.getApplicationNumber(),"FMFS SUBMITTED","MINE ENGINEER");
+        List<TaskManagement> tasks = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(),"FMFS SUBMITTED","MINE ENGINEER", SERVICE_CODE);
 
         if (tasks.isEmpty()) {
             throw new RuntimeException("No tasks found");
@@ -611,7 +649,7 @@ public class MiningLeaseService {
     public void reassignTaskMineChief(@Valid ReassignTaskRequest request, Long userId) {
         log.info("Mine chief reassigning task: {} by user: {}", request.getApplicationNumber(), userId);
 
-        List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRole(request.getApplicationNumber(),"MINING_CHIEF_REVIEW","MINING_CHIEF_REVIEW");
+        List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(),"MINING_CHIEF_REVIEW","MINING_CHIEF_REVIEW", SERVICE_CODE);
 
         TaskManagement taskManagement = new TaskManagement();
 
@@ -651,6 +689,15 @@ public class MiningLeaseService {
         if (request.getApplicationNo() != null) {
             Optional<MiningLeaseApplication> miningLeaseApplication1 = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationNo());
             if (miningLeaseApplication1.isPresent()) {
+                List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNo(),"MPCD ASSIGNED","MPCD_FOCAL", SERVICE_CODE);
+
+                TaskManagement taskManagement = new TaskManagement();
+
+                if (task != null) {
+                    taskManagement = task.getFirst();
+                }
+                Long assignedMPCDFocalId = taskManagement.getAssignedToUserId();
+
                 miningLeaseApplication = miningLeaseApplication1.get();
                 ApplicationMaster applicationMaster = miningLeaseApplication.getApplicationMaster();
                 miningLeaseApplication.setFileUploadIdPA(request.getPaDocId());
@@ -661,11 +708,11 @@ public class MiningLeaseService {
                 applicationMasterRepository.save(applicationMaster);
                 miningLeaseApplicationRepository.save(miningLeaseApplication);
 
-                createTask(applicationMaster,miningLeaseApplication,"APPLICANT", userId, userId);
+                createTask(applicationMaster,miningLeaseApplication,"MPCD_FOCAL", userId, assignedMPCDFocalId);
 
-                if(userId != null) {
-                    String title = "Submit Geological Report to proceed further.";
-                    String message = "You have upload PA / FC for you application now you have to upload FMFS to proceed further.";
+                if(assignedMPCDFocalId != null) {
+                    String title = "PA/FC submitted. ";
+                    String message = "PA/FC has been submitted by applicant. Please login an process the application."+ "Application No. : "+ miningLeaseApplication.getApplicationNumber();
                     String serviceId = "78";
                     notificationClient.sendUserNotification(title, message, userId, serviceId);
                 }
@@ -798,7 +845,7 @@ public class MiningLeaseService {
                     app.setDirectorReviewedAt(now);
                     app.setApprovedAt(now);
 
-                    List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRole(app.getApplicationNumber(),"FMFS SUBMITTED","MINE ENGINEER");
+                    List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(app.getApplicationNumber(),"FMFS SUBMITTED","MINE ENGINEER", SERVICE_CODE);
                     Long mineEngineerId = null;
                     if (taskManagement != null) {
                         TaskManagement taskManagement1 = taskManagement.getFirst();
@@ -1109,11 +1156,16 @@ public class MiningLeaseService {
                     }
                 }
                 case "Resubmit PFS" -> {
-                    miningLeaseApplication.setCurrentStatus("RESUBMIT PFS");
+                    miningLeaseApplication.setCurrentStatus("RESUBMIT PFS GEOLOGIST");
                     miningLeaseApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     miningLeaseApplication.setGeologistReviewedAt(LocalDateTime.now());
 
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus("RESUBMIT PFS GEOLOGIST");
+                        applicationMasterRepository.save(applicationMaster);
+                    }
                     createRevisionRecord(miningLeaseApplication, "GEOLOGIST_REVIEW", reviewQuarryLeaseApplicationGeologist.getGeologistRemarks(), userId);
+                    assert applicationMaster != null;
                     createTask(applicationMaster, miningLeaseApplication, "APPLICANT", userId, miningLeaseApplication.getApplicantUserId());
 
                     if (miningLeaseApplication.getApplicantEmail() != null) {
@@ -1130,7 +1182,13 @@ public class MiningLeaseService {
                     miningLeaseApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     miningLeaseApplication.setGeologistReviewedAt(LocalDateTime.now());
 
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus("RESUBMIT GR");
+                        applicationMasterRepository.save(applicationMaster);
+                    }
+
                     createRevisionRecord(miningLeaseApplication, "GEOLOGIST_REVIEW", reviewQuarryLeaseApplicationGeologist.getGeologistRemarks(), userId);
+                    assert applicationMaster != null;
                     createTask(applicationMaster, miningLeaseApplication, "APPLICANT", userId, miningLeaseApplication.getApplicantUserId());
 
                     if (miningLeaseApplication.getApplicantEmail() != null) {
@@ -1146,6 +1204,11 @@ public class MiningLeaseService {
                     miningLeaseApplication.setCurrentStatus("ADDITIONAL DATA NEEDED FMFS");
                     miningLeaseApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     miningLeaseApplication.setGeologistReviewedAt(LocalDateTime.now());
+
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus("ADDITIONAL DATA NEEDED FMFS");
+                        applicationMasterRepository.save(applicationMaster);
+                    }
 
                     createRevisionRecord(miningLeaseApplication, "GEOLOGIST_REVIEW", reviewQuarryLeaseApplicationGeologist.getGeologistRemarks(), userId);
                     createTask(applicationMaster, miningLeaseApplication, "APPLICANT", userId, userId);
@@ -1229,7 +1292,7 @@ public class MiningLeaseService {
         if(reviewQuarryLeaseApplication.getStatus() != null) {
             switch (reviewQuarryLeaseApplication.getStatus()) {
                 case "ACCEPTED APP" -> {
-                    List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRole(miningLeaseApplication.getApplicationNumber(),"ASSIGNED","GEOLOGIST");
+                    List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(miningLeaseApplication.getApplicationNumber(),"ASSIGNED","GEOLOGIST", SERVICE_CODE);
                     Long geologistId = null;
                     if (taskManagement != null) {
                         TaskManagement taskManagement1 = taskManagement.getFirst();
@@ -1293,6 +1356,34 @@ public class MiningLeaseService {
                     notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId);
 
                 }
+                case "Accepted PA/FC" -> {
+                    miningLeaseApplication.setCurrentStatus("ACCEPTED PA/FC");
+                    miningLeaseApplication.setRemarksMPCD(reviewQuarryLeaseApplication.getMpcdRemarks());
+                    miningLeaseApplication.setMpcdReviewedAt(LocalDateTime.now());
+
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus(miningLeaseApplication.getCurrentStatus());
+                        applicationMasterRepository.save(applicationMaster);
+                    }
+
+                    assert applicationMaster != null;
+                    createTask(applicationMaster, miningLeaseApplication, "APPLICANT", userId, miningLeaseApplication.getApplicantUserId());
+
+                    if (miningLeaseApplication.getApplicantEmail() != null) {
+                        notificationClient.sendStatusUpdateNotification(
+                                miningLeaseApplication.getApplicantEmail(),
+                                miningLeaseApplication.getApplicantName(),
+                                miningLeaseApplication.getApplicationNumber(),
+                                "PA/FC accepted by MPCD",
+                                "PA/FC has been approved. Please proceed by uploading FMFS before the set deadline.");
+                    }
+
+                    String title = "Application status updated.";
+                    String message = "PA/FC has been approved by MPCD. Please proceed by uploading FMFS before the set deadline.";
+                    String serviceId = "78";
+                    notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId);
+
+                }
                 case "Rejected" -> {
                     miningLeaseApplication.setCurrentStatus("REJECTED");
                     miningLeaseApplication.setRemarksMPCD(reviewQuarryLeaseApplication.getMpcdRemarks());
@@ -1314,7 +1405,7 @@ public class MiningLeaseService {
                     }
                 }
                 case "Resubmit PFS" -> {
-                    miningLeaseApplication.setCurrentStatus("RESUBMIT PFS");
+                    miningLeaseApplication.setCurrentStatus("RESUBMIT PFS MPCD");
                     miningLeaseApplication.setRemarksMPCD(reviewQuarryLeaseApplication.getMpcdRemarks());
                     miningLeaseApplication.setMpcdReviewedAt(LocalDateTime.now());
 
@@ -1392,6 +1483,7 @@ public class MiningLeaseService {
                 ApplicationMaster applicationMaster = miningleaseapplication.getApplicationMaster();
                 applicationMaster.setCurrentStatus("MA SUBMITTED");
                 miningleaseapplication.setMpcdFileUploadIdMa(request.getMaDocId());
+                miningleaseapplication.setSignedPFSId(request.getSignedPFSId());
                 miningleaseapplication.setCurrentStatus("MA SUBMITTED");
                 applicationMasterRepository.save(applicationMaster);
                 miningLeaseApplicationRepository.save(miningleaseapplication);
@@ -1416,8 +1508,8 @@ public class MiningLeaseService {
         TaskManagementAssignedUser assignedUser = new TaskManagementAssignedUser();
         if(agencyUser){
             List<TaskManagement> taskManagements =
-                    taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRole
-                            (applicationNo,"ASSIGNED", "GEOLOGIST");
+                    taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode
+                            (applicationNo,"ASSIGNED", "GEOLOGIST", SERVICE_CODE);
             TaskManagement taskManagement = taskManagements.getFirst();
             assignedUser.setAssignedToRole(taskManagement.getAssignedToRole());
             assignedUser.setAssignedToUserId(taskManagement.getAssignedToUserId());
@@ -1884,13 +1976,13 @@ public class MiningLeaseService {
 
         ApplicationMaster applicationMaster = quarryLeaseApplication.getApplicationMaster();
 
-        List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRole(request.getApplicationNumber(), "RESUBMIT PFS", "APPLICANT");
+        List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(), "RESUBMIT PFS GEOLOGIST", "APPLICANT", SERVICE_CODE);
         if(!taskManagement.isEmpty()) {
             TaskManagement taskManagement1 = taskManagement.getFirst();
             geologistId = taskManagement1.getAssignedToUserId();
         }
 
-        List<TaskManagement> taskManagement2 = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRole(request.getApplicationNumber(), "RESUBMIT PFS", "APPLICANT");
+        List<TaskManagement> taskManagement2 = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(), "RESUBMIT PFS MPCD", "APPLICANT", SERVICE_CODE);
         if(!taskManagement2.isEmpty()) {
             TaskManagement taskManagement3 = taskManagement.getFirst();
             mpcdId = taskManagement3.getAssignedToUserId();
@@ -1898,18 +1990,22 @@ public class MiningLeaseService {
 
         if(request.getFileType().equals("PFS")) {
             quarryLeaseApplication.setPfsDocId(request.getFileId());
-            applicationMaster.setCurrentStatus("RESUBMITTED PFS");
-            quarryLeaseApplication.setCurrentStatus("RESUBMITTED PFS");
 
-            createTask(applicationMaster,quarryLeaseApplication,"GEOLOGIST",userId,geologistId);
-            createTask(applicationMaster,quarryLeaseApplication,"MPCD FOCAL",userId,mpcdId);
+            if(quarryLeaseApplication.getCurrentStatus().equals("RESUBMIT PFS GEOLOGIST")) {
+                applicationMaster.setCurrentStatus("RESUBMITTED PFS GEOLOGIST");
+                quarryLeaseApplication.setCurrentStatus("RESUBMITTED PFS GEOLOGIST");
+                createTask(applicationMaster,quarryLeaseApplication,"GEOLOGIST",userId,geologistId);
+            }else {
+                applicationMaster.setCurrentStatus("RESUBMITTED PFS MPCD");
+                quarryLeaseApplication.setCurrentStatus("RESUBMITTED PFS MPCD");
+                createTask(applicationMaster,quarryLeaseApplication,"MPCD FOCAL",userId,mpcdId);
+            }
         } else if (request.getFileType().equals("GR")) {
             quarryLeaseApplication.setFileUploadIdGr(Long.valueOf(request.getFileId()));
             applicationMaster.setCurrentStatus("RESUBMITTED GR");
             quarryLeaseApplication.setCurrentStatus("RESUBMITTED GR");
 
             createTask(applicationMaster,quarryLeaseApplication,"GEOLOGIST",userId,geologistId);
-            createTask(applicationMaster,quarryLeaseApplication,"MPCD FOCAL",userId,mpcdId);
 
         }else {
             quarryLeaseApplication.setFmfsDocId(request.getFileId());
@@ -1919,7 +2015,7 @@ public class MiningLeaseService {
             createTask(applicationMaster,quarryLeaseApplication,"GEOLOGIST",userId,geologistId);
             createTask(applicationMaster,quarryLeaseApplication,"MPCD FOCAL",userId,mpcdId);
         }
-
+        applicationMasterRepository.save(applicationMaster);
         miningLeaseApplicationRepository.save(quarryLeaseApplication);
         return mapper.toResponse(quarryLeaseApplication);
     }
