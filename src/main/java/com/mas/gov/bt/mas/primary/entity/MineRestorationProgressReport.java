@@ -81,7 +81,7 @@ public class MineRestorationProgressReport {
     private LocalDateTime meReviewedAt;
 
     // "DRAFT", "SUBMITTED", "VERIFICATION_SUBMITTED", "ME_REVIEWED", "COMPLETION_REQUESTED"
-    @Column(name = "status", length = 30)
+    @Column(name = "status", length = 255)
     private String status;
 
     // ========== Audit ==========
