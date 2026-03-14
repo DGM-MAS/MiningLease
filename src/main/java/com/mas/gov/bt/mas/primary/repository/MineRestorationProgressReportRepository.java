@@ -29,10 +29,21 @@ public interface MineRestorationProgressReportRepository extends JpaRepository<M
     @Query("""
         SELECT r FROM MineRestorationProgressReport r
         WHERE r.restorationApplicationNumber = :appNumber
-        AND r.status = 'SUBMITTED'
+        AND r.status = 'PROGRESS_REPORT_SUBMITTED'
         ORDER BY r.createdOn DESC
     """)
     List<MineRestorationProgressReport> findPendingVerification(@Param("appNumber") String applicationNumber);
+
+    // Latest progress report by status for a given application
+    @Query("""
+        SELECT r FROM MineRestorationProgressReport r
+        WHERE r.restorationApplicationNumber = :appNumber
+        AND r.status = :status
+        ORDER BY r.createdOn DESC
+    """)
+    List<MineRestorationProgressReport> findByRestorationApplicationNumberAndStatus(
+            @Param("appNumber") String applicationNumber,
+            @Param("status") String status);
 
     // Reports assigned to a specific RC
     Page<MineRestorationProgressReport> findByAssignedRcUserId(Long rcUserId, Pageable pageable);

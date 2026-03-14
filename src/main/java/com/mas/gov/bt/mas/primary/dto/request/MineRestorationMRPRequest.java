@@ -8,6 +8,9 @@ import lombok.Setter;
 @Setter
 public class MineRestorationMRPRequest {
 
+    // Provided when updating an existing draft
+    private Long restorationApplicationId;
+
     // The existing mining lease application number to link to
     @NotBlank(message = "Mining lease application number is required")
     private String miningLeaseApplicationNumber;

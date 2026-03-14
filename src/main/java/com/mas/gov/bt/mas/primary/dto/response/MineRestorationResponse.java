@@ -47,6 +47,8 @@ public class MineRestorationResponse {
     private String erbDecision;
     private LocalDateTime erbDecidedAt;
     private String erbRemarks;
+    private String erbReleaseLetterDocId;
+    private LocalDateTime erbReleaseLetterIssuedAt;
 
     // Status
     private String currentStatus;
