@@ -8,4 +8,5 @@ import lombok.Setter;
 public class MiningLeaseMLARequest {
     private String applicationNo;
     private String mlaDocId;
+    private Long workOrderDocId;
 }
