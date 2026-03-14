@@ -202,6 +202,19 @@ public class MiningLeaseController {
                 .body(new SuccessResponse<>("Application created successfully", response));
     }
 
+    // Used by user to submit PA/FC
+    @PostMapping("/resubmitPAFC")
+    @Operation(summary = "Submit PA/FC file application", description = "Submit PA/FC file for Mining lease application")
+    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> resubmitPAFCFile(
+            @Valid @RequestBody MiningLeasePAFCRequest request) {
+
+        Long userId = userContext.getCurrentUserId();
+        MiningLeaseResponse response = miningLeaseService.resubmitPAFC(request, userId);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new SuccessResponse<>("Application created successfully", response));
+    }
+
 
     // Used by user to submit FMFS
     @PostMapping("/applicationsFMFS")
