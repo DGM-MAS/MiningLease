@@ -358,7 +358,7 @@ public class MiningLeaseRenewalService {
                                 app.setDirectorReviewedAt(now);
                                 app.setApprovedAt(now);
 
-                                List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRole(app.getApplicationNumber(),"FMFS SUBMITTED","MINE ENGINEER");
+                                List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(app.getApplicationNumber(),"FMFS SUBMITTED","MINE ENGINEER", SERVICE_CODE);
                                 Long mineEngineerId = null;
                                 if (taskManagement != null) {
                                     TaskManagement taskManagement1 = taskManagement.getFirst();
@@ -424,8 +424,8 @@ public class MiningLeaseRenewalService {
 
                         // Notify ME to upload work order
                         List<TaskManagement> meTasks = taskManagementRepository
-                                .findByApplicationNumberAndTaskStatusAndAssignedToRole(
-                                        app.getApplicationNumber(), "FMFS SUBMITTED", "MINE ENGINEER");
+                                .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+                                        app.getApplicationNumber(), "FMFS SUBMITTED", "MINE ENGINEER", SERVICE_CODE);
                         Long meId = (meTasks != null && !meTasks.isEmpty()) ? meTasks.getFirst().getAssignedToUserId() : null;
 
                         assert master != null;
@@ -513,7 +513,7 @@ public class MiningLeaseRenewalService {
                     }
                 }
                 case "ACCEPTED APP" -> {
-                    List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRole(app.getApplicationNumber(),"ASSIGNED","GEOLOGIST");
+                    List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(app.getApplicationNumber(),"ASSIGNED","GEOLOGIST", SERVICE_CODE);
                     Long geologistId = null;
                     if (taskManagement != null) {
                         TaskManagement taskManagement1 = taskManagement.getFirst();
@@ -947,8 +947,8 @@ public class MiningLeaseRenewalService {
 
                     // Route back to the previously assigned Mining Engineer
                     List<TaskManagement> meTasks = taskManagementRepository
-                            .findByApplicationNumberAndTaskStatusAndAssignedToRole(
-                                    miningLeaseRenewalApplication.getApplicationNumber(), "ASSIGNED", "MINE ENGINEER");
+                            .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+                                    miningLeaseRenewalApplication.getApplicationNumber(), "ASSIGNED", "MINE ENGINEER", SERVICE_CODE);
                     Long meId = (meTasks != null && !meTasks.isEmpty()) ? meTasks.getFirst().getAssignedToUserId() : null;
 
                     assert applicationMaster != null;
@@ -1015,7 +1015,7 @@ public class MiningLeaseRenewalService {
         TaskManagement taskManagement;
         if (request.getApplicationNo() != null) {
             Optional<MiningLeaseRenewalApplication> miningLeaseRenewalApplication1 = miningLeaseRenewalApplicationRepository.findByApplicationNumber(request.getApplicationNo());
-            List<TaskManagement> taskManagements = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRole(request.getApplicationNo(),"ASSIGNED", "MINE ENGINEER");
+            List<TaskManagement> taskManagements = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNo(),"ASSIGNED", "MINE ENGINEER", SERVICE_CODE);
             if (miningLeaseRenewalApplication1.isPresent()) {
                 if (taskManagements != null && !taskManagements.isEmpty()) {
                     taskManagement = taskManagements.getFirst();
@@ -1129,8 +1129,8 @@ public class MiningLeaseRenewalService {
                     }
 
                     List<TaskManagement> meTasks = taskManagementRepository
-                            .findByApplicationNumberAndTaskStatusAndAssignedToRole(
-                                    app.getApplicationNumber(), "FMFS SUBMITTED", "MINE ENGINEER");
+                            .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+                                    app.getApplicationNumber(), "FMFS SUBMITTED", "MINE ENGINEER", SERVICE_CODE);
                     Long meId = (meTasks != null && !meTasks.isEmpty()) ? meTasks.getFirst().getAssignedToUserId() : null;
 
                     assert master != null;
@@ -1211,7 +1211,7 @@ public class MiningLeaseRenewalService {
 
                 if(miningLeaseRenewalApplication.getCreatedBy() != null) {
                     String title = "Work order has been uploaded by mine engineer.";
-                    String message = "Work order for your application has been uploaded by mine engineer. Your application for mining lease has been approved.";
+                    String message = "Work order for your application has been uploaded by mine engineer. Your application for mining lease renewal has been approved.";
                     String serviceId = "78";
                     notificationClient.sendUserNotification(title, message, miningLeaseRenewalApplication.getCreatedBy(), serviceId);
                 }
@@ -1231,8 +1231,8 @@ public class MiningLeaseRenewalService {
                 miningLeaseRenewalApplication = miningLeaseRenewalApplication1.get();
                 ApplicationMaster applicationMaster = miningLeaseRenewalApplication.getApplicationMaster();
                 miningLeaseRenewalApplication.setMlaDocId(request.getMlaDocId());
+                miningLeaseRenewalApplication.setWorkOrderDocId(request.getWorkOrderDocId());
                 miningLeaseRenewalApplication.setMlaStatus("SUBMITTED");
-                miningLeaseRenewalApplication.setCurrentStatus("MLA SUBMITTED");
                 applicationMaster.setCurrentStatus("MLA SUBMITTED");
                 applicationMasterRepository.save(applicationMaster);
                 miningLeaseRenewalApplicationRepository.save(miningLeaseRenewalApplication);
@@ -1417,8 +1417,8 @@ public class MiningLeaseRenewalService {
             }
 
             List<TaskManagement> geologistTasks = taskManagementRepository
-                    .findByApplicationNumberAndTaskStatusAndAssignedToRole(
-                            app.getApplicationNumber(), "ASSIGNED", "GEOLOGIST");
+                    .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+                            app.getApplicationNumber(), "ASSIGNED", "GEOLOGIST", SERVICE_CODE);
             Long geologistId = (geologistTasks != null && !geologistTasks.isEmpty())
                     ? geologistTasks.getFirst().getAssignedToUserId() : null;
 
@@ -1441,8 +1441,8 @@ public class MiningLeaseRenewalService {
             }
 
             List<TaskManagement> tasks = taskManagementRepository
-                    .findByApplicationNumberAndTaskStatusAndAssignedToRole(
-                            app.getApplicationNumber(), "ASSIGNED", "MINE ENGINEER");
+                    .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+                            app.getApplicationNumber(), "ASSIGNED", "MINE ENGINEER", SERVICE_CODE);
             Long meId = (tasks != null && !tasks.isEmpty()) ? tasks.getFirst().getAssignedToUserId() : null;
 
             if (master != null && meId != null) {
@@ -1497,8 +1497,8 @@ public class MiningLeaseRenewalService {
             }
 
             List<TaskManagement> tasks = taskManagementRepository
-                    .findByApplicationNumberAndTaskStatusAndAssignedToRole(
-                            app.getApplicationNumber(), "FMFS SUBMITTED", "MINE ENGINEER");
+                    .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+                            app.getApplicationNumber(), "FMFS SUBMITTED", "MINE ENGINEER", SERVICE_CODE);
             Long meId = (tasks != null && !tasks.isEmpty()) ? tasks.getFirst().getAssignedToUserId() : null;
 
             if (master != null && meId != null) {
