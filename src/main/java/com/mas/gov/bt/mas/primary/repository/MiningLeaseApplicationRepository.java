@@ -63,6 +63,9 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     @Query("SELECT a FROM MiningLeaseApplication a WHERE a.applicantUserId = :userId AND a.currentStatus IN :applicationStatus")
     Page<MiningLeaseApplication> findByApplicantUserIdAndStatusIn(Long userId, List<String> applicationStatus, Pageable pageable);
 
+    @Query("SELECT a FROM MiningLeaseApplication a WHERE a.applicantUserId = :userId ")
+    Page<MiningLeaseApplication> findByApplicantUserId(Long userId, Pageable pageable);
+
     @Query("SELECT a FROM MiningLeaseApplication a WHERE a.currentStatus IN :statuses")
     Page<MiningLeaseApplication> findByStatusIn(@Param("statuses") List<String> statuses, Pageable pageable);
 
@@ -174,7 +177,7 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('ASSIGNED','GEOLOGIST_REVIEW', 'ACCEPTED PFS', 'FMFS SUBMITTED', 'GR SUBMITTED', 'ACCEPTED PFS MPCD')
+    AND t.taskStatus IN ('ASSIGNED','GEOLOGIST_REVIEW', 'RESUBMIT PFS GEOLOGIST', 'ACCEPTED PFS', 'FMFS SUBMITTED', 'GR SUBMITTED', 'ACCEPTED PFS MPCD', 'RESUBMITTED PFS GEOLOGIST')
 """)
     Page<MiningLeaseApplication> findAssignedToUserGeologist(Long userId, Pageable pageable);
 
@@ -184,7 +187,7 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('ASSIGNED','GEOLOGIST_REVIEW', 'ACCEPTED PFS', 'FMFS SUBMITTED', 'GR SUBMITTED')
+    AND t.taskStatus IN ('ASSIGNED','GEOLOGIST_REVIEW', 'ACCEPTED PFS', 'RESUBMIT PFS GEOLOGIST', 'FMFS SUBMITTED', 'GR SUBMITTED', 'RESUBMITTED PFS GEOLOGIST')
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseApplication> findAssignedToUserAndSearchGeologist(Long userId, String search, Pageable pageable);
@@ -195,7 +198,7 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('PENDING', 'MPCD ASSIGNED', 'ASSIGNED', 'APPROVED', 'ACCEPTED PFS', 'MINING_CHIEF_REVIEW', 'PA/FC SUBMITTED')
+    AND t.taskStatus IN ('PENDING', 'MPCD ASSIGNED', 'ASSIGNED', 'APPROVED', 'ACCEPTED PFS', 'MINING_CHIEF_REVIEW', 'PA/FC SUBMITTED', 'RESUBMITTED PFS MPCD')
 """)
     Page<MiningLeaseApplication> findAssignedToUserMPCD(
             Long userId,
@@ -208,7 +211,7 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('PENDING', 'MPCD ASSIGNED', 'ASSIGNED', 'APPROVED', 'ACCEPTED PFS', 'MINING_CHIEF_REVIEW')
+    AND t.taskStatus IN ('PENDING', 'MPCD ASSIGNED', 'ASSIGNED', 'APPROVED', 'ACCEPTED PFS', 'MINING_CHIEF_REVIEW', 'PA/FC SUBMITTED', 'RESUBMITTED PFS MPCD')
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseApplication> findAssignedToUserAndSearchMPCD(
@@ -281,4 +284,19 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     AND LOWER(a.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseApplication> findArchivedAssignedToUserAndSearch(Long userId, String search, Pageable pageable);
+
+    @Query("""
+    SELECT q FROM MiningLeaseApplication q
+    WHERE q.createdBy = :userId
+    AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
+""")
+    Page<MiningLeaseApplication> findByAssignedToUserAndSearch(Long userId, String Search, Pageable pageable);
+
+    @Query("""
+    SELECT q FROM MiningLeaseApplication q
+    WHERE q.createdBy = :userId
+    AND q.currentStatus IN :archivedStatuses
+    AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
+""")
+    Page<MiningLeaseApplication> findByApplicantUserIdAndSearch(Long userId, List<String> archivedStatuses, String search, Pageable pageable);
 }

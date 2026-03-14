@@ -70,6 +70,7 @@ public class MiningLeaseController {
     @GetMapping("/my-applications")
     @Operation(summary = "Get my applications", description = "Get list of applications. Agency users get all applications, others get only their own.")
     public ResponseEntity<SuccessResponse<List<ApplicationListResponse>>> getMyApplications(
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
@@ -85,7 +86,7 @@ public class MiningLeaseController {
         } else {
             // Regular users can only see their own applications
             Long userId = userContext.getCurrentUserId();
-            applications = miningLeaseService.getMyApplications(userId, pageable);
+            applications = miningLeaseService.getMyApplications(userId, pageable, search);
         }
 
         return ResponseEntity.ok(SuccessResponse.fromPage("Applications retrieved successfully", applications));
@@ -106,6 +107,7 @@ public class MiningLeaseController {
     @GetMapping("/archived-applications")
     @Operation(summary = "Get archived applications", description = "Get list of archived (APPROVED/REJECTED) applications. Agency users get all archived applications, others get only their own.")
     public ResponseEntity<SuccessResponse<List<ApplicationListResponse>>> getArchivedApplications(
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
@@ -117,11 +119,12 @@ public class MiningLeaseController {
         Page<ApplicationListResponse> applications;
         if (userContext.isAgencyUser()) {
             // Agency users can see all archived applications
-            applications = miningLeaseService.getArchivedApplications(pageable);
+            Long userId = userContext.getCurrentUserId();
+            applications = miningLeaseService.getArchivedApplications(pageable, search, userId);
         } else {
             // Regular users can only see their own archived applications
             Long userId = userContext.getCurrentUserId();
-            applications = miningLeaseService.getMyArchivedApplications(userId, pageable);
+            applications = miningLeaseService.getMyArchivedApplications(userId, pageable, search);
         }
 
         return ResponseEntity.ok(SuccessResponse.fromPage("Archived applications retrieved successfully", applications));

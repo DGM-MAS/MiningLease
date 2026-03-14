@@ -151,6 +151,9 @@ public class MiningLeaseApplication {
     @Column(name = "mpcd_file_upload_id_ma")
     private Long mpcdFileUploadIdMa;
 
+    @Column(name = "signed_pfs_id")
+    private Long signedPFSId;
+
     @Column(name = "remarks_mpcd")
     private String remarksMPCD;
 

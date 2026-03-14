@@ -8,4 +8,5 @@ import lombok.Setter;
 public class MiningLeaseMARequest {
     private String applicationNo;
     private Long maDocId;
+    private Long signedPFSId;
 }
