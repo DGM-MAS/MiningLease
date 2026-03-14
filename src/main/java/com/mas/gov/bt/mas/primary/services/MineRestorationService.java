@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.Year;
 import java.util.List;
+import java.util.Random;
 
 @Service
 @Slf4j
@@ -32,6 +33,8 @@ public class MineRestorationService {
 
     // Statuses
     public static final String STATUS_MRP_DRAFT = "MRP_DRAFT";
+    public static final String STATUS_PROGRESS_REPORT_DRAFT = "PROGRESS_REPORT_DRAFT";
+    public static final String STATUS_COMPLETION_REPORT_DRAFT = "COMPLETION_REPORT_DRAFT";
     public static final String STATUS_MRP_SUBMITTED = "MRP_SUBMITTED";
     public static final String STATUS_MRP_REVISION_REQUESTED = "MRP_REVISION_REQUESTED";
     public static final String STATUS_MRP_APPROVED = "MRP_APPROVED";
@@ -40,6 +43,8 @@ public class MineRestorationService {
     public static final String STATUS_PROGRESS_REPORT_SUBMITTED = "PROGRESS_REPORT_SUBMITTED";
     public static final String STATUS_COMPLETION_REPORT_REQUESTED = "COMPLETION_REPORT_REQUESTED";
     public static final String STATUS_COMPLETION_REPORT_SUBMITTED = "COMPLETION_REPORT_SUBMITTED";
+    public static final String STATUS_VERIFICATION_SUBMITTED = "VERIFICATION_SUBMITTED";
+    public static final String STATUS_ERB_APPROVED = "ERB_APPROVED";
     public static final String STATUS_ERB_RELEASED = "ERB_RELEASED";
     public static final String STATUS_ERB_UTILIZED = "ERB_UTILIZED";
 
@@ -59,18 +64,29 @@ public class MineRestorationService {
                 .findByApplicationNumber(request.getMiningLeaseApplicationNumber())
                 .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
 
-        MineRestorationApplication restoration = new MineRestorationApplication();
-        restoration.setMiningLeaseApplicationNumber(request.getMiningLeaseApplicationNumber());
-        restoration.setRestorationType(request.getRestorationType());
-        restoration.setApplicantUserId(userId);
-        restoration.setApplicantName(lease.getApplicantName());
-        restoration.setApplicantEmail(lease.getApplicantEmail());
-        restoration.setApplicantContact(lease.getApplicantContact());
-        restoration.setNameOfMine(lease.getPlaceOfMiningActivity());
-        restoration.setLeaseAreaAcres(lease.getTotalLand());
-        restoration.setLeaseEndDate(lease.getLeaseEndDate());
+        // Load existing draft if ID provided, otherwise create new
+        MineRestorationApplication restoration;
+        if (request.getRestorationApplicationId() != null) {
+            restoration = findById(request.getRestorationApplicationId());
+            if (!STATUS_MRP_DRAFT.equals(restoration.getCurrentStatus())) {
+                throw new BusinessException(ErrorCodes.INVALID_STATE);
+            }
+            restoration.setUpdatedBy(userId);
+        } else {
+            restoration = new MineRestorationApplication();
+            restoration.setMiningLeaseApplicationNumber(request.getMiningLeaseApplicationNumber());
+            restoration.setRestorationType(request.getRestorationType());
+            restoration.setApplicantUserId(userId);
+            restoration.setApplicantName(lease.getApplicantName());
+            restoration.setApplicantEmail(lease.getApplicantEmail());
+            restoration.setApplicantContact(lease.getApplicantContact());
+            restoration.setNameOfMine(lease.getPlaceOfMiningActivity());
+            restoration.setLeaseAreaAcres(lease.getTotalLand());
+            restoration.setLeaseEndDate(lease.getLeaseEndDate());
+            restoration.setCreatedBy(userId);
+        }
+
         restoration.setMrpDocId(request.getMrpDocId());
-        restoration.setCreatedBy(userId);
 
         boolean isDraft = "DRAFT".equalsIgnoreCase(request.getStatus());
         if (isDraft) {
@@ -78,7 +94,9 @@ public class MineRestorationService {
         } else {
             restoration.setCurrentStatus(STATUS_MRP_SUBMITTED);
             restoration.setMrpSubmittedAt(LocalDateTime.now());
-            restoration.setApplicationNumber(generateApplicationNumber());
+            if (restoration.getApplicationNumber() == null) {
+                restoration.setApplicationNumber(generateApplicationNumber());
+            }
 
             // Auto-assign ME by workload
             UserWorkloadProjection assignedME = restorationApplicationRepository.findMEWithLeastWorkload();
@@ -99,10 +117,6 @@ public class MineRestorationService {
             }
         }
 
-        if (restoration.getApplicationNumber() == null) {
-            restoration.setApplicationNumber(generateApplicationNumber());
-        }
-
         restorationApplicationRepository.save(restoration);
         return toResponse(restoration);
     }
@@ -120,6 +134,9 @@ public class MineRestorationService {
         restoration.setCurrentStatus(STATUS_MRP_SUBMITTED);
         restoration.setMrpSubmittedAt(LocalDateTime.now());
         restoration.setUpdatedBy(userId);
+        if (restoration.getApplicationNumber() == null) {
+            restoration.setApplicationNumber(generateApplicationNumber());
+        }
 
         restorationApplicationRepository.save(restoration);
 
@@ -148,10 +165,10 @@ public class MineRestorationService {
                 .findByApplicationNumber(request.getRestorationApplicationNumber())
                 .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
 
-        if (!STATUS_RESTORATION_IN_PROGRESS.equals(restoration.getCurrentStatus())
-                && !STATUS_PROGRESS_REPORT_SUBMITTED.equals(restoration.getCurrentStatus())) {
-            throw new BusinessException(ErrorCodes.INVALID_STATE);
-        }
+//        if (!STATUS_RESTORATION_IN_PROGRESS.equals(restoration.getCurrentStatus())
+//                && !STATUS_PROGRESS_REPORT_SUBMITTED.equals(restoration.getCurrentStatus())) {
+//            throw new BusinessException(ErrorCodes.INVALID_STATE);
+//        }
 
         MineRestorationProgressReport report = new MineRestorationProgressReport();
         report.setRestorationApplicationNumber(request.getRestorationApplicationNumber());
@@ -169,13 +186,26 @@ public class MineRestorationService {
 
         boolean isDraft = "DRAFT".equalsIgnoreCase(request.getStatus());
         if (isDraft) {
-            report.setStatus("DRAFT");
+            report.setStatus(STATUS_PROGRESS_REPORT_DRAFT);
+            restoration.setCurrentStatus(STATUS_PROGRESS_REPORT_DRAFT);
+            restorationApplicationRepository.save(restoration);
         } else {
             long count = progressReportRepository.countSubmittedReports(request.getRestorationApplicationNumber());
             report.setProgressReportNumber((int) count + 1);
             report.setStatus("PROGRESS_REPORT_SUBMITTED");
             restoration.setCurrentStatus(STATUS_PROGRESS_REPORT_SUBMITTED);
             restorationApplicationRepository.save(restoration);
+
+            // Auto-assign RC randomly between userId 18 and 21
+            long assignedRcUserId = new Random().nextBoolean() ? 18L : 21L;
+            report.setAssignedRcUserId(assignedRcUserId);
+            notificationClient.sendUserNotification(
+                    "Progress Report Assigned for Verification",
+                    "A progress report for application " + restoration.getApplicationNumber()
+                            + " has been assigned to you for verification.",
+                    assignedRcUserId,
+                    SERVICE_CODE
+            );
 
             // Notify ME
             if (restoration.getAssignedMeUserId() != null) {
@@ -205,11 +235,11 @@ public class MineRestorationService {
                 .findByApplicationNumber(request.getRestorationApplicationNumber())
                 .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
 
-        if (!STATUS_PROGRESS_REPORT_SUBMITTED.equals(restoration.getCurrentStatus())
-                && !STATUS_RESTORATION_IN_PROGRESS.equals(restoration.getCurrentStatus())
-                && !STATUS_COMPLETION_REPORT_REQUESTED.equals(restoration.getCurrentStatus())) {
-            throw new BusinessException(ErrorCodes.INVALID_STATE);
-        }
+//        if (!STATUS_PROGRESS_REPORT_SUBMITTED.equals(restoration.getCurrentStatus())
+//                && !STATUS_RESTORATION_IN_PROGRESS.equals(restoration.getCurrentStatus())
+//                && !STATUS_COMPLETION_REPORT_REQUESTED.equals(restoration.getCurrentStatus())) {
+//            throw new BusinessException(ErrorCodes.INVALID_STATE);
+//        }
 
         MineRestorationCompletionReport report = new MineRestorationCompletionReport();
         report.setRestorationApplicationNumber(request.getRestorationApplicationNumber());
@@ -226,11 +256,22 @@ public class MineRestorationService {
 
         boolean isDraft = "DRAFT".equalsIgnoreCase(request.getStatus());
         if (isDraft) {
-            report.setStatus("DRAFT");
+            report.setStatus(STATUS_COMPLETION_REPORT_DRAFT);
+            restoration.setCurrentStatus(STATUS_COMPLETION_REPORT_DRAFT);
+            restorationApplicationRepository.save(restoration);
         } else {
-            report.setStatus("SUBMITTED");
+            MineRestorationProgressReport progressReport = progressReportRepository
+                    .findByRestorationApplicationNumberAndStatus(
+                            request.getRestorationApplicationNumber(), "COMPLETION_REPORT_REQUESTED")
+                    .stream().findFirst()
+                    .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
+
+            report.setStatus("COMPLETION_REPORT_SUBMITTED");
             restoration.setCurrentStatus(STATUS_COMPLETION_REPORT_SUBMITTED);
             restorationApplicationRepository.save(restoration);
+
+            progressReport.setStatus(STATUS_COMPLETION_REPORT_SUBMITTED);
+            progressReportRepository.save(progressReport);
 
             if (restoration.getAssignedMeUserId() != null) {
                 notificationClient.sendUserNotification(
@@ -410,7 +451,7 @@ public class MineRestorationService {
 
         switch (request.getDecision().toUpperCase()) {
             case "REVIEWED" -> {
-                report.setStatus("ME_REVIEWED");
+                report.setStatus(STATUS_RESTORATION_IN_PROGRESS);
                 restoration.setCurrentStatus(STATUS_RESTORATION_IN_PROGRESS);
                 notificationClient.sendUserNotification(
                         "Progress Report Reviewed",
@@ -421,7 +462,7 @@ public class MineRestorationService {
                 );
             }
             case "COMPLETION_REQUESTED" -> {
-                report.setStatus("COMPLETION_REQUESTED");
+                report.setStatus("COMPLETION_REPORT_REQUESTED");
                 restoration.setCurrentStatus(STATUS_COMPLETION_REPORT_REQUESTED);
                 notificationClient.sendUserNotification(
                         "Please Submit Restoration Completion Report",
@@ -453,6 +494,11 @@ public class MineRestorationService {
                 .findByRestorationApplicationNumber(restoration.getApplicationNumber())
                 .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
 
+        MineRestorationProgressReport progressReport = progressReportRepository
+                .findByRestorationApplicationNumberAndStatus(
+                        restoration.getApplicationNumber(), "COMPLETION_REPORT_SUBMITTED")
+                .stream().findFirst().orElse(null);
+
         completionReport.setMeRemarks(request.getRemarks());
         completionReport.setMeReviewedAt(LocalDateTime.now());
         restoration.setErbDecision(request.getDecision().toUpperCase());
@@ -462,24 +508,23 @@ public class MineRestorationService {
 
         switch (request.getDecision().toUpperCase()) {
             case "ERB_RELEASED" -> {
-                completionReport.setStatus("APPROVED");
-                restoration.setCurrentStatus(STATUS_ERB_RELEASED);
-                notificationClient.sendApprovalNotification(
-                        restoration.getApplicantEmail(),
-                        restoration.getApplicantName(),
-                        restoration.getApplicationNumber()
-                );
+                completionReport.setStatus(STATUS_ERB_APPROVED);
+                restoration.setCurrentStatus(STATUS_ERB_APPROVED);
                 notificationClient.sendUserNotification(
-                        "Restoration Approved — ERB Released",
+                        "Restoration Approved — ERB Release Letter Pending",
                         "Your restoration work for application " + restoration.getApplicationNumber()
-                                + " has been approved. The Environmental Restoration Bond (ERB) will be refunded through BIRMS.",
+                                + " has been approved. The ERB Release Letter will be issued shortly.",
                         restoration.getApplicantUserId(),
                         SERVICE_CODE
                 );
             }
             case "ERB_UTILIZED" -> {
-                completionReport.setStatus("REJECTED");
+                completionReport.setStatus(STATUS_ERB_UTILIZED);
                 restoration.setCurrentStatus(STATUS_ERB_UTILIZED);
+                if (progressReport != null) {
+                    progressReport.setStatus(STATUS_ERB_UTILIZED);
+                    progressReportRepository.save(progressReport);
+                }
                 notificationClient.sendRejectionNotification(
                         restoration.getApplicantEmail(),
                         restoration.getApplicantName(),
@@ -500,6 +545,55 @@ public class MineRestorationService {
 
         completionReportRepository.save(completionReport);
         restorationApplicationRepository.save(restoration);
+        return toResponse(restoration);
+    }
+
+    @Transactional
+    public MineRestorationResponse issueERBReleaseLetter(Long restorationApplicationId, String erbReleaseLetterDocId, Long userId) {
+        MineRestorationApplication restoration = findById(restorationApplicationId);
+
+        if (!STATUS_ERB_APPROVED.equals(restoration.getCurrentStatus())) {
+            throw new BusinessException(ErrorCodes.INVALID_STATE);
+        }
+
+        restoration.setErbReleaseLetterDocId(erbReleaseLetterDocId);
+        restoration.setErbReleaseLetterIssuedAt(LocalDateTime.now());
+        restoration.setCurrentStatus(STATUS_ERB_RELEASED);
+        restoration.setUpdatedBy(userId);
+
+        // Sync progress report
+        MineRestorationProgressReport progressReport = progressReportRepository
+                .findByRestorationApplicationNumberAndStatus(restoration.getApplicationNumber(), STATUS_COMPLETION_REPORT_SUBMITTED)
+                .stream().findFirst().orElse(null);
+        if (progressReport != null) {
+            progressReport.setStatus(STATUS_ERB_RELEASED);
+            progressReportRepository.save(progressReport);
+        }
+
+        // Sync completion report
+        MineRestorationCompletionReport completionReport = completionReportRepository
+                .findByRestorationApplicationNumber(restoration.getApplicationNumber())
+                .orElse(null);
+        if (completionReport != null) {
+            completionReport.setStatus(STATUS_ERB_RELEASED);
+            completionReportRepository.save(completionReport);
+        }
+
+        restorationApplicationRepository.save(restoration);
+
+        notificationClient.sendApprovalNotification(
+                restoration.getApplicantEmail(),
+                restoration.getApplicantName(),
+                restoration.getApplicationNumber()
+        );
+        notificationClient.sendUserNotification(
+                "ERB Release Letter Issued",
+                "The ERB Release Letter has been issued for your restoration application "
+                        + restoration.getApplicationNumber() + ". The Environmental Restoration Bond (ERB) will be refunded through BIRMS.",
+                restoration.getApplicantUserId(),
+                SERVICE_CODE
+        );
+
         return toResponse(restoration);
     }
 
@@ -588,25 +682,17 @@ public class MineRestorationService {
         report.setVerificationReportDocId(request.getVerificationReportDocId());
         report.setVerificationRemarks(request.getRemarks());
         report.setVerificationSubmittedAt(LocalDateTime.now());
-        report.setStatus("VERIFICATION_SUBMITTED");
+        report.setStatus(STATUS_VERIFICATION_SUBMITTED);
 
         progressReportRepository.save(report);
 
-        MineRestorationApplication mineRestorationApplication = restorationApplicationRepository.findByApplicationNumber(report.getRestorationApplicationNumber())
-                .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
-        mineRestorationApplication.setCurrentStatus("VERIFICATION_SUBMITTED");
-        restorationApplicationRepository.save(mineRestorationApplication);
-
-        MineRestorationProgressReport updatedReport = progressReportRepository.findById(report.getId())
-                .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
-        updatedReport.setStatus("VERIFICATION_SUBMITTED");
-        progressReportRepository.save(updatedReport);
-
-        // Notify ME
         MineRestorationApplication restoration = restorationApplicationRepository
                 .findByApplicationNumber(report.getRestorationApplicationNumber())
                 .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
+        restoration.setCurrentStatus(STATUS_VERIFICATION_SUBMITTED);
+        restorationApplicationRepository.save(restoration);
 
+        // Notify ME
         if (restoration.getAssignedMeUserId() != null) {
             notificationClient.sendUserNotification(
                     "Verification Report Submitted",
@@ -687,6 +773,8 @@ public class MineRestorationService {
         res.setErbDecision(app.getErbDecision());
         res.setErbDecidedAt(app.getErbDecidedAt());
         res.setErbRemarks(app.getErbRemarks());
+        res.setErbReleaseLetterDocId(app.getErbReleaseLetterDocId());
+        res.setErbReleaseLetterIssuedAt(app.getErbReleaseLetterIssuedAt());
         res.setCurrentStatus(app.getCurrentStatus());
         res.setCurrentStatusDisplayName(getStatusDisplayName(app.getCurrentStatus()));
         res.setRejectionReason(app.getRejectionReason());
@@ -746,6 +834,8 @@ public class MineRestorationService {
         if (status == null) return null;
         return switch (status) {
             case "MRP_DRAFT" -> "MRP Draft";
+            case "PROGRESS_REPORT_DRAFT" -> "Progress Report Draft";
+            case "COMPLETION_REPORT_DRAFT" -> "Completion Report Draft";
             case "MRP_SUBMITTED" -> "MRP Submitted";
             case "MRP_REVISION_REQUESTED" -> "MRP Revision Requested";
             case "MRP_APPROVED" -> "MRP Approved";
@@ -754,6 +844,8 @@ public class MineRestorationService {
             case "PROGRESS_REPORT_SUBMITTED" -> "Progress Report Submitted";
             case "COMPLETION_REPORT_REQUESTED" -> "Completion Report Requested";
             case "COMPLETION_REPORT_SUBMITTED" -> "Completion Report Submitted";
+            case "VERIFICATION_SUBMITTED" -> "Verification Submitted";
+            case "ERB_APPROVED" -> "ERB Approved — Release Letter Pending";
             case "ERB_RELEASED" -> "ERB Released";
             case "ERB_UTILIZED" -> "ERB Utilized by DGM";
             default -> status.replace("_", " ");
