@@ -21,7 +21,7 @@ public class MineRestorationApplication {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "application_number", nullable = false, unique = true, length = 30)
+    @Column(name = "application_number", nullable = true, unique = true, length = 30)
     private String applicationNumber;
 
     // Reference to the original mining lease application
@@ -95,8 +95,15 @@ public class MineRestorationApplication {
     @Column(name = "erb_remarks", columnDefinition = "TEXT")
     private String erbRemarks;
 
+    // ========== ERB Release Letter ==========
+    @Column(name = "erb_release_letter_doc_id", length = 100)
+    private String erbReleaseLetterDocId;
+
+    @Column(name = "erb_release_letter_issued_at")
+    private LocalDateTime erbReleaseLetterIssuedAt;
+
     // ========== Status ==========
-    @Column(name = "current_status", length = 50)
+    @Column(name = "current_status", length = 500)
     private String currentStatus;
 
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
