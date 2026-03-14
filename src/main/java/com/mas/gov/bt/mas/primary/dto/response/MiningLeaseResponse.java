@@ -92,7 +92,10 @@ public class MiningLeaseResponse {
     private String approvedLeasePeriod;
     private String approvedMineral;
     private String llcDocId;
+    private String llcMineEngineerDocId;
     private String notesheetDocId;
+    private String noteSheetDocId;
+    private Long workOrderDocId;
     private String mlaDocId;
     private String mlaStatus;
     private LocalDateTime mlaSignedAt;
@@ -143,8 +146,6 @@ public class MiningLeaseResponse {
     private String fileUploadIdFC;
 
     private String fileUploadIdPublicClearance;
-
-    private Long workOrderDocId;
 
     private String workOrderRemarks;
 
