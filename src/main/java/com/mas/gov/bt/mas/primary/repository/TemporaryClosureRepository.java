@@ -1,7 +1,6 @@
 package com.mas.gov.bt.mas.primary.repository;
 
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
-import com.mas.gov.bt.mas.primary.entity.MiningLeaseApplication;
 import com.mas.gov.bt.mas.primary.entity.TemporaryClosureEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -113,5 +112,34 @@ public interface TemporaryClosureRepository extends JpaRepository<TemporaryClosu
     SELECT q FROM TemporaryClosureEntity q
     WHERE LOWER(q.applicationId) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
-    Page<TemporaryClosureEntity> findAllBySearch(String trim, Pageable pageable);
+    Page<TemporaryClosureEntity> findAllBySearch(String search, Pageable pageable);
+
+    @Query("""
+    SELECT q
+    FROM TemporaryClosureEntity q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationId
+    WHERE t.assignedToUserId = :userId
+    AND q.currentStatus IN ('APPROVED BY RC')
+    AND LOWER(q.applicationId) LIKE LOWER(CONCAT('%', :search, '%'))
+""")
+    Page<TemporaryClosureEntity> findArchivedAssignedToUserAndSearch(Long userId, String search, Pageable pageable);
+
+    @Query("""
+    SELECT q FROM TemporaryClosureEntity q
+    WHERE q.applicantUserId = :userId
+    AND q.currentStatus IN :archivedStatuses
+    AND LOWER(q.applicationId) LIKE LOWER(CONCAT('%', :search, '%'))
+""")
+    Page<TemporaryClosureEntity> findByApplicantUserIdAndSearch(Long userId, List<String> archivedStatuses, String search, Pageable pageable);
+
+    @Query("""
+    SELECT q
+    FROM TemporaryClosureEntity q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationId
+    WHERE t.assignedToUserId = :userId
+    AND q.currentStatus IN ('APPROVED BY RC')
+""")
+    Page<TemporaryClosureEntity> findArchivedAssignedToUser(Long userId, List<String> archivedStatuses, Pageable pageable);
 }

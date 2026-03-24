@@ -3,6 +3,7 @@ package com.mas.gov.bt.mas.primary.controller;
 import com.mas.gov.bt.mas.primary.config.UserContext;
 import com.mas.gov.bt.mas.primary.dto.request.ReassignTaskRequest;
 import com.mas.gov.bt.mas.primary.dto.request.TemporaryClosureNotificationRequest;
+import com.mas.gov.bt.mas.primary.dto.response.ApplicationListResponse;
 import com.mas.gov.bt.mas.primary.dto.response.TemporaryClosureNotificationResponse;
 import com.mas.gov.bt.mas.primary.services.TemporaryClosureService;
 import com.mas.gov.bt.mas.primary.utility.PageRequest1Based;
@@ -90,7 +91,7 @@ public class TemporaryClosureController {
         TemporaryClosureNotificationResponse response = temporaryClosureService.submitRectification(request, userId);
 
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new SuccessResponse<>("Application created successfully", response));
+                .body(new SuccessResponse<>("Rectification submitted successfully", response));
     }
 
     @GetMapping("/applications/{applicationNo}")
@@ -140,5 +141,30 @@ public class TemporaryClosureController {
         return ResponseEntity.ok(temporaryClosureService.getAllApplicationAdmin(pageable, search));
     }
 
+    @GetMapping("/archived-applications")
+    @Operation(summary = "Get archived applications", description = "Get list of archived (APPROVED/REJECTED) applications. Agency users get all archived applications, others get only their own.")
+    public ResponseEntity<SuccessResponse<List<TemporaryClosureNotificationResponse>>> getArchivedApplications(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "submittedAt") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection) {
+
+        Pageable pageable = PageRequest1Based.of(page, size,
+                Sort.Direction.fromString(sortDirection), sortBy);
+
+        Page<TemporaryClosureNotificationResponse> applications;
+        if (userContext.isAgencyUser()) {
+            // Agency users can see all archived applications
+            Long userId = userContext.getCurrentUserId();
+            applications = temporaryClosureService.getArchivedApplications(pageable, search, userId);
+        } else {
+            // Regular users can only see their own archived applications
+            Long userId = userContext.getCurrentUserId();
+            applications = temporaryClosureService.getMyArchivedApplications(userId, pageable, search);
+        }
+
+        return ResponseEntity.ok(SuccessResponse.fromPage("Archived applications retrieved successfully", applications));
+    }
 
 }

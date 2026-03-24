@@ -1,8 +1,8 @@
 package com.mas.gov.bt.mas.primary.controller.Termination;
 
 import com.mas.gov.bt.mas.primary.config.UserContext;
-import com.mas.gov.bt.mas.primary.dto.request.MiningLeaseGRRequest;
-import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
+import com.mas.gov.bt.mas.primary.dto.request.TerminationApplicationRequest;
+import com.mas.gov.bt.mas.primary.dto.response.TerminationApplicationResponse;
 import com.mas.gov.bt.mas.primary.services.TerminationService;
 import com.mas.gov.bt.mas.primary.utility.SuccessResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/termination")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Termination", description = "Termination Application Management APIs")
+@Tag(name = "Termination Chief User", description = "Termination Chief User Application Management APIs")
 @SecurityRequirement(name = "bearerAuth")
 public class TerminationController {
 
@@ -34,17 +34,19 @@ public class TerminationController {
 
     // ========== Applicant APIs ==========
 
-    // Used by user to submit Geological report
-    // The initial stage of mining lease application submission
-//    @PostMapping("/applicationsGR")
-//    @Operation(summary = "Submit GR file application", description = "Submit PA/FC file for mining lease application")
-//    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> submitGRFile(
-//            @Valid @RequestBody MiningLeaseGRRequest request) {
-//
-//        Long userId = userContext.getCurrentUserId();
-//        MiningLeaseResponse response = miningLeaseService.submitGR(request, userId);
-//
-//        return ResponseEntity.status(HttpStatus.CREATED)
-//                .body(new SuccessResponse<>("Application created successfully", response));
-//    }
+    // Used by chief to submit termination report
+    // The initial stage of termination application submission
+    @PostMapping("/applications")
+    @Operation(summary = "Submit termination file application", description = "Submit termination file for termination application")
+    public ResponseEntity<SuccessResponse<TerminationApplicationResponse>> submitApplication(
+            @Valid @RequestBody TerminationApplicationRequest request) {
+
+        Long userId = userContext.getCurrentUserId();
+        TerminationApplicationResponse response = terminationService.submitTerminationApplication(request, userId);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new SuccessResponse<>("Application created successfully", response));
+    }
+
+
 }
