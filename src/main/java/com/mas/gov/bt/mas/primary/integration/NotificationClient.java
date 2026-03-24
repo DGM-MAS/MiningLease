@@ -106,7 +106,7 @@ public class NotificationClient {
         String body = String.format("""
                 Dear %s,
 
-                Your quarry lease application has been submitted successfully.
+                Your Mining lease application has been submitted successfully.
 
                 Application Number: %s
 
@@ -131,7 +131,7 @@ public class NotificationClient {
         String body = String.format("""
                 Dear %s,
 
-                Your quarry lease application status has been updated.
+                Your Mining lease application status has been updated.
 
                 Application Number: %s
                 New Status: %s
@@ -154,11 +154,11 @@ public class NotificationClient {
     @Async
     public void sendApprovalNotification(String email, String applicantName,
                                           String applicationNumber) {
-        String subject = "Congratulations! Quarry Lease Application Approved - " + applicationNumber;
+        String subject = "Congratulations! Mining Lease Application Approved - " + applicationNumber;
         String body = String.format("""
                 Dear %s,
 
-                We are pleased to inform you that your quarry lease application has been approved.
+                We are pleased to inform you that your mining lease application has been approved.
 
                 Application Number: %s
 
@@ -183,11 +183,11 @@ public class NotificationClient {
     @Async
     public void sendRejectionNotification(String email, String applicantName,
                                            String applicationNumber, String reason) {
-        String subject = "Quarry Lease Application Update - " + applicationNumber;
+        String subject = "Mining Lease Application Update - " + applicationNumber;
         String body = String.format("""
                 Dear %s,
 
-                We regret to inform you that your quarry lease application could not be approved.
+                We regret to inform you that your mining lease application could not be approved.
 
                 Application Number: %s
                 Reason: %s
