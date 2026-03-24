@@ -321,12 +321,28 @@ public class MiningLeaseRenewalService {
                 .orElseThrow(() -> new ResourceNotFoundException("Application not found with ID: " + id));
     }
 
+    private void completeCurrentTask(ApplicationMaster master, String action, String remarks) {
+        if (master == null) return;
+        List<TaskManagement> pendingTasks = taskManagementRepository.findByApplicationNumber(master.getApplicationNumber());
+        pendingTasks.stream()
+                .filter(t -> "PENDING".equals(t.getTaskStatus()))
+                .findFirst()
+                .ifPresent(task -> {
+                    task.setTaskStatus("COMPLETED");
+                    task.setActionTaken(action);
+                    task.setActionRemarks(remarks);
+                    taskManagementRepository.save(task);
+                });
+    }
+
     @Transactional
     public MiningLeaseResponse reviewApplicationDirector(@Valid ReviewMiningLeaseApplicationDirector request, Long userId) {
         log.info("Reviewing renewal mining lease application by Director user: {}", userId);
 
         MiningLeaseRenewalApplication app = findApplicationById(request.getId());
         ApplicationMaster master = app.getApplicationMaster();
+
+        completeCurrentTask(master, request.getStatus(), request.getRemarks());
 
         if (request.getStatus() != null) {
             switch (request.getStatus()) {
@@ -616,6 +632,11 @@ public class MiningLeaseRenewalService {
                     app.setRemarksME(request.getRemarks());
                     app.setMeReviewedAt(LocalDateTime.now());
 
+                    if (master != null) {
+                        master.setCurrentStatus("RESUBMIT FMFS");
+                        applicationMasterRepository.save(master);
+                    }
+
                     createRevisionRecord(app, "ME_REVIEW_FMFS", request.getRemarks(), userId);
                     createTask(master, app, "APPLICANT", userId, app.getCreatedBy());
 
@@ -632,6 +653,11 @@ public class MiningLeaseRenewalService {
                     app.setCurrentStatus("RESUBMIT APP");
                     app.setRemarksME(request.getRemarks());
                     app.setMeReviewedAt(LocalDateTime.now());
+
+                    if (master != null) {
+                        master.setCurrentStatus("RESUBMIT APP");
+                        applicationMasterRepository.save(master);
+                    }
 
                     createRevisionRecord(app, "ME_REVIEW_APP", request.getRemarks(), userId);
                     createTask(master, app, "APPLICANT", userId, app.getCreatedBy());
@@ -770,7 +796,7 @@ public class MiningLeaseRenewalService {
                     miningLeaseRenewalApplication.setGeologistReviewedAt(LocalDateTime.now());
 
                     if (applicationMaster != null) {
-                        applicationMaster.setCurrentStatus("ACCEPTED PFS");
+                        applicationMaster.setCurrentStatus(miningLeaseRenewalApplication.getCurrentStatus());
                         applicationMasterRepository.save(applicationMaster);
                     }
 
@@ -866,6 +892,11 @@ public class MiningLeaseRenewalService {
                     miningLeaseRenewalApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     miningLeaseRenewalApplication.setGeologistReviewedAt(LocalDateTime.now());
 
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus("RESUBMIT PFS");
+                        applicationMasterRepository.save(applicationMaster);
+                    }
+
                     createRevisionRecord(miningLeaseRenewalApplication, "GEOLOGIST_REVIEW", reviewQuarryLeaseApplicationGeologist.getGeologistRemarks(), userId);
                     createTask(applicationMaster, miningLeaseRenewalApplication, "APPLICANT", userId, miningLeaseRenewalApplication.getCreatedBy());
 
@@ -883,6 +914,11 @@ public class MiningLeaseRenewalService {
                     miningLeaseRenewalApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     miningLeaseRenewalApplication.setGeologistReviewedAt(LocalDateTime.now());
 
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus("RESUBMIT GR");
+                        applicationMasterRepository.save(applicationMaster);
+                    }
+
                     createRevisionRecord(miningLeaseRenewalApplication, "GEOLOGIST_REVIEW", reviewQuarryLeaseApplicationGeologist.getGeologistRemarks(), userId);
                     createTask(applicationMaster, miningLeaseRenewalApplication, "APPLICANT", userId, miningLeaseRenewalApplication.getCreatedBy());
 
@@ -899,6 +935,11 @@ public class MiningLeaseRenewalService {
                     miningLeaseRenewalApplication.setCurrentStatus("ADDITIONAL DATA NEEDED FMFS");
                     miningLeaseRenewalApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     miningLeaseRenewalApplication.setGeologistReviewedAt(LocalDateTime.now());
+
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus("ADDITIONAL DATA NEEDED FMFS");
+                        applicationMasterRepository.save(applicationMaster);
+                    }
 
                     createRevisionRecord(miningLeaseRenewalApplication, "GEOLOGIST_REVIEW", reviewQuarryLeaseApplicationGeologist.getGeologistRemarks(), userId);
                     createTask(applicationMaster, miningLeaseRenewalApplication, "APPLICANT", userId, userId);
@@ -1009,6 +1050,7 @@ public class MiningLeaseRenewalService {
         return mapper.toRenewalResponse(miningLeaseRenewalApplication);
     }
 
+    @Transactional
     public MiningLeaseResponse submitFMFS(@Valid MiningLeaseFMFSRequest request, Long userId) {
         MiningLeaseRenewalApplication miningLeaseRenewalApplication = null;
         new TaskManagement();
@@ -1202,7 +1244,10 @@ public class MiningLeaseRenewalService {
             if (miningLeaseRenewalApplication1.isPresent()) {
                 miningLeaseRenewalApplication = miningLeaseRenewalApplication1.get();
                 ApplicationMaster applicationMaster = miningLeaseRenewalApplication.getApplicationMaster();
+                LocalDateTime now = LocalDateTime.now();
                 applicationMaster.setCurrentStatus("MINING RENEWAL APPROVED");
+                applicationMaster.setApprovedAt(now);
+                applicationMaster.setCompletedAt(now);
                 miningLeaseRenewalApplication.setWorkOrderDocId(request.getWorkOrderDocId());
                 miningLeaseRenewalApplication.setWorkOrderRemarks(request.getRemarks());
                 miningLeaseRenewalApplication.setCurrentStatus("MINING RENEWAL APPROVED");
@@ -1223,6 +1268,7 @@ public class MiningLeaseRenewalService {
         return mapper.toRenewalResponse(miningLeaseRenewalApplication);
     }
 
+    @Transactional
     public MiningLeaseResponse submitMLA(@Valid MiningLeaseMLARequest request, Long userId) {
         MiningLeaseRenewalApplication miningLeaseRenewalApplication = null;
         if (request.getApplicationNo() != null) {
@@ -1233,6 +1279,7 @@ public class MiningLeaseRenewalService {
                 miningLeaseRenewalApplication.setMlaDocId(request.getMlaDocId());
                 miningLeaseRenewalApplication.setWorkOrderDocId(request.getWorkOrderDocId());
                 miningLeaseRenewalApplication.setMlaStatus("SUBMITTED");
+                miningLeaseRenewalApplication.setCurrentStatus("MLA SUBMITTED");
                 applicationMaster.setCurrentStatus("MLA SUBMITTED");
                 applicationMasterRepository.save(applicationMaster);
                 miningLeaseRenewalApplicationRepository.save(miningLeaseRenewalApplication);
