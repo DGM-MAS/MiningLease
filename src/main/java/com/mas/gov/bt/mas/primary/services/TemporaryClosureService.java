@@ -294,6 +294,7 @@ public class TemporaryClosureService {
                     app.setCurrentStatus("RECTIFICATION BY RC");
                     app.setRemarksRC(request.getRemarks());
                     app.setRcReviewedAt(LocalDateTime.now());
+                    app.setApplicantFileId(null);
 
                     createRevisionRecord(app, "RC REVIEWED", app.getCurrentStatus(), userId, request.getRemarks() );
 
@@ -547,5 +548,39 @@ public class TemporaryClosureService {
 
         revisionHistoryRepository.save(revision);
         log.info("Created revision record #{} for application {} at stage {}", revision.getRevisionNumber(), miningLeaseApplication.getApplicationId(), geologistReview);
+    }
+
+    public Page<TemporaryClosureNotificationResponse> getArchivedApplications(Pageable pageable, String search, Long userId) {
+        List<String> archivedStatuses = List.of("APPROVED BY RC");
+        Page<TemporaryClosureEntity> applications;
+
+        if (search == null || search.isBlank()) {
+            applications = temporaryClosureRepository.findArchivedAssignedToUser(
+                    userId,
+                    archivedStatuses,
+                    pageable);
+        }
+        else {
+
+            applications = temporaryClosureRepository.findArchivedAssignedToUserAndSearch(
+                    userId,
+                    search.trim(),
+                    pageable
+            );
+        }
+        return applications.map(TemporaryClosureMapper::toListResponse);
+    }
+
+    public Page<TemporaryClosureNotificationResponse> getMyArchivedApplications(Long userId, Pageable pageable, String search) {
+        List<String> archivedStatuses = List.of("APPROVED BY RC");
+        Page<TemporaryClosureEntity> applications ;
+
+        if (search == null || search.isBlank()) {
+            applications =  temporaryClosureRepository.findByApplicantUserIdAndStatusIn(userId, archivedStatuses, pageable);
+        } else {
+            applications = temporaryClosureRepository.findByApplicantUserIdAndSearch(userId, archivedStatuses, search.trim(), pageable);
+        }
+
+        return applications.map(TemporaryClosureMapper::toListResponse);
     }
 }
