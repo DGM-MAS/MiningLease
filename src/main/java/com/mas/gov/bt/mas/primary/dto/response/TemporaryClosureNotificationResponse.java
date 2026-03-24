@@ -21,6 +21,7 @@ public class TemporaryClosureNotificationResponse {
     private String applicantCid;
     private String applicantName;
     private String applicantEmail;
+    private Long applicantFileId;
 
     private String reasonForClosure;
 

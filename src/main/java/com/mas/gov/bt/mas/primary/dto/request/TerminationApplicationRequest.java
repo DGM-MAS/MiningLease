@@ -4,11 +4,16 @@ import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.List;
+
 @Data
 @Getter
 @Setter
 public class TerminationApplicationRequest {
 
     private Long promoterUserId;
+    private Long fileId;
+    private String remarksChief;
+    private List<String> applicationNumber;
 
 }
