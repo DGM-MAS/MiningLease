@@ -74,3 +74,5 @@ Desktop.ini
 ### Logs ###
 *.log
 logs/
+
+megalinter-reports/
