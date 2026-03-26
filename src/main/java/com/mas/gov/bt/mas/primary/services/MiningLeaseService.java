@@ -1118,7 +1118,7 @@ public class MiningLeaseService {
                     miningLeaseApplication.setGeologistReviewedAt(LocalDateTime.now());
 
                     if (applicationMaster != null) {
-                        applicationMaster.setCurrentStatus("ACCEPTED PFS");
+                        applicationMaster.setCurrentStatus(miningLeaseApplication.getCurrentStatus());
                         applicationMasterRepository.save(applicationMaster);
                     }
 
@@ -1463,6 +1463,11 @@ public class MiningLeaseService {
                     miningLeaseApplication.setRemarksMPCD(reviewQuarryLeaseApplication.getMpcdRemarks());
                     miningLeaseApplication.setMpcdReviewedAt(LocalDateTime.now());
 
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus("RESUBMIT PFS MPCD");
+                        applicationMasterRepository.save(applicationMaster);
+                    }
+
                     createRevisionRecord(miningLeaseApplication, "MPCD_REVIEW", reviewQuarryLeaseApplication.getMpcdRemarks(), userId);
                     createTask(applicationMaster, miningLeaseApplication, "APPLICANT", userId, miningLeaseApplication.getApplicantUserId());
 
@@ -1480,6 +1485,11 @@ public class MiningLeaseService {
                     miningLeaseApplication.setRemarksMPCD(reviewQuarryLeaseApplication.getMpcdRemarks());
                     miningLeaseApplication.setMpcdReviewedAt(LocalDateTime.now());
 
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus("RESUBMIT PA/FC");
+                        applicationMasterRepository.save(applicationMaster);
+                    }
+
                     createRevisionRecord(miningLeaseApplication, "MPCD_REVIEW", reviewQuarryLeaseApplication.getMpcdRemarks(), userId);
                     createTask(applicationMaster, miningLeaseApplication, "APPLICANT", userId, miningLeaseApplication.getApplicantUserId());
 
@@ -1496,6 +1506,11 @@ public class MiningLeaseService {
                     miningLeaseApplication.setCurrentStatus("RESUBMIT APPLICATION");
                     miningLeaseApplication.setRemarksMPCD(reviewQuarryLeaseApplication.getMpcdRemarks());
                     miningLeaseApplication.setMpcdReviewedAt(LocalDateTime.now());
+
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus("RESUBMIT APPLICATION");
+                        applicationMasterRepository.save(applicationMaster);
+                    }
 
                     createRevisionRecord(miningLeaseApplication, "MPCD_REVIEW", reviewQuarryLeaseApplication.getMpcdRemarks(), userId);
                     createTask(applicationMaster, miningLeaseApplication, "APPLICANT", userId, miningLeaseApplication.getApplicantUserId());
@@ -1598,6 +1613,8 @@ public class MiningLeaseService {
         MiningLeaseApplication app = findApplicationById(request.getId());
         ApplicationMaster master = app.getApplicationMaster();
 
+        completeCurrentTask(master, request.getStatus(), request.getRemarks());
+
         Long directorId = request.getDirectorId();
 
         if (request.getStatus() != null) {
@@ -1643,6 +1660,9 @@ public class MiningLeaseService {
 
                     if (master != null) {
                         master.setCurrentStatus("REJECTED");
+                        master.setRejectedAt(LocalDateTime.now());
+                        master.setRejectionRemarks(request.getRemarks());
+                        master.setCompletedAt(LocalDateTime.now());
                         applicationMasterRepository.save(master);
                     }
 
@@ -1848,6 +1868,11 @@ public class MiningLeaseService {
                     app.setRemarksME(request.getRemarks());
                     app.setMeReviewedAt(LocalDateTime.now());
 
+                    if (master != null) {
+                        master.setCurrentStatus("RESUBMIT FMFS");
+                        applicationMasterRepository.save(master);
+                    }
+
                     createRevisionRecord(app, "ME_REVIEW", request.getRemarks(), userId);
                     createTask(master, app, "APPLICANT", userId, app.getApplicantUserId());
 
@@ -1971,7 +1996,10 @@ public class MiningLeaseService {
             if (quarryLeaseApplication.isPresent()) {
                 quarryLeaseApplication1 = quarryLeaseApplication.get();
                 ApplicationMaster applicationMaster = quarryLeaseApplication1.getApplicationMaster();
+                LocalDateTime now = LocalDateTime.now();
                 applicationMaster.setCurrentStatus("MINING LEASE APPROVED");
+                applicationMaster.setApprovedAt(now);
+                applicationMaster.setCompletedAt(now);
                 quarryLeaseApplication1.setWorkOrderDocId(request.getWorkOrderDocId());
                 quarryLeaseApplication1.setWorkOrderRemarks(request.getRemarks());
                 quarryLeaseApplication1.setCurrentStatus("MINING LEASE APPROVED");
