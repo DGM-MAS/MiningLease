@@ -102,7 +102,7 @@ public class NotificationClient {
     @Async
     public void sendApplicationSubmittedNotification(String email, String applicantName,
                                                       String applicationNumber) {
-        String subject = "Quarry Lease Application Submitted - " + applicationNumber;
+        String subject = "Mining Lease Application Submitted - " + applicationNumber;
         String body = String.format("""
                 Dear %s,
 
@@ -177,6 +177,31 @@ public class NotificationClient {
         sendEmail(email, subject, body);
     }
 
+
+    @Async
+    public void sendUpliftingSuspensionNotification(String email, String applicantName,
+                                         String applicationNumber) {
+        String subject = "Congratulations! Mining Lease Application uplifting suspension has be uplifted. - " + applicationNumber;
+        String body = String.format("""
+                Dear %s,
+
+                We are pleased to inform you that your lease suspension application has been uplifted.
+
+                Application Number: %s
+
+                Please log in to the system to:
+                1. View your immediate suspension application details
+                
+                Thank you for using our services.
+
+                Best regards,
+                Mines Administrative System
+                Ministry of Energy and Natural Resources
+                """, applicantName, applicationNumber);
+
+        sendEmail(email, subject, body);
+    }
+
     /**
      * Send rejection notification to applicant.
      */
@@ -235,12 +260,12 @@ public class NotificationClient {
                                                        String applicantName,
                                                        String applicationNumber) {
 
-        String subject = "Application Fee Required - Quarry Lease Application " + applicationNumber;
+        String subject = "Application Fee Required - Mining Lease Application " + applicationNumber;
 
         String body = String.format("""
             Dear %s,
 
-            Your quarry lease application is pending for payment of the required application fee.
+            Your mining lease application is pending for payment of the required application fee.
 
             Application Number: %s
 
@@ -265,13 +290,60 @@ public class NotificationClient {
         String body = String.format("""
                 Dear %s,
 
-                Your quarry lease application requires additional information.
+                Your mining lease application requires additional information.
 
                 Application Number: %s
                 Review Stage: %s
                 Remarks: %s
 
                 Please log in to the system to provide the requested information and resubmit your application.
+
+                Thank you,
+                Mines Administrative System
+                Ministry of Energy and Natural Resources
+                """, applicantName, applicationNumber, stage, remarks != null ? remarks : "N/A");
+
+        sendEmail(email, subject, body);
+    }
+
+    @Async
+    public void sendTerminationRevisionRequestNotification(String email, String applicantName,
+                                                String applicationNumber, String stage, String remarks) {
+        String subject = "Additional Information Required for termination process - " + applicationNumber;
+        String body = String.format("""
+                Dear %s,
+
+                Your mining lease application are under termination review please provide requires additional information.
+
+                Application Number: %s
+                Review Stage: %s
+                Remarks: %s
+
+                Please log in to the system to provide the requested information and resubmit your additional information.
+
+                Thank you,
+                Mines Administrative System
+                Ministry of Energy and Natural Resources
+                """, applicantName, applicationNumber, stage, remarks != null ? remarks : "N/A");
+
+        sendEmail(email, subject, body);
+    }
+
+
+    @Async
+    public void sendImmediateSuspensionRevisionRequestPromoterNotification(String email, String applicantName,
+                                                           String applicationNumber, String stage, String remarks) {
+        String subject = "Rectification from promoter - " + applicationNumber;
+        String body = String.format("""
+                Dear %s,
+
+                Additional information from promoter has been provided. Please login to review the application.
+
+                Application Number: %s
+                Review Stage: %s
+                Remarks: %s
+
+                Please log in to the system to provide the requested information and resubmit your additional information.
 
                 Thank you,
                 Mines Administrative System
@@ -391,6 +463,54 @@ public class NotificationClient {
         sendEmail(email, subject, body);
     }
 
+    @Async
+    public void sendTerminationNotification(String email, String officerName,
+                                                 String applicationNumber) {
+        if (email == null) {
+            log.info("No email provided for termination notification. Application: {}", applicationNumber );
+            return;
+        }
+        String subject = "Termination Notification - " + applicationNumber;
+        String body = String.format("""
+                Dear %s,
+
+                The termination of mining has been approved by CMS Head.
+
+                Application Number: %s
+
+                Please log in to the system to review the details of termination.
+
+                Thank you,
+                Mines Administrative System
+                """, officerName != null ? officerName : "Officer", applicationNumber);
+
+        sendEmail(email, subject, body);
+    }
+
+    @Async
+    public void sendTerminationCancellationNotification(String email, String officerName,
+                                            String applicationNumber) {
+        if (email == null) {
+            log.info("No email provided for termination notification. Application: {}", applicationNumber );
+            return;
+        }
+        String subject = "Termination Cancelled  - " + applicationNumber;
+        String body = String.format("""
+                Dear %s,
+
+                The termination of mining lease has been cancelled by CMS Head.
+
+                Application Number: %s
+
+                Please log in to the system to review the details.
+
+                Thank you,
+                Mines Administrative System
+                """, officerName != null ? officerName : "Officer", applicationNumber);
+
+        sendEmail(email, subject, body);
+    }
+
     public void sendUserNotification(String title, String message, Long userId, String serviceId) {
 
         String url = UriComponentsBuilder
@@ -422,13 +542,13 @@ public class NotificationClient {
         }
     }
 
-    public void sendMailToDirectorAssigned(String directorEmail, String directorName, String applicationNumber) {
+    public void sendMiningLeaseMailToDirectorAssigned(String directorEmail, String directorName, String applicationNumber) {
         String subject = "New Application Assigned - " + applicationNumber;
         String body = String.format("""
                 Dear %s,
 
                 A new quarry lease application has been assigned to you.
-                Assign MPCD and Geologist focal respectively. 
+                Assign MPCD and Geologist focal respectively.
 
                 Application Number: %s
 
@@ -439,5 +559,27 @@ public class NotificationClient {
                 """, directorName, applicationNumber);
 
         sendEmail(directorEmail, subject, body);
+    }
+
+    /**
+     * Send application submitted notification to applicant.
+     */
+    @Async
+    public void sendApplicationSuspendedNotification(String email, String applicantName,
+                                                     String applicationNumber) {
+        String subject = "Mining Lease Application has been suspended - " + applicationNumber;
+        String body = String.format("""
+                Dear %s,
+
+                Your Mining lease application has been suspended.
+
+                Application Number: %s
+
+                Thank you,
+                Mines Administrative System
+                Ministry of Energy and Natural Resources
+                """, applicantName, applicationNumber);
+
+        sendEmail(email, subject, body);
     }
 }
