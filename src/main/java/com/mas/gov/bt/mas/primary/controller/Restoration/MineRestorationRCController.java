@@ -1,4 +1,4 @@
-package com.mas.gov.bt.mas.primary.controller;
+package com.mas.gov.bt.mas.primary.controller.Restoration;
 
 import com.mas.gov.bt.mas.primary.config.UserContext;
 import com.mas.gov.bt.mas.primary.dto.request.MineRestorationVerificationReportRequest;

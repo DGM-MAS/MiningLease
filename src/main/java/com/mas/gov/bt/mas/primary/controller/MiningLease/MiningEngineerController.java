@@ -1,9 +1,9 @@
-package com.mas.gov.bt.mas.primary.controller;
+package com.mas.gov.bt.mas.primary.controller.MiningLease;
 
 import com.mas.gov.bt.mas.primary.config.UserContext;
 import com.mas.gov.bt.mas.primary.dto.request.*;
 import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
-import com.mas.gov.bt.mas.primary.services.MiningLeaseRenewalService;
+import com.mas.gov.bt.mas.primary.services.MiningLeaseService;
 import com.mas.gov.bt.mas.primary.utility.PageRequest1Based;
 import com.mas.gov.bt.mas.primary.utility.SuccessResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,24 +20,25 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+
 @RestController
-@RequestMapping("/api/mining-lease-renewal/mining-engineer")
+@RequestMapping("/api/mining-lease/mining-engineer")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Mining Lease Renewal- Mining Engineer", description = "Mining Engineer renewal Review APIs")
+@Tag(name = "Mining Lease - Mining Engineer", description = "Mining Engineer Review APIs")
 @SecurityRequirement(name = "bearerAuth")
-public class MiningEngineerRenewalController {
+public class MiningEngineerController {
 
+    private final MiningLeaseService miningLeaseService;
     private final UserContext userContext;
-    private final MiningLeaseRenewalService miningLeaseRenewalService;
 
     @PostMapping("/review")
-    @Operation(summary = "Review renewal application", description = "Review  renewal mining lease application by Mining Engineer")
+    @Operation(summary = "Review application", description = "Review mining lease application by Mining Engineer")
     public ResponseEntity<SuccessResponse<MiningLeaseResponse>> reviewApplication(
             @Valid @RequestBody ReviewMiningLeaseApplicationME request) {
 
         Long userId = userContext.getCurrentUserId();
-        MiningLeaseResponse response = miningLeaseRenewalService.reviewApplicationME(request, userId);
+        MiningLeaseResponse response = miningLeaseService.reviewApplicationME(request, userId);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new SuccessResponse<>("Application reviewed successfully", response));
@@ -51,7 +52,7 @@ public class MiningEngineerRenewalController {
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "createdOn") String sortBy,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "DESC") String sortDirection) {
 
         Pageable pageable = PageRequest1Based.of(page, size,
@@ -59,7 +60,7 @@ public class MiningEngineerRenewalController {
 
         Long userId = userContext.getCurrentUserId();
         return ResponseEntity.ok(
-                miningLeaseRenewalService.getAssignedToMineEngineer(userId, pageable, search)
+                miningLeaseService.getAssignedToMineEngineer(userId, pageable, search)
         );
     }
 
@@ -69,23 +70,23 @@ public class MiningEngineerRenewalController {
     public ResponseEntity<SuccessResponse<MiningLeaseResponse>> submitFMFSFile(
             @Valid @RequestBody MiningLeaseLLCRequest request) {
 
-        MiningLeaseResponse response = miningLeaseRenewalService.submitLLC(request);
+        MiningLeaseResponse response = miningLeaseService.submitLLC(request);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new SuccessResponse<>("LLC submitted successfully", response));
     }
 
     // Used by user to submit LLC
-//    @PostMapping("/applicationNoteSheet")
-//    @Operation(summary = "Submit note sheet file ", description = "Submit Note Sheet file and any additional information for quarry lease application")
-//    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> submitNoteSheetFile(
-//            @Valid @RequestBody MiningLeaseNoteSheetRequest request) {
-//
-//        MiningLeaseResponse response = miningLeaseRenewalService.submitNoteSheetAndAdditionalDetails(request);
-//
-//        return ResponseEntity.status(HttpStatus.CREATED)
-//                .body(new SuccessResponse<>("LLC submitted successfully", response));
-//    }
+    @PostMapping("/applicationNoteSheet")
+    @Operation(summary = "Submit note sheet file ", description = "Submit Note Sheet file and any additional information for quarry lease application")
+    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> submitNoteSheetFile(
+            @Valid @RequestBody MiningLeaseNoteSheetRequest request) {
+
+        MiningLeaseResponse response = miningLeaseService.submitNoteSheetAndAdditionalDetails(request);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new SuccessResponse<>("LLC submitted successfully", response));
+    }
 
     // Used by user to submit work order
     @PostMapping("/applicationsWorkOrder")
@@ -93,7 +94,7 @@ public class MiningEngineerRenewalController {
     public ResponseEntity<SuccessResponse<MiningLeaseResponse>> submitWorkOrderFile(
             @Valid @RequestBody MiningLeaseWorkOrderRequest request) {
 
-        MiningLeaseResponse response = miningLeaseRenewalService.submitWorkOrder(request);
+        MiningLeaseResponse response = miningLeaseService.submitWorkOrder(request);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new SuccessResponse<>("Application created successfully", response));
@@ -106,37 +107,11 @@ public class MiningEngineerRenewalController {
             @Valid @RequestBody MiningLeaseMLARequest request) {
 
         Long userId = userContext.getCurrentUserId();
-        MiningLeaseResponse response = miningLeaseRenewalService.submitMLA(request, userId);
+        MiningLeaseResponse response = miningLeaseService.submitMLA(request, userId);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new SuccessResponse<>("Application created successfully", response));
     }
 
-    @PostMapping("/notesheet")
-    @Operation(summary = "Upload signed notesheet", description = "Upload signed notesheet for mining lease renewal application")
-    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> uploadNoteSheet(
-            @Valid @RequestBody MiningLeaseNoteSheetRequest request) {
 
-        MiningLeaseResponse response = miningLeaseRenewalService.submitNoteSheet(request);
-
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new SuccessResponse<>("Notesheet uploaded successfully", response));
-    }
-
-    @PostMapping("/submitNotesheetMLA")
-    @Operation(summary = "ME submits notesheet and MLA", description = "Mining Engineer submits notesheet and MLA after Director approval. Sets status to PAYMENT PENDING if ERB regularization required, otherwise APPROVED BY DIRECTOR.")
-    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> submitNotesheetAndMLA(
-            @Valid @RequestBody RenewalNotesheetMlaRequest request) {
-
-        Long userId = userContext.getCurrentUserId();
-        MiningLeaseResponse response = miningLeaseRenewalService.submitNotesheetAndMLA(request, userId);
-        return ResponseEntity.ok(new SuccessResponse<>("Submitted successfully", response));
-    }
-
-    @GetMapping("/{id}")
-    @Operation(summary = "Get application by ID", description = "Get renewal application details by ID")
-    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> getApplicationById(@PathVariable Long id) {
-        return ResponseEntity.ok(new SuccessResponse<>("Application fetched successfully",
-                miningLeaseRenewalService.getApplicationById(id)));
-    }
 }
