@@ -1,9 +1,8 @@
-package com.mas.gov.bt.mas.primary.controller;
+package com.mas.gov.bt.mas.primary.controller.TemporaryClosure;
 
 import com.mas.gov.bt.mas.primary.config.UserContext;
 import com.mas.gov.bt.mas.primary.dto.request.ReassignTaskRequest;
 import com.mas.gov.bt.mas.primary.dto.request.TemporaryClosureNotificationRequest;
-import com.mas.gov.bt.mas.primary.dto.response.ApplicationListResponse;
 import com.mas.gov.bt.mas.primary.dto.response.TemporaryClosureNotificationResponse;
 import com.mas.gov.bt.mas.primary.services.TemporaryClosureService;
 import com.mas.gov.bt.mas.primary.utility.PageRequest1Based;

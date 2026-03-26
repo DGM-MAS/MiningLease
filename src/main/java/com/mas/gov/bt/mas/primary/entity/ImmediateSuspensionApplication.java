@@ -1,5 +1,6 @@
 package com.mas.gov.bt.mas.primary.entity;
 
+
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -10,11 +11,11 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "t_termination_application")
+@Table(name = "t_immediate_suspension_application")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class TerminationApplicationEntity {
+public class ImmediateSuspensionApplication {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -22,6 +23,9 @@ public class TerminationApplicationEntity {
 
     @Column(name = "application_number", unique = true, nullable = false, length = 30)
     private String applicationNumber;
+
+    @Column(name = "application_from")
+    private String applicationFrom;
 
     // Reference to master application
     @OneToOne(fetch = FetchType.LAZY)
@@ -37,26 +41,26 @@ public class TerminationApplicationEntity {
     @Column(name = "applicant_name", length = 255)
     private String applicantName;
 
-    @Column(name = "termination_id")
-    private String terminationId;
+    @Column(name = "suspension_reason_id")
+    private Long suspensionReasonId;
 
-    @Column(name = "field_id")
-    private Long fileId;
+    @Column(name = "remarks_rc_mi")
+    private String remarksRcMi;
 
-    @Column(name = "remarks_chief")
-    private String remarksChief;
+    @Column(name = "rc_mi_reviewed_at")
+    private LocalDateTime rcMiReviewedAt;
 
-    @Column(name = "chief_reviewed_at")
-    private LocalDateTime chiefReviewedAt;
+    @Column(name = "promoter_reviewed_at")
+    private LocalDateTime promoterReviewedAt;
 
-    @Column(name = "remarks_cms_head")
-    private String remarksCMSHead;
+    @Column(name = "promoter_file_id")
+    private Long promoterFileId;
 
-    @Column(name = "cms_head_reviewed_at")
-    private LocalDateTime cmsHeadReviewedAt;
+    @Column(name = "mi_reviewed_at")
+    private LocalDateTime miReviewedAt;
 
-    @Column(name = "cms_head_file_id")
-    private Long cmsHeadFileId;
+    @Column(name = "mi_file_id")
+    private Long miFileId;
 
     // ========== Status & Workflow ==========
     @Column(name = "current_status", length = 30)

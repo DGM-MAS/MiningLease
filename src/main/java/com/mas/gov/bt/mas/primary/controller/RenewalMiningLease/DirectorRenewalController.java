@@ -1,7 +1,6 @@
-package com.mas.gov.bt.mas.primary.controller;
+package com.mas.gov.bt.mas.primary.controller.RenewalMiningLease;
 
 import com.mas.gov.bt.mas.primary.config.UserContext;
-import com.mas.gov.bt.mas.primary.dto.request.AssignTaskDirector;
 import com.mas.gov.bt.mas.primary.dto.request.RenewalTaskAssignedDirector;
 import com.mas.gov.bt.mas.primary.dto.request.ReviewMiningLeaseApplicationDirector;
 import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
