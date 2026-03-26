@@ -1,15 +1,14 @@
 package com.mas.gov.bt.mas.primary.services;
 
+import com.mas.gov.bt.mas.primary.dto.TerminationGroupedProjection;
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
 import com.mas.gov.bt.mas.primary.dto.request.ReassignTaskRequest;
 import com.mas.gov.bt.mas.primary.dto.request.ReviewTerminationApplicationCMSHead;
 import com.mas.gov.bt.mas.primary.dto.request.TerminationApplicationRequest;
 import com.mas.gov.bt.mas.primary.dto.response.TerminationApplicationResponse;
-import com.mas.gov.bt.mas.primary.entity.ApplicationMaster;
-import com.mas.gov.bt.mas.primary.entity.MiningLeaseApplication;
-import com.mas.gov.bt.mas.primary.entity.TaskManagement;
-import com.mas.gov.bt.mas.primary.entity.TerminationApplicationEntity;
+import com.mas.gov.bt.mas.primary.entity.*;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
+import com.mas.gov.bt.mas.primary.exception.ResourceNotFoundException;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.mapper.TerminationMapper;
 import com.mas.gov.bt.mas.primary.repository.ApplicationMasterRepository;
@@ -22,14 +21,15 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.time.Year;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -52,63 +52,79 @@ public class TerminationService {
     private final MiningLeaseApplicationRepository miningLeaseApplicationRepository;
 
     @Transactional
-    public TerminationApplicationResponse submitTerminationApplication(@Valid TerminationApplicationRequest request, Long userId) {
+    public List<TerminationApplicationResponse> submitTerminationApplication(
+            @Valid TerminationApplicationRequest request, Long userId) {
 
-        Optional<MiningLeaseApplication> miningLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationNumber().getFirst());
-        MiningLeaseApplication miningLeaseApplication1 = null;
-        if (miningLeaseApplication.isPresent()) {
-            miningLeaseApplication1 = miningLeaseApplication.get();
-        }
-        // 1.
-        // ======== SAVE TERMINATION SUBMITTED BY APPLICANT ====== //
+        String terminationId = generateTerminationId();
 
-        TerminationApplicationEntity terminationApplicationEntity =  new TerminationApplicationEntity();
-        terminationApplicationEntity.setPromoterUserId(request.getPromoterUserId());
-        terminationApplicationEntity.setFileId(request.getFileId());
-        terminationApplicationEntity.setCreatedBy(userId);
-        terminationApplicationEntity.setCreatedAt(LocalDateTime.now());
-        terminationApplicationEntity.setApplicationNumber(request.getApplicationNumber().toString());
-        terminationApplicationEntity.setRemarksChief(request.getRemarksChief());
+        List<TerminationApplicationResponse> responseList = new ArrayList<>();
 
-        terminationApplicationRepository.save(terminationApplicationEntity);
-
-        // =====================================================
-        // 2. ASSIGN DIRECTOR
-        // =====================================================
+        // ✅ Assign once (better design)
         UserWorkloadProjection assignedCMSHead = assignCMSHead();
 
-        // =====================================================
-        // 3. Application master and create task for director
-        // =====================================================
-        assert miningLeaseApplication1 != null;
-        ApplicationMaster master = miningLeaseApplication1.getApplicationMaster();
-        master.setSubmittedAt(LocalDateTime.now());
-        master.setCurrentStatus("SUBMITTED");
-        master.setApplicantUserId(userId);
-        master.setServiceCode(SERVICE_CODE);
-        applicationMasterRepository.save(master);
-        terminationApplicationEntity.setApplicationMaster(master);
-        createTask( master, terminationApplicationEntity, "CMS HEAD", userId, assignedCMSHead.getUserId());
+        for (String appNo : request.getApplicationNumber()) {
 
-        if (assignedCMSHead.getEmail() != null) {
-            notificationClient.sendMailToDirectorAssigned(
-                    assignedCMSHead.getEmail(),
-                    assignedCMSHead.getUsername(),
-                    terminationApplicationEntity.getApplicationNumber());
+            Optional<MiningLeaseApplication> miningLeaseApplication =
+                    miningLeaseApplicationRepository.findByApplicationNumber(appNo);
+
+            if (miningLeaseApplication.isEmpty()) {
+                throw new RuntimeException("Invalid application number: " + appNo);
+            }
+
+            MiningLeaseApplication miningLeaseApplication1 = miningLeaseApplication.get();
+
+            TerminationApplicationEntity entity = new TerminationApplicationEntity();
+
+            entity.setTerminationId(terminationId);
+            entity.setApplicationNumber(appNo);
+            entity.setPromoterUserId(request.getPromoterUserId());
+            entity.setFileId(request.getFileId());
+            entity.setCreatedBy(userId);
+            entity.setCreatedAt(LocalDateTime.now());
+            entity.setRemarksChief(request.getRemarksChief());
+            entity.setCurrentStatus("SUBMITTED");
+
+            entity.setApplicantName(miningLeaseApplication1.getApplicantName());
+            entity.setApplicantEmail(miningLeaseApplication1.getApplicantEmail());
+
+            // Application master
+            ApplicationMaster master = miningLeaseApplication1.getApplicationMaster();
+            master.setSubmittedAt(LocalDateTime.now());
+            master.setCurrentStatus("SUBMITTED");
+            master.setApplicantUserId(userId);
+            master.setServiceCode(SERVICE_CODE);
+            applicationMasterRepository.save(master);
+
+            entity.setApplicationMaster(master);
+
+            terminationApplicationRepository.save(entity);
+
+            // Task creation
+            createTask(master, entity, "CMS HEAD", userId, assignedCMSHead.getUserId());
+
+            // Notifications
+            if (assignedCMSHead.getEmail() != null) {
+                notificationClient.sendMiningLeaseMailToDirectorAssigned(
+                        assignedCMSHead.getEmail(),
+                        assignedCMSHead.getUsername(),
+                        entity.getApplicationNumber());
+            }
+
+            if (assignedCMSHead.getUserId() != null) {
+                String title = "Termination application has been assigned.";
+                String message = "Application No. " + entity.getApplicationNumber() + " assigned for review.";
+                String serviceId = "108";
+                notificationClient.sendUserNotification(title, message, assignedCMSHead.getUserId(), serviceId);
+            }
+
+            // ✅ Add to response list
+            responseList.add(terminationMapper.toResponse(entity));
         }
 
-        if(assignedCMSHead.getUserId()!= null) {
-            String title = "Termination application has been assigned.";
-            String message = "An application for termination has been assigned for review. Application No. "+ terminationApplicationEntity.getApplicationNumber()+" Please login to review the report.";
-            String serviceId = "108";
-            notificationClient.sendUserNotification(title, message, assignedCMSHead.getUserId(), serviceId);
-        }else {
-            throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
-        }
-
-        return terminationMapper.toResponse(terminationApplicationEntity);
+        return responseList;
     }
 
+    @Transactional(readOnly = true)
     private UserWorkloadProjection assignCMSHead() {
         UserWorkloadProjection cmsHead =
                 terminationApplicationRepository.findCMSTermination();
@@ -206,106 +222,275 @@ public class TerminationService {
         log.info("CMS Head task {} reassigned to user {}", taskManagement.getId(), request.getNewAssigneeUserId());
     }
 
-//    public TerminationApplicationResponse reviewApplicationCMSHead(@Valid ReviewTerminationApplicationCMSHead request, Long userId) {
-//        log.info("Reviewing Termination application by CMS Head user: {}", userId);
-//
-//        MiningLeaseApplication app = findApplicationById(request.getId());
-//        ApplicationMaster master = app.getApplicationMaster();
-//
-//        completeCurrentTask(master,request.getStatus(), request.getRemarks());
-//
-//        if (request.getStatus() != null) {
-//            switch (request.getStatus()) {
-//
-//                case "Accepted" -> {
-//                    LocalDateTime now = LocalDateTime.now();
-//                    app.setCurrentStatus("DIRECTOR APPROVED FMFS");
-//                    app.setRemarksDirector(request.getRemarks());
-//                    app.setDirectorReviewedAt(now);
-//                    app.setApprovedAt(now);
-//
-//                    List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(app.getApplicationNumber(),"FMFS SUBMITTED","MINE ENGINEER", SERVICE_CODE);
-//                    Long mineEngineerId = null;
-//                    if (taskManagement != null) {
-//                        TaskManagement taskManagement1 = taskManagement.getFirst();
-//                        mineEngineerId = taskManagement1.getAssignedToUserId();
-//                    }
-//
-//                    if (master != null) {
-//                        master.setCurrentStatus("DIRECTOR APPROVED FMFS");
-//                        master.setApprovedAt(now);
-//                        master.setCompletedAt(now);
-//                        applicationMasterRepository.save(master);
-//                    }
-//
-//                    if (app.getApplicantEmail() != null) {
-//                        notificationClient.sendApprovalNotification(
-//                                app.getApplicantEmail(),
-//                                app.getApplicantName(),
-//                                app.getApplicationNumber());
-//                    }
-//                    assert master != null;
-//                    createTask( master, app, "DIRECTOR APPROVED FMFS", userId, mineEngineerId);
-//                }
-//                case "Approved" -> {
-//                    LocalDateTime now = LocalDateTime.now();
-//                    app.setCurrentStatus("APPROVED BY DIRECTOR");
-//                    app.setRemarksDirector(request.getRemarks());
-//                    app.setMlaSignedAt(now);
-//                    app.setMlaStatus("SIGNED");
-//                    app.setDirectorReviewedAt(now);
-//                    app.setApprovedAt(now);
-//
-//                    if (master != null) {
-//                        master.setCurrentStatus("APPROVED BY DIRECTOR");
-//                        master.setApprovedAt(now);
-//                        master.setCompletedAt(now);
-//                        applicationMasterRepository.save(master);
-//                    }
-//
-//                    if (app.getApplicantEmail() != null) {
-//                        notificationClient.sendApprovalNotification(
-//                                app.getApplicantEmail(),
-//                                app.getApplicantName(),
-//                                app.getApplicationNumber());
-//                    }
-//
-//                    if (app.getApplicantEmail() != null) {
-//                        notificationClient.sendMLASigningNotification(
-//                                app.getApplicantEmail(),
-//                                app.getApplicantName(),
-//                                app.getApplicationNumber());
-//                    }
-//                    assert master != null;
-//                    createTask(master, app, "DIRECTOR", userId, userId);
-//                }
-//                case "Rejected" -> {
-//                    app.setCurrentStatus("REJECTED");
-//                    app.setRemarksDirector(request.getRemarks());
-//                    app.setDirectorReviewedAt(LocalDateTime.now());
-//                    app.setRejectedAt(LocalDateTime.now());
-//                    app.setRejectionReason(request.getRemarks());
-//
-//                    if (master != null) {
-//                        master.setCurrentStatus("REJECTED");
-//                        master.setRejectedAt(LocalDateTime.now());
-//                        master.setRejectionRemarks(request.getRemarks());
-//                        master.setCompletedAt(LocalDateTime.now());
-//                        applicationMasterRepository.save(master);
-//                    }
-//
-//                    if (app.getApplicantEmail() != null) {
-//                        notificationClient.sendRejectionNotification(
-//                                app.getApplicantEmail(),
-//                                app.getApplicantName(),
-//                                app.getApplicationNumber(),
-//                                request.getRemarks());
-//                    }
-//                }
-//                default -> throw new IllegalArgumentException("Application status not recognized");
-//            }
-//            miningLeaseApplicationRepository.save(app);
-//        }
-//        return mapper.toResponse(app);
-//    }
+    @Transactional
+    public TerminationApplicationResponse reviewApplicationCMSHead(@Valid ReviewTerminationApplicationCMSHead request, Long userId) {
+        log.info("Reviewing Termination application by CMS Head user: {}", userId);
+
+        TerminationApplicationEntity app = findApplicationById(request.getId());
+        ApplicationMaster master = app.getApplicationMaster();
+
+        if (request.getStatus() != null) {
+            switch (request.getStatus()) {
+
+                case "Approved" -> {
+                    LocalDateTime now = LocalDateTime.now();
+                    app.setCurrentStatus("CMS HEAD APPROVED");
+                    app.setRemarksCMSHead(request.getRemarks());
+                    app.setCmsHeadReviewedAt(now);
+                    app.setCmsHeadFileId(request.getFileId());
+                    app.setApprovedAt(now);
+
+                    if (master != null) {
+                        master.setCurrentStatus("CMS HEAD APPROVED");
+                        master.setApprovedAt(now);
+                        master.setCompletedAt(now);
+                        applicationMasterRepository.save(master);
+                    }
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendTerminationNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber());
+                    }
+                    assert master != null;
+                    createTask( master, app, "DIRECTOR CMS APPROVED", userId, app.getCreatedBy());
+
+                    Optional<MiningLeaseApplication> miningLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(app.getApplicationNumber());
+                    MiningLeaseApplication miningLeaseApplicationEntity = null;
+                    if (miningLeaseApplication.isPresent()) {
+                        miningLeaseApplicationEntity = miningLeaseApplication.get();
+                    }
+                    assert miningLeaseApplicationEntity != null;
+                    miningLeaseApplicationEntity.setCurrentStatus("TERMINATION APPROVED");
+                    miningLeaseApplicationRepository.save(miningLeaseApplicationEntity);
+                }
+                case "Rectification" -> {
+                    LocalDateTime now = LocalDateTime.now();
+                    app.setCurrentStatus("RECTIFICATION BY CMS");
+                    app.setRemarksCMSHead(request.getRemarks());
+                    app.setCmsHeadReviewedAt(now);
+                    app.setCmsHeadFileId(request.getFileId());
+
+                    if (master != null) {
+                        master.setCurrentStatus("RECTIFICATION BY CMS");
+                        master.setRemarks(request.getRemarks());
+                        applicationMasterRepository.save(master);
+                    }
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendTerminationRevisionRequestNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber(),
+                                app.getCurrentStatus(),
+                                app.getRemarksCMSHead());
+                    }
+
+                    assert master != null;
+                    createTask(master, app, "APPLICANT", userId, app.getPromoterUserId());
+                }
+                case "Lift suspension" -> {
+                    LocalDateTime now = LocalDateTime.now();
+                    app.setCurrentStatus("TERMINATION CANCELED");
+                    app.setRemarksCMSHead(request.getRemarks());
+                    app.setCmsHeadReviewedAt(now);
+                    app.setCmsHeadFileId(request.getFileId());
+                    app.setApprovedAt(now);
+
+                    if (master != null) {
+                        master.setCurrentStatus("TERMINATION CANCELED");
+                        master.setApprovedAt(now);
+                        master.setCompletedAt(now);
+                        applicationMasterRepository.save(master);
+                    }
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendTerminationCancellationNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber());
+                    }
+                    assert master != null;
+                    createTask( master, app, "TERMINATION CANCELED", userId, app.getCreatedBy());
+                }
+                default -> throw new IllegalArgumentException("Application status not recognized");
+            }
+            terminationApplicationRepository.save(app);
+        }
+        return terminationMapper.toResponse(app);
+    }
+
+    private TerminationApplicationEntity findApplicationById(Long id) {
+        return terminationApplicationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Application not found with ID: " + id));
+    }
+
+    public SuccessResponse<List<TerminationApplicationResponse>> getAssignedToPromoter(Long userId, Pageable pageable, String search) {
+        Page<TerminationApplicationEntity> page;
+
+        if (search == null || search.isBlank()) {
+
+            page = terminationApplicationRepository
+                    .findAssignedToUserPromoter(userId, pageable);
+
+        } else {
+
+            page = terminationApplicationRepository
+                    .findAssignedToUserAndSearchPromoter(
+                            userId,
+                            search.trim(),
+                            pageable
+                    );
+        }
+
+        Page<TerminationApplicationResponse> responsePage =
+                page.map(terminationMapper::toResponse);
+
+        return SuccessResponse.fromPage(
+                "Assigned applications fetched successfully",
+                responsePage
+        );
+    }
+
+    @Transactional
+    public TerminationApplicationResponse reviewApplicationPromoter(@Valid ReviewTerminationApplicationCMSHead request, Long userId) {
+        log.info("Reviewing Termination application by Promoter: {}", userId);
+
+        TerminationApplicationEntity app = findApplicationById(request.getId());
+        ApplicationMaster master = app.getApplicationMaster();
+
+        TaskManagement taskManagement = taskManagementRepository.findByAssignedToRoleAndTaskStatusAndServiceCode("CMS HEAD", "SUBMITTED", SERVICE_CODE );
+        if (request.getStatus() != null) {
+
+            if (request.getStatus().equals("Rectification")) {
+                LocalDateTime now = LocalDateTime.now();
+                app.setCurrentStatus("RECTIFICATION BY PROMOTER");
+                app.setRemarksCMSHead(request.getRemarks());
+                app.setCmsHeadReviewedAt(now);
+                app.setCmsHeadFileId(request.getFileId());
+
+                if (master != null) {
+                    master.setCurrentStatus("RECTIFICATION BY PROMOTER");
+                    master.setRemarks(request.getRemarks());
+                    applicationMasterRepository.save(master);
+                }
+
+                if (app.getApplicantEmail() != null) {
+                    notificationClient.sendTerminationRevisionRequestNotification(
+                            app.getApplicantEmail(),
+                            app.getApplicantName(),
+                            app.getApplicationNumber(),
+                            app.getCurrentStatus(),
+                            app.getRemarksCMSHead());
+                }
+
+                assert master != null;
+                createTask(master, app, "CMS HEAD", userId, taskManagement.getAssignedToUserId());
+            } else {
+                throw new IllegalArgumentException("Application status not recognized");
+            }
+            terminationApplicationRepository.save(app);
+}
+        return terminationMapper.toResponse(app);
+
+    }
+
+    public SuccessResponse<List<TerminationApplicationResponse>> getAllApplications(
+            Long userId, Pageable pageable, String search) {
+
+        // Normalize search
+        if (search != null && search.isBlank()) {
+            search = null;
+        }
+
+        Page<TerminationGroupedProjection> page =
+                terminationApplicationRepository.findGroupedApplications(userId, search, pageable);
+
+        Page<TerminationApplicationResponse> responsePage = page.map(p -> {
+
+            TerminationApplicationResponse res = new TerminationApplicationResponse();
+
+            res.setTerminationId(p.getTerminationId());
+
+            // Convert array → List
+            if (p.getApplicationNumbers() != null) {
+                res.setApplicationNumbers(Arrays.asList(p.getApplicationNumbers()));
+            }
+
+            res.setCurrentStatus(p.getCurrentStatus());
+            res.setCreatedAt(p.getCreatedAt());
+
+            // ✅ NEW FIELDS
+            res.setApplicantName(p.getApplicantName());
+            res.setPromoterUserId(p.getPromoterUserId());
+
+            return res;
+        });
+
+        return SuccessResponse.fromPage(
+                "Assigned applications fetched successfully",
+                responsePage
+        );
+    }
+
+    public Page<TerminationApplicationResponse> getArchivedApplications(Pageable pageable, String search, Long userId) {
+        List<String> archivedStatuses = List.of("CMS HEAD APPROVED");
+        Page<TerminationApplicationEntity> applications;
+
+        if (search == null || search.isBlank()) {
+            applications = terminationApplicationRepository.findArchivedAssignedToUser(
+                    userId,
+                    archivedStatuses,
+                    pageable);
+        }
+        else {
+
+            applications = terminationApplicationRepository.findArchivedAssignedToUserAndSearch(
+                    userId,
+                    search.trim(),
+                    pageable
+            );
+        }
+        return applications.map(terminationMapper::toListResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<TerminationApplicationResponse> getMyArchivedApplications(Long userId, Pageable pageable, String search) {
+        List<String> archivedStatuses = List.of("CMS HEAD APPROVED");
+        Page<TerminationApplicationEntity> applications ;
+
+        if (search == null || search.isBlank()) {
+            applications =  terminationApplicationRepository.findByApplicantUserIdAndStatusIn(userId, archivedStatuses, pageable);
+        } else {
+            applications = terminationApplicationRepository.findByApplicantUserIdAndSearch(userId, archivedStatuses, search.trim(), pageable);
+        }
+
+        return applications.map(terminationMapper::toListResponse);
+    }
+
+    @Transactional
+    private synchronized String generateTerminationId() {
+
+        int year = Year.now().getValue();
+        String prefix = String.format("TERMINATION-%d-", year);
+
+        Integer maxSequence = terminationApplicationRepository.findMaxSequenceByPrefix(prefix);
+
+        long nextSequence = (maxSequence == null ? 0 : maxSequence) + 1;
+
+        return String.format("TERMINATION-%d-%06d", year, nextSequence);
+    }
+
+    public SuccessResponse<List<TerminationApplicationResponse>> getAllApplicationAdmin(Pageable pageable, String search) {
+        Page<TerminationApplicationEntity> page;
+
+        if (search == null || search.isBlank()) {
+            page = terminationApplicationRepository.findAll(pageable);
+        } else {
+            page = terminationApplicationRepository.findAllBySearch(search.trim(), pageable);
+        }
+
+        return SuccessResponse.fromPage("Applications fetched successfully", page.map(terminationMapper::toResponse));
+    }
 }
