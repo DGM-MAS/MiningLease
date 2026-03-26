@@ -75,184 +75,195 @@ public class MiningLeaseService {
         boolean isDraft = "Draft".equalsIgnoreCase(request.getApplicationType());
         LocalDateTime now = LocalDateTime.now();
 
-        // =====================================================
-        // 1. FETCH EXISTING APPLICATION OR CREATE NEW
-        // =====================================================
-        MiningLeaseApplication application =
-                miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationNo())
-                        .orElse(new MiningLeaseApplication());
+        // ============================================================
+        // 0. Checking if the user has not more than two mining lease
+        // ============================================================
+            String houseHoldNumber = miningLeaseApplicationRepository.findUserHouseHoldNumber(userId);
+            Integer miningLeaseCount = miningLeaseApplicationRepository.findLeaseCountForMining(houseHoldNumber);
 
-        boolean isNew = application.getId() == null;
+            if(miningLeaseCount <=1){
+                // =====================================================
+                // 1. FETCH EXISTING APPLICATION OR CREATE NEW
+                // =====================================================
+                MiningLeaseApplication application =
+                        miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationNo())
+                                .orElse(new MiningLeaseApplication());
 
-        // =====================================================
-        // 2. GENERATE APPLICATION NUMBER (ONLY IF NEW)
-        // =====================================================
-        String applicationNumber;
+                boolean isNew = application.getId() == null;
 
-        if (request.getApplicationNo() == null) {
-            applicationNumber = isDraft
-                    ? generateDraftApplicationNumber()
-                    : generateApplicationNumber();
-        } else {
-            if(Objects.equals(request.getApplicationType(), "Submitted") && Objects.equals(application.getCurrentStatus(), "DRAFT")) {
-                applicationNumber = generateApplicationNumber();
+                // =====================================================
+                // 2. GENERATE APPLICATION NUMBER (ONLY IF NEW)
+                // =====================================================
+                String applicationNumber;
+
+                if (request.getApplicationNo() == null) {
+                    applicationNumber = isDraft
+                            ? generateDraftApplicationNumber()
+                            : generateApplicationNumber();
+                } else {
+                    if(Objects.equals(request.getApplicationType(), "Submitted") && Objects.equals(application.getCurrentStatus(), "DRAFT")) {
+                        applicationNumber = generateApplicationNumber();
+                    }else {
+                        applicationNumber = request.getApplicationNo();
+                    }
+                }
+
+                // =====================================================
+                // 3. CREATE MASTER ONLY FOR NEW APPLICATION
+                // =====================================================
+                if (isNew) {
+                    ApplicationMaster master =
+                            createApplicationMaster(applicationNumber, userId);
+
+                    application.setApplicationNumber(applicationNumber);
+                    application.setApplicationMaster(master);
+                    application.setApplicantUserId(userId);
+                    application.setCreatedBy(userId);
+                    application.setCurrentStatus("DRAFT");
+                    application.setIsActive(true);
+                }
+
+                // =====================================================
+                // 4. UPDATE ENTITY FROM REQUEST (SAFE UPDATE)
+                // =====================================================
+                mapper.updateEntityFromRequest(request, application);
+
+                if (request.getDzongkhag() != null && !request.getDzongkhag().isEmpty()) {
+                    DzongkhagLookup dzongkhag = dzongkhagLookupRepository
+                            .findById(request.getDzongkhag())
+                            .orElseThrow(() -> new RuntimeException("Invalid Dzongkhag ID"));
+
+                    application.setDzongkhag(dzongkhag);
+                }
+
+                if (request.getGewog() != null && !request.getGewog().isEmpty()) {
+                    GewogLookup gewog = (GewogLookup) gewogLookupRepository
+                            .findByGewogId(request.getGewog())
+                            .orElseThrow(() -> new RuntimeException("Invalid gewog ID"));
+
+                    application.setGewog(gewog);
+                }
+
+                if (request.getNearestVillage() != null && !request.getNearestVillage().isEmpty()) {
+                    VillageLookup villageLookup = (VillageLookup) villageLookupRepository
+                            .findByVillageSerialNo(Integer.parseInt(request.getNearestVillage()))
+                            .orElseThrow(() -> new RuntimeException("Invalid village ID"));
+
+                    application.setNearestVillage(villageLookup);
+                }
+
+                application.setUpdatedBy(userId);
+
+                PaymentMaster paymentMaster =
+                        paymentMasterRepository.findByServiceName(SERVICE_CODE);
+
+                // =====================================================
+                // 5. DRAFT FLOW
+                // =====================================================
+                if (isDraft) {
+
+                    application.setCurrentStatus("DRAFT");
+
+                    // Draft does not trigger workflow or notifications
+                    miningLeaseApplicationRepository.save(application);
+
+                    log.info("Application saved as DRAFT: {}", application.getApplicationNumber());
+
+                    return mapper.toResponse(application);
+                }
+
+                // =====================================================
+                // 6. SUBMIT FLOW
+                // =====================================================
+
+                // Safety checks
+                if (!userId.equals(application.getApplicantUserId())) {
+                    throw new UnauthorizedOperationException(
+                            "You are not authorized to submit this application");
+                }
+
+                boolean feeRequired =
+                        paymentMaster != null &&
+                                Boolean.TRUE.equals(paymentMaster.getIsApplicationFeeEnabled());
+
+                Long directorId;
+                if (feeRequired) {
+                    application.setCurrentStatus("PAYMENT PENDING");
+                    application.setApplicationFeesAmount(paymentMaster.getApplicationFee());
+                    application.setApplicationFeesRequired(true);
+                } else {
+                    application.setCurrentStatus("SUBMITTED");
+                }
+
+                application.setSubmittedAt(now);
+                application.setApplicationNumber(applicationNumber);
+                // =====================================================
+                // 6. UPDATE APPLICATION MASTER
+                // =====================================================
+                ApplicationMaster master = application.getApplicationMaster();
+
+                master.setApplicationNumber(applicationNumber);
+                master.setCurrentStatus(application.getCurrentStatus());
+                master.setSubmittedAt(now);
+                applicationMasterRepository.save(master);
+
+                // Resubmission of application to director after application submission from client
+                List<TaskManagement> getAssignedDirector =
+                        taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode
+                                (application.getApplicationNumber(),"GR SUBMITTED", "DIRECTOR", SERVICE_CODE);
+                TaskManagement taskManagement = getAssignedDirector.getFirst();
+                directorId = taskManagement.getAssignedToUserId();
+
+                createTask(master,application,"DIRECTOR",userId,directorId);
+
+                // =====================================================
+                // 7. NOTIFICATIONS
+                // =====================================================
+
+                if (application.getApplicantEmail() != null) {
+                    if (feeRequired) {
+                        notificationClient.sendApplicationFeeRequiredNotification(
+                                application.getApplicantEmail(),
+                                application.getApplicantName(),
+                                application.getApplicationNumber());
+                    } else {
+                        notificationClient.sendApplicationSubmittedNotification(
+                                application.getApplicantEmail(),
+                                application.getApplicantName(),
+                                application.getApplicationNumber());
+                    }
+                }
+
+                if (application.getApplicantUserId() != null) {
+                    String title = feeRequired
+                            ? "Application pending for payment"
+                            : "Application submitted successfully";
+
+                    String message = feeRequired
+                            ? "Your application will be processed after payment."
+                            : "Your quarry lease application has been submitted.";
+
+                    notificationClient.sendUserNotification(
+                            title,
+                            message,
+                            application.getApplicantUserId(),
+                            "78"
+                    );
+                }
+
+                // =====================================================
+                // 9. FINAL SAVE (ONLY ONCE)
+                // =====================================================
+                miningLeaseApplicationRepository.save(application);
+
+                log.info("Application submitted successfully: {}",
+                        application.getApplicationNumber());
+
+                return mapper.toResponse(application);
             }else {
-                applicationNumber = request.getApplicationNo();
+                throw new BusinessException("The number of mining lease count has exceeded");
             }
-        }
 
-        // =====================================================
-        // 3. CREATE MASTER ONLY FOR NEW APPLICATION
-        // =====================================================
-        if (isNew) {
-            ApplicationMaster master =
-                    createApplicationMaster(applicationNumber, userId);
-
-            application.setApplicationNumber(applicationNumber);
-            application.setApplicationMaster(master);
-            application.setApplicantUserId(userId);
-            application.setCreatedBy(userId);
-            application.setCurrentStatus("DRAFT");
-            application.setIsActive(true);
-        }
-
-        // =====================================================
-        // 4. UPDATE ENTITY FROM REQUEST (SAFE UPDATE)
-        // =====================================================
-        mapper.updateEntityFromRequest(request, application);
-
-        if (request.getDzongkhag() != null && !request.getDzongkhag().isEmpty()) {
-            DzongkhagLookup dzongkhag = dzongkhagLookupRepository
-                    .findById(request.getDzongkhag())
-                    .orElseThrow(() -> new RuntimeException("Invalid Dzongkhag ID"));
-
-            application.setDzongkhag(dzongkhag);
-        }
-
-        if (request.getGewog() != null && !request.getGewog().isEmpty()) {
-            GewogLookup gewog = (GewogLookup) gewogLookupRepository
-                    .findByGewogId(request.getGewog())
-                    .orElseThrow(() -> new RuntimeException("Invalid gewog ID"));
-
-            application.setGewog(gewog);
-        }
-
-        if (request.getNearestVillage() != null && !request.getNearestVillage().isEmpty()) {
-            VillageLookup villageLookup = (VillageLookup) villageLookupRepository
-                    .findByVillageSerialNo(Integer.parseInt(request.getNearestVillage()))
-                    .orElseThrow(() -> new RuntimeException("Invalid village ID"));
-
-            application.setNearestVillage(villageLookup);
-        }
-
-        application.setUpdatedBy(userId);
-
-        PaymentMaster paymentMaster =
-                paymentMasterRepository.findByServiceName(SERVICE_CODE);
-
-        // =====================================================
-        // 5. DRAFT FLOW
-        // =====================================================
-        if (isDraft) {
-
-            application.setCurrentStatus("DRAFT");
-
-            // Draft does not trigger workflow or notifications
-            miningLeaseApplicationRepository.save(application);
-
-            log.info("Application saved as DRAFT: {}", application.getApplicationNumber());
-
-            return mapper.toResponse(application);
-        }
-
-        // =====================================================
-        // 6. SUBMIT FLOW
-        // =====================================================
-
-        // Safety checks
-        if (!userId.equals(application.getApplicantUserId())) {
-            throw new UnauthorizedOperationException(
-                    "You are not authorized to submit this application");
-        }
-
-        boolean feeRequired =
-                paymentMaster != null &&
-                        Boolean.TRUE.equals(paymentMaster.getIsApplicationFeeEnabled());
-
-        Long directorId;
-        if (feeRequired) {
-            application.setCurrentStatus("PAYMENT PENDING");
-            application.setApplicationFeesAmount(paymentMaster.getApplicationFee());
-            application.setApplicationFeesRequired(true);
-        } else {
-            application.setCurrentStatus("SUBMITTED");
-        }
-
-        application.setSubmittedAt(now);
-        application.setApplicationNumber(applicationNumber);
-        // =====================================================
-        // 6. UPDATE APPLICATION MASTER
-        // =====================================================
-        ApplicationMaster master = application.getApplicationMaster();
-
-        master.setApplicationNumber(applicationNumber);
-        master.setCurrentStatus(application.getCurrentStatus());
-        master.setSubmittedAt(now);
-        applicationMasterRepository.save(master);
-
-        // Resubmission of application to director after application submission from client
-        List<TaskManagement> getAssignedDirector =
-                taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode
-                        (application.getApplicationNumber(),"GR SUBMITTED", "DIRECTOR", SERVICE_CODE);
-        TaskManagement taskManagement = getAssignedDirector.getFirst();
-        directorId = taskManagement.getAssignedToUserId();
-
-        createTask(master,application,"DIRECTOR",userId,directorId);
-
-        // =====================================================
-        // 7. NOTIFICATIONS
-        // =====================================================
-
-        if (application.getApplicantEmail() != null) {
-            if (feeRequired) {
-                notificationClient.sendApplicationFeeRequiredNotification(
-                        application.getApplicantEmail(),
-                        application.getApplicantName(),
-                        application.getApplicationNumber());
-            } else {
-                notificationClient.sendApplicationSubmittedNotification(
-                        application.getApplicantEmail(),
-                        application.getApplicantName(),
-                        application.getApplicationNumber());
-            }
-        }
-
-        if (application.getApplicantUserId() != null) {
-            String title = feeRequired
-                    ? "Application pending for payment"
-                    : "Application submitted successfully";
-
-            String message = feeRequired
-                    ? "Your application will be processed after payment."
-                    : "Your quarry lease application has been submitted.";
-
-            notificationClient.sendUserNotification(
-                    title,
-                    message,
-                    application.getApplicantUserId(),
-                    "78"
-            );
-        }
-
-        // =====================================================
-        // 9. FINAL SAVE (ONLY ONCE)
-        // =====================================================
-        miningLeaseApplicationRepository.save(application);
-
-        log.info("Application submitted successfully: {}",
-                application.getApplicationNumber());
-
-        return mapper.toResponse(application);
     }
 
     @Transactional
@@ -358,7 +369,7 @@ public class MiningLeaseService {
         createTask(master,miningLeaseApplication,"DIRECTOR",userId,assignedDirector.getUserId());
 
         if (assignedDirector.getEmail() != null) {
-            notificationClient.sendMailToDirectorAssigned(
+            notificationClient.sendMiningLeaseMailToDirectorAssigned(
                     assignedDirector.getEmail(),
                     assignedDirector.getUsername(),
                     miningLeaseApplication.getApplicationNumber());

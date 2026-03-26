@@ -60,7 +60,7 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
 """)
     Page<MiningLeaseApplication> findApplicationsAssignedToUser(Long currentUserId, Pageable pageable);
 
-    @Query("SELECT a FROM MiningLeaseApplication a WHERE a.applicantUserId = :userId AND a.currentStatus IN :applicationStatus")
+    @Query("SELECT a FROM MiningLeaseApplication a WHERE a.currentStatus IN :applicationStatus")
     Page<MiningLeaseApplication> findByApplicantUserIdAndStatusIn(Long userId, List<String> applicationStatus, Pageable pageable);
 
     @Query("SELECT a FROM MiningLeaseApplication a WHERE a.applicantUserId = :userId ")
@@ -279,8 +279,7 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     @Query("""
     SELECT a
     FROM MiningLeaseApplication a
-    WHERE a.applicantUserId = :userId
-    AND a.currentStatus IN ('MINING LEASE APPROVED')
+    WHERE a.currentStatus IN ('MINING LEASE APPROVED')
     AND LOWER(a.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseApplication> findArchivedAssignedToUserAndSearch(Long userId, String search, Pageable pageable);
@@ -299,4 +298,22 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseApplication> findByApplicantUserIdAndSearch(Long userId, List<String> archivedStatuses, String search, Pageable pageable);
+
+    @Query(value = """
+    SELECT 
+    u.household_number
+    FROM mas_db.t_citizens u
+    WHERE u.id = :userId
+    AND u.account_status = 'ACTIVE'
+    LIMIT 1
+    """, nativeQuery = true)
+    String findUserHouseHoldNumber(Long userId);
+
+    @Query(value = """
+    SELECT
+    SUM(mining_lease_count) AS total_mining_lease_count
+    FROM mas_db.t_citizens
+    WHERE household_number = :houseHoldNumber
+    """, nativeQuery = true)
+    Integer findLeaseCountForMining(String houseHoldNumber);
 }

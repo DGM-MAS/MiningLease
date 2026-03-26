@@ -1,8 +1,8 @@
-package com.mas.gov.bt.mas.primary.controller;
+package com.mas.gov.bt.mas.primary.controller.MiningLease;
+
 
 import com.mas.gov.bt.mas.primary.config.UserContext;
-import com.mas.gov.bt.mas.primary.dto.request.AssignTaskDirector;
-import com.mas.gov.bt.mas.primary.dto.request.ReviewMiningLeaseApplicationDirector;
+import com.mas.gov.bt.mas.primary.dto.request.ReviewMiningLeaseApplicationGeologist;
 import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
 import com.mas.gov.bt.mas.primary.services.MiningLeaseService;
 import com.mas.gov.bt.mas.primary.utility.PageRequest1Based;
@@ -21,46 +21,32 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@RestController
-@RequestMapping("/api/mining-lease/director")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Mining Lease - Director", description = "Director Review APIs")
+@Tag(name = "Mining Lease - Geologist", description = "Geologist Review APIs")
 @SecurityRequirement(name = "bearerAuth")
-public class DirectorController {
+@RestController
+@RequestMapping("/api/mining-lease/geologist")
+public class GeologistController {
 
-    private final UserContext userContext;
     private final MiningLeaseService miningLeaseService;
-
+    private final UserContext userContext;
 
     @PostMapping("/review")
-    @Operation(summary = "Review application", description = "Review mining lease application by Director")
-    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> reviewApplication(
-            @Valid @RequestBody ReviewMiningLeaseApplicationDirector request) {
+    @Operation(summary = "Review new application", description = "Review new mining lease application by MPCD")
+    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> createApplication(
+            @Valid @RequestBody ReviewMiningLeaseApplicationGeologist reviewQuarryLeaseApplicationGeologist) {
 
         Long userId = userContext.getCurrentUserId();
-        MiningLeaseResponse response = miningLeaseService.reviewApplicationDirector(request, userId);
+        MiningLeaseResponse response = miningLeaseService.reviewApplicationGeologist(reviewQuarryLeaseApplicationGeologist, userId);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new SuccessResponse<>("Application reviewed successfully", response));
     }
 
-    @PostMapping("/assignTask")
-    @Operation(summary = "Assign application", description = "Assign mining lease application by Director to MPCD and Mine Engineer")
-    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> assignApplication(
-            @Valid @RequestBody AssignTaskDirector request) {
-
-        Long userId = userContext.getCurrentUserId();
-        MiningLeaseResponse response = miningLeaseService.assignApplicationDirector(request, userId);
-
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new SuccessResponse<>("Application assigned successfully", response));
-    }
-
-    // ** Dashboard information for Director mining lease application ** //
-    // ** Assigned application to director ** //
+    // ** Dashboard information for RC application assigned to particular RC ** //
     @GetMapping("/assigned")
-    public ResponseEntity<SuccessResponse<List<MiningLeaseResponse>>> assignedToDirector(
+    public ResponseEntity<SuccessResponse<List<MiningLeaseResponse>>> assignedToGeologist(
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -71,7 +57,8 @@ public class DirectorController {
                 Sort.Direction.fromString(sortDirection), sortBy);
 
         Long userId = userContext.getCurrentUserId();
-        return ResponseEntity.ok(miningLeaseService.getAssignedToDirector(userId, pageable, search)
+        return ResponseEntity.ok(
+                miningLeaseService.getAssignedToGeologist(userId, pageable, search)
         );
     }
 }

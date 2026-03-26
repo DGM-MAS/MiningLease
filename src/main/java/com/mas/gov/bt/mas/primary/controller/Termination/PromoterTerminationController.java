@@ -1,10 +1,7 @@
 package com.mas.gov.bt.mas.primary.controller.Termination;
 
 import com.mas.gov.bt.mas.primary.config.UserContext;
-import com.mas.gov.bt.mas.primary.dto.request.ReassignTaskRequest;
-import com.mas.gov.bt.mas.primary.dto.request.ReviewMiningLeaseApplicationDirector;
 import com.mas.gov.bt.mas.primary.dto.request.ReviewTerminationApplicationCMSHead;
-import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
 import com.mas.gov.bt.mas.primary.dto.response.TerminationApplicationResponse;
 import com.mas.gov.bt.mas.primary.services.TerminationService;
 import com.mas.gov.bt.mas.primary.utility.PageRequest1Based;
@@ -24,15 +21,15 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * REST Controller for MI Termination Application management.
+ * REST Controller for Termination promoter Application management.
  */
 @RestController
-@RequestMapping("/api/termination/cms-head")
+@RequestMapping("/api/termination/promoter")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "CMS HEAD Termination", description = "CMS HEAD Termination Application Management APIs")
+@Tag(name = "Termination promoter User", description = "Termination promoter User Application Management APIs")
 @SecurityRequirement(name = "bearerAuth")
-public class CMSHeadTerminationController {
+public class PromoterTerminationController {
 
     private final UserContext userContext;
     private final TerminationService terminationService;
@@ -51,30 +48,17 @@ public class CMSHeadTerminationController {
                 Sort.Direction.fromString(sortDirection), sortBy);
 
         Long userId = userContext.getCurrentUserId();
-        return ResponseEntity.ok(terminationService.getAssignedToCMSHead(userId, pageable, search)
+        return ResponseEntity.ok(terminationService.getAssignedToPromoter(userId, pageable, search)
         );
     }
 
-    // ========== Task Reassignment ==========
-
-    @PutMapping("/tasks/reassignCMS")
-    @Operation(summary = "Reassign task", description = "Reassign a pending task to another user")
-    public ResponseEntity<SuccessResponse<Void>> reassignTaskCMS(
-            @Valid @RequestBody ReassignTaskRequest request) {
-
-        Long userId = userContext.getCurrentUserId();
-        terminationService.reassignTaskCMS(request, userId);
-
-        return SuccessResponse.buildSuccessResponse("Task reassigned successfully");
-    }
-
     @PostMapping("/review")
-    @Operation(summary = "Review application", description = "Review Termination application by CMS Head")
+    @Operation(summary = "Rectification application", description = "Rectification Termination application by promoter")
     public ResponseEntity<SuccessResponse<TerminationApplicationResponse>> reviewApplication(
             @Valid @RequestBody ReviewTerminationApplicationCMSHead request) {
 
         Long userId = userContext.getCurrentUserId();
-        TerminationApplicationResponse response = terminationService.reviewApplicationCMSHead(request, userId);
+        TerminationApplicationResponse response = terminationService.reviewApplicationPromoter(request, userId);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new SuccessResponse<>("Application reviewed successfully", response));
