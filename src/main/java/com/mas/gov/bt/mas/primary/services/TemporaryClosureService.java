@@ -84,7 +84,7 @@ public class TemporaryClosureService {
         createTask(master,temporaryClosureEntity,"RC", userId, assignedRC.getUserId());
 
         if (assignedRC.getEmail() != null) {
-            notificationClient.sendMailToDirectorAssigned(
+            notificationClient.sendMiningLeaseMailToDirectorAssigned(
                     assignedRC.getEmail(),
                     assignedRC.getUsername(),
                     temporaryClosureEntity.getApplicationId());
@@ -289,6 +289,15 @@ public class TemporaryClosureService {
                                 app.getApplicantName(),
                                 app.getApplicationId());
                     }
+
+                    Optional<MiningLeaseApplication> miningLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(app.getApplicationId());
+                    MiningLeaseApplication miningLeaseApplicationEntity = null;
+                    if (miningLeaseApplication.isPresent()) {
+                        miningLeaseApplicationEntity = miningLeaseApplication.get();
+                    }
+                    assert miningLeaseApplicationEntity != null;
+                    miningLeaseApplicationEntity.setCurrentStatus("TEMPORARY CLOSURE APPROVED");
+                    miningLeaseApplicationRepository.save(miningLeaseApplicationEntity);
                 }
                 case "Rectification" -> {
                     app.setCurrentStatus("RECTIFICATION BY RC");
