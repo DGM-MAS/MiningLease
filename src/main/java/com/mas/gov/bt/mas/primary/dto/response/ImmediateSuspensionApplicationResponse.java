@@ -1,24 +1,22 @@
 package com.mas.gov.bt.mas.primary.dto.response;
 
+import jakarta.persistence.Column;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
-@Setter
 @Getter
+@Setter
 @Data
-public class TerminationApplicationResponse {
+public class ImmediateSuspensionApplicationResponse {
 
     private Long id;
 
     private String applicationNumber;
-
-    private List<String> applicationNumbers;
-
-    private String terminationId;
 
     private Long promoterUserId;
 
@@ -26,22 +24,21 @@ public class TerminationApplicationResponse {
 
     private String applicantName;
 
-    private Long fileId;
+    private String remarksRcMi;
 
-    private String remarksChief;
+    private LocalDateTime rcMiReviewedAt;
 
-    private LocalDateTime chiefReviewedAt;
+    private LocalDateTime promoterReviewedAt;
 
-    private String remarksCMSHead;
+    private Long promoterFileId;
 
-    private LocalDateTime cmsHeadReviewedAt;
+    private LocalDateTime miReviewedAt;
 
-    private Long cmsHeadFileId;
+    private Long miFileId;
 
-    // ========== Status & Workflow ==========
     private String currentStatus;
+    private String currentStatusDisplayName;
 
-    // ========== Audit Fields ==========
     private Long createdBy;
 
     private LocalDateTime createdAt;
@@ -53,4 +50,5 @@ public class TerminationApplicationResponse {
     private Long updatedBy;
 
     private LocalDateTime updatedAt;
+
 }
