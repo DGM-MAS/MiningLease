@@ -2,11 +2,11 @@ package com.mas.gov.bt.mas.primary.controller.Termination;
 
 import com.mas.gov.bt.mas.primary.config.UserContext;
 import com.mas.gov.bt.mas.primary.dto.request.ReassignTaskRequest;
-import com.mas.gov.bt.mas.primary.dto.request.ReviewMiningLeaseApplicationDirector;
 import com.mas.gov.bt.mas.primary.dto.request.ReviewTerminationApplicationCMSHead;
-import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
 import com.mas.gov.bt.mas.primary.dto.response.TerminationApplicationResponse;
+import com.mas.gov.bt.mas.primary.exception.BusinessException;
 import com.mas.gov.bt.mas.primary.services.TerminationService;
+import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
 import com.mas.gov.bt.mas.primary.utility.PageRequest1Based;
 import com.mas.gov.bt.mas.primary.utility.SuccessResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
@@ -78,5 +79,29 @@ public class CMSHeadTerminationController {
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new SuccessResponse<>("Application reviewed successfully", response));
+    }
+
+    @GetMapping("/archived-applications")
+    @Operation(summary = "Get archived applications", description = "Get list of archived (APPROVED/REJECTED) applications. Agency users get all archived applications, others get only their own.")
+    public ResponseEntity<SuccessResponse<List<TerminationApplicationResponse>>> getArchivedApplications(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection) {
+
+        Pageable pageable = PageRequest1Based.of(page, size,
+                Sort.Direction.fromString(sortDirection), sortBy);
+
+        Page<TerminationApplicationResponse> applications;
+        if (userContext.isAgencyUser()) {
+            // Agency users can see all archived applications
+            Long userId = userContext.getCurrentUserId();
+            applications = terminationService.getArchivedApplications(pageable, search, userId);
+        } else {
+          throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
+        }
+
+        return ResponseEntity.ok(SuccessResponse.fromPage("Archived applications retrieved successfully", applications));
     }
 }

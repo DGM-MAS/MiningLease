@@ -3,11 +3,12 @@ package com.mas.gov.bt.mas.primary.controller.ImmediateSuspension;
 import com.mas.gov.bt.mas.primary.config.UserContext;
 import com.mas.gov.bt.mas.primary.dto.request.AssignedTaskRC;
 import com.mas.gov.bt.mas.primary.dto.request.ImmediateSuspensionApplicationRequest;
-import com.mas.gov.bt.mas.primary.dto.request.PromoterImmediateSuspensionRequest;
 import com.mas.gov.bt.mas.primary.dto.request.RcMeImmediateSuspensionRequest;
 import com.mas.gov.bt.mas.primary.dto.response.ImmediateSuspensionApplicationResponse;
-import com.mas.gov.bt.mas.primary.dto.response.TemporaryClosureNotificationResponse;
+import com.mas.gov.bt.mas.primary.dto.response.TerminationApplicationResponse;
+import com.mas.gov.bt.mas.primary.exception.BusinessException;
 import com.mas.gov.bt.mas.primary.services.ImmediateSuspensionService;
+import com.mas.gov.bt.mas.primary.utility.PageRequest1Based;
 import com.mas.gov.bt.mas.primary.utility.SuccessResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -15,12 +16,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * REST Controller for Immediate Suspension Application management.
@@ -38,7 +41,7 @@ public class ImmediateSuspensionController {
 
     // ========== Applicant APIs ==========
 
-    // Used by RC/ Mining engineer to submit immediate suspension report
+    // Used by RC/Mining engineer to submit immediate suspension report
     // The initial stage of immediate suspension application submission
     @PostMapping("/applications")
     @Operation(summary = "Submit immediate suspension application submission", description = "Submit immediate suspension application")
@@ -49,7 +52,7 @@ public class ImmediateSuspensionController {
         ImmediateSuspensionApplicationResponse response = immediateSuspensionService.submitImmediateSuspensionApplication(request, userId);
 
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new SuccessResponse<>("The report has been successfully submitted to CMS Head.", response));
+                .body(new SuccessResponse<>("The immediate suspension application has been submitted successfully.", response));
     }
 
     @PostMapping("/assignTask")
@@ -75,6 +78,76 @@ public class ImmediateSuspensionController {
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new SuccessResponse<>("Application reviewed successfully", response));
+    }
+
+    @GetMapping("/my-applications")
+    @Operation(summary = "Get my applications", description = "Get list of applications. Agency users get all applications, others get only their own.")
+    public ResponseEntity<SuccessResponse<List<ImmediateSuspensionApplicationResponse>>> getMyApplications(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection
+    ) {
+
+        Pageable pageable = PageRequest1Based.of(page, size, Sort.Direction.fromString(sortDirection), sortBy);
+
+        if (userContext.isAgencyUser()) {
+            return ResponseEntity.ok(immediateSuspensionService.getAllApplications(userContext.getCurrentUserId(), pageable, search)) ;
+        }else {
+            throw new BusinessException("The Current user is not allowed to access these data");
+        }
+    }
+
+    @GetMapping("/archived-applications")
+    @Operation(summary = "Get archived applications", description = "Get list of archived (APPROVED/REJECTED) applications. Agency users get all archived applications, others get only their own.")
+    public ResponseEntity<SuccessResponse<List<ImmediateSuspensionApplicationResponse>>> getArchivedApplications(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection) {
+
+        Pageable pageable = PageRequest1Based.of(page, size,
+                Sort.Direction.fromString(sortDirection), sortBy);
+
+        Page<ImmediateSuspensionApplicationResponse> applications;
+        if (userContext.isAgencyUser()) {
+            // Agency users can see all archived applications
+            Long userId = userContext.getCurrentUserId();
+            applications = immediateSuspensionService.getArchivedApplications(pageable, search, userId);
+        } else {
+            // Regular users can only see their own archived applications
+            Long userId = userContext.getCurrentUserId();
+            applications = immediateSuspensionService.getMyArchivedApplications(userId, pageable, search);
+        }
+
+        return ResponseEntity.ok(SuccessResponse.fromPage("Archived applications retrieved successfully", applications));
+    }
+
+    @GetMapping("/all")
+    @Operation(summary = "Get all Termination applications", description = "Get paginated list of all termination applications (admin view)")
+    public ResponseEntity<SuccessResponse<List<ImmediateSuspensionApplicationResponse>>> getAllApplications(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection) {
+
+        Pageable pageable = PageRequest1Based.of(page, size,
+                Sort.Direction.fromString(sortDirection), sortBy);
+
+        return ResponseEntity.ok(immediateSuspensionService.getAllApplicationAdmin(pageable, search));
+    }
+
+    @GetMapping("/applications/{applicationNo}")
+    @Operation(summary = "Get application by number", description = "Get application details by application number. Agency users can view any application, others can only view their own.")
+    public ResponseEntity<SuccessResponse<ImmediateSuspensionApplicationResponse>> getApplicationByNumber(
+            @PathVariable String applicationNo) {
+
+        ImmediateSuspensionApplicationResponse response = immediateSuspensionService.getApplicationByNumber(applicationNo);
+
+        return ResponseEntity.ok(new SuccessResponse<>("Application retrieved successfully", response));
     }
 
 

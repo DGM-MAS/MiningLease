@@ -32,6 +32,9 @@ public class ApplicationMaster {
     @Column(name = "service_code", nullable = false, length = 30)
     private String serviceCode;
 
+    @Column(name = "service_id")
+    private String serviceId;
+
     @Column(name = "service_application_id")
     private Long serviceApplicationId;
 
@@ -46,6 +49,9 @@ public class ApplicationMaster {
     // Timestamps
     @Column(name = "submitted_at")
     private LocalDateTime submittedAt;
+
+    @Column(name = "submitted_on")
+    private LocalDateTime submittedOn;
 
     @Column(name = "approved_at")
     private LocalDateTime approvedAt;

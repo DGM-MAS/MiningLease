@@ -29,6 +29,7 @@ import java.util.Optional;
 public class TemporaryClosureService {
 
     private static final String SERVICE_CODE = "TEMPORARY CLOSURE SERVICE";
+    private static final String SERVICE_ID = "108";
     private static final int DEFAULT_TAT_DAYS = 2;
 
     private final TemporaryClosureRepository temporaryClosureRepository;
@@ -55,6 +56,7 @@ public class TemporaryClosureService {
         temporaryClosureEntity.setApplicantName(miningLeaseApplication1.getApplicantName());
         temporaryClosureEntity.setApplicantCid(miningLeaseApplication1.getApplicantCid());
         temporaryClosureEntity.setApplicantEmail(email);
+        temporaryClosureEntity.setApplicantContact(miningLeaseApplication1.getApplicantContact());
         temporaryClosureEntity.setApplicantType(applicantType);
         temporaryClosureEntity.setApplicationId(request.getApplicationId());
 
@@ -76,8 +78,11 @@ public class TemporaryClosureService {
         // =====================================================
         ApplicationMaster master = miningLeaseApplication1.getApplicationMaster();
         master.setSubmittedAt(LocalDateTime.now());
+        master.setServiceId(SERVICE_ID);
+        master.setSubmittedOn(LocalDateTime.now());
         master.setCurrentStatus("SUBMITTED");
         master.setApplicantUserId(userId);
+        master.setApplicationNumber(temporaryClosureEntity.getApplicationId());
         master.setServiceCode(SERVICE_CODE);
         applicationMasterRepository.save(master);
         temporaryClosureEntity.setApplicationMaster(master);
@@ -154,7 +159,8 @@ public class TemporaryClosureService {
         List<String> ApplicationStatus = List.of(
                 "SUBMITTED",
                 "RC ASSIGNED",
-                "RECTIFICATION BY RC");
+                "RECTIFICATION BY RC",
+                "RESUBMITTED");
         Page<TemporaryClosureEntity> applications;
 
         if (search == null || search.isBlank()) {
@@ -275,6 +281,7 @@ public class TemporaryClosureService {
                     app.setFileUploadIdRC(request.getFileUploadIdRC());
                     app.setRcReviewedAt(now);
                     app.setApprovedAt(now);
+                    temporaryClosureRepository.save(app);
 
                     if (master != null) {
                         master.setCurrentStatus("APPROVED BY RC");
@@ -357,16 +364,7 @@ public class TemporaryClosureService {
 
                 if (master != null) {
                     master.setCurrentStatus("MI REVIEWED");
-                    master.setApprovedAt(now);
-                    master.setCompletedAt(now);
                     applicationMasterRepository.save(master);
-                }
-
-                if (app.getApplicantEmail() != null) {
-                    notificationClient.sendApprovalNotification(
-                            app.getApplicantEmail(),
-                            app.getApplicantName(),
-                            app.getApplicationId());
                 }
                 assert master != null;
                 createTask(master, app, "RC", userId, RCUserId);
@@ -446,25 +444,27 @@ public class TemporaryClosureService {
     public void reassignTaskRC(@Valid ReassignTaskRequest request, Long userId) {
         List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(),"SUBMITTED","RC", SERVICE_CODE);
 
-        TaskManagement taskManagement = new TaskManagement();
-
-        if (task != null) {
-            taskManagement = task.getFirst();
+        if (task == null) {
+            throw new RuntimeException("No tasks found");
         }
 
-        taskManagement.setAssignedToUserId(request.getNewAssigneeUserId());
-        taskManagement.setAssignedByUserId(userId);
-        taskManagement.setAssignedAt(LocalDateTime.now());
-        taskManagement.setReassignmentCount(taskManagement.getReassignmentCount() + 1);
-        taskManagement.setActionRemarks(request.getRemarks());
+        for (TaskManagement taskManagement : task) {
+            taskManagement.setAssignedToUserId(request.getNewAssigneeUserId());
+            taskManagement.setAssignedByUserId(userId);
+            taskManagement.setAssignedAt(LocalDateTime.now());
+            taskManagement.setReassignmentCount(taskManagement.getReassignmentCount() + 1);
+            taskManagement.setActionRemarks(request.getRemarks());
+        }
+        taskManagementRepository.saveAll(task);
 
-        taskManagementRepository.save(taskManagement);
+        TaskManagement firstTask = task.getFirst();
 
         UserWorkloadProjection userDetails = miningLeaseApplicationRepository.findUserDetails(request.getNewAssigneeUserId());
         notificationClient.sendTaskReassignmentNotification(
                 userDetails.getEmail(), userDetails.getUsername(),
-                taskManagement.getApplicationNumber(),
-                taskManagement.getAssignedToRole());
+                firstTask.getApplicationNumber(),
+                firstTask.getAssignedToRole(),
+                request.getRemarks());
 
         if(userDetails.getUserId()!= null) {
             String title = "An new application has been reassigned.";
@@ -475,7 +475,7 @@ public class TemporaryClosureService {
             throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
 
-        log.info("RC task {} reassigned to user {}", taskManagement.getId(), request.getNewAssigneeUserId());
+        log.info("RC task {} reassigned to user {}", firstTask.getId(), request.getNewAssigneeUserId());
 
     }
 
@@ -506,25 +506,27 @@ public class TemporaryClosureService {
     public void reassignTaskMI(@Valid ReassignTaskRequest request, Long userId) {
         List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(),"MI ASSIGNED","MI", SERVICE_CODE);
 
-        TaskManagement taskManagement = new TaskManagement();
-
-        if (task != null) {
-            taskManagement = task.getFirst();
+        if (task == null) {
+            throw new RuntimeException("No tasks found");
         }
 
-        taskManagement.setAssignedToUserId(request.getNewAssigneeUserId());
-        taskManagement.setAssignedByUserId(userId);
-        taskManagement.setAssignedAt(LocalDateTime.now());
-        taskManagement.setReassignmentCount(taskManagement.getReassignmentCount() + 1);
-        taskManagement.setActionRemarks(request.getRemarks());
+        for (TaskManagement taskManagement : task) {
+            taskManagement.setAssignedToUserId(request.getNewAssigneeUserId());
+            taskManagement.setAssignedByUserId(userId);
+            taskManagement.setAssignedAt(LocalDateTime.now());
+            taskManagement.setReassignmentCount(taskManagement.getReassignmentCount() + 1);
+            taskManagement.setActionRemarks(request.getRemarks());
+        }
+        taskManagementRepository.saveAll(task);
 
-        taskManagementRepository.save(taskManagement);
+        TaskManagement firstTask = task.getFirst();
 
         UserWorkloadProjection userDetails = miningLeaseApplicationRepository.findUserDetails(request.getNewAssigneeUserId());
         notificationClient.sendTaskReassignmentNotification(
                 userDetails.getEmail(), userDetails.getUsername(),
-                taskManagement.getApplicationNumber(),
-                taskManagement.getAssignedToRole());
+                firstTask.getApplicationNumber(),
+                firstTask.getAssignedToRole(),
+                request.getRemarks());
 
         if(userDetails.getUserId()!= null) {
             String title = "An new application has been reassigned.";
@@ -535,7 +537,7 @@ public class TemporaryClosureService {
             throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
 
-        log.info("MI task {} reassigned to user {}", taskManagement.getId(), request.getNewAssigneeUserId());
+        log.info("MI task {} reassigned to user {}", firstTask.getId(), request.getNewAssigneeUserId());
     }
 
 
