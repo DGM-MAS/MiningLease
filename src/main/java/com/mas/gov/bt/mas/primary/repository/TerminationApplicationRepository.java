@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 @Transactional
 public interface TerminationApplicationRepository extends JpaRepository<TerminationApplicationEntity, Long> {
@@ -41,7 +42,7 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('SUBMITTED')
+    AND t.taskStatus IN ('SUBMITTED', 'RECTIFICATION BY CMS')
 """)
     Page<TerminationApplicationEntity> findAssignedToUserMI(Long userId, Pageable pageable);
 
@@ -51,7 +52,7 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('GR SUBMITTED', 'NOTE SHEET UPLOADED', 'MLA SUBMITTED')
+    AND t.taskStatus IN ('SUBMITTED', 'RECTIFICATION BY CMS')
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<TerminationApplicationEntity> findAssignedToUserAndSearchMI(Long userId, String search, Pageable pageable);
@@ -78,8 +79,8 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     FROM TerminationApplicationEntity q
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
-    WHERE t.assignedToUserId = :userId
-    AND q.currentStatus IN ('APPROVED BY RC')
+    WHERE q.currentStatus IN :archivedStatuses
+    AND q.createdBy = :userId
 """)
     Page<TerminationApplicationEntity> findArchivedAssignedToUser(Long userId, List<String> archivedStatuses, Pageable pageable);
 
@@ -88,18 +89,19 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     FROM TerminationApplicationEntity q
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
-    WHERE t.assignedToUserId = :userId
-    AND q.currentStatus IN ('APPROVED BY RC')
+    WHERE q.currentStatus IN :archivedStatuses
+    AND q.createdBy = :userId
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
-    Page<TerminationApplicationEntity> findArchivedAssignedToUserAndSearch(Long userId, String search, Pageable pageable);
+    Page<TerminationApplicationEntity> findArchivedAssignedToUserAndSearch(Long userId, String search, List<String> archivedStatuses, Pageable pageable);
 
-    @Query("SELECT a FROM TerminationApplicationEntity a WHERE a.currentStatus IN :archivedStatuses")
+    @Query("SELECT a FROM TerminationApplicationEntity a WHERE a.promoterUserId = :userId AND a.currentStatus IN :archivedStatuses")
     Page<TerminationApplicationEntity> findByApplicantUserIdAndStatusIn(Long userId, List<String> archivedStatuses, Pageable pageable);
 
     @Query("""
     SELECT q FROM TerminationApplicationEntity q
     WHERE q.currentStatus IN :archivedStatuses
+    AND q.promoterUserId = :userId
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<TerminationApplicationEntity> findByApplicantUserIdAndSearch(Long userId, List<String> archivedStatuses, String search, Pageable pageable);
@@ -156,4 +158,62 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     WHERE LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :trim, '%'))
 """)
     Page<TerminationApplicationEntity> findAllBySearch(String trim, Pageable pageable);
+
+    Optional<TerminationApplicationEntity> findByApplicationNumber(String applicationNumber);
+
+    @Query("""
+    SELECT q
+    FROM TerminationApplicationEntity q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE t.createdBy = :currentUserId
+    AND t.taskStatus IN ('SUBMITTED', 'RECTIFICATION BY CMS')
+""")
+    Page<TerminationApplicationEntity> findAssignedToUserChiefMD(Long currentUserId, Pageable pageable);
+
+    @Query("""
+    SELECT q
+    FROM TerminationApplicationEntity q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE t.createdBy = :currentUserId
+    AND t.taskStatus IN ('SUBMITTED', 'RECTIFICATION BY CMS')
+    AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
+""")
+    Page<TerminationApplicationEntity> findAssignedToUserAndSearchChiefMD(Long currentUserId, String trim, Pageable pageable);
+
+    @Query("""
+    SELECT q
+    FROM TerminationApplicationEntity q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE q.currentStatus IN :archivedStatuses
+    AND t.assignedToUserId = :userId
+""")
+    Page<TerminationApplicationEntity> findArchivedAssignedToUserCMSHead(Long userId, List<String> archivedStatuses, Pageable pageable);
+
+    @Query("""
+    SELECT q
+    FROM TerminationApplicationEntity q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE t.assignedToUserId = :userId
+    AND t.taskStatus IN :archivedStatuses
+    AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
+""")
+    Page<TerminationApplicationEntity> findArchivedAssignedToUserAndSearchCMSHead(Long userId, String search, List<String> archivedStatuses, Pageable pageable);
+
+
+    @Query(value = """
+    SELECT 
+        ub.role_id AS roleId
+    FROM mas_db.users u
+    LEFT JOIN mas_db.user_roles ub
+        ON u.id = ub.user_id
+    WHERE u.id = :miFocalId
+      AND u.account_status = 'ACTIVE'
+      AND ub.role_id IS NOT NULL
+    GROUP BY ub.role_id
+    """, nativeQuery = true)
+    List<Long> findUserDetails(Long miFocalId);
 }

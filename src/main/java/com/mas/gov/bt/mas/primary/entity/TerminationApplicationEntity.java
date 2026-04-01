@@ -31,6 +31,9 @@ public class TerminationApplicationEntity {
     @Column(name = "promoter_user_id")
     private Long promoterUserId;
 
+    @Column(name = "promoter_file_id")
+    private Long promoterFileId;
+
     @Column(name = "applicant_email", length = 255)
     private String applicantEmail;
 
