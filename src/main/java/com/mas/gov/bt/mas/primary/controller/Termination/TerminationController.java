@@ -2,7 +2,6 @@ package com.mas.gov.bt.mas.primary.controller.Termination;
 
 import com.mas.gov.bt.mas.primary.config.UserContext;
 import com.mas.gov.bt.mas.primary.dto.request.TerminationApplicationRequest;
-import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
 import com.mas.gov.bt.mas.primary.dto.response.TerminationApplicationResponse;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
 import com.mas.gov.bt.mas.primary.services.TerminationService;
@@ -53,15 +52,34 @@ public class TerminationController {
                 .body(new SuccessResponse<>("The report has been successfully submitted to CMS Head.", response));
     }
 
+//    @GetMapping("/my-applications")
+//    @Operation(summary = "Get my applications", description = "Get list of applications. Agency users get all applications, others get only their own.")
+//    public ResponseEntity<SuccessResponse<List<TerminationApplicationResponse>>> getMyApplications(
+//            @RequestParam(required = false) String search,
+//            @RequestParam(defaultValue = "1") int page,
+//            @RequestParam(defaultValue = "10") int size
+//    ) {
+//
+//        Pageable pageable = PageRequest1Based.of(page, size);
+//
+//        if (userContext.isAgencyUser()) {
+//            return ResponseEntity.ok(terminationService.getAllApplications(userContext.getCurrentUserId(), pageable, search)) ;
+//        }else {
+//            throw new BusinessException("The Current user is not allowed to access these data");
+//        }
+//    }
+
     @GetMapping("/my-applications")
     @Operation(summary = "Get my applications", description = "Get list of applications. Agency users get all applications, others get only their own.")
     public ResponseEntity<SuccessResponse<List<TerminationApplicationResponse>>> getMyApplications(
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection
     ) {
 
-        Pageable pageable = PageRequest1Based.of(page, size);
+        Pageable pageable = PageRequest1Based.of(page, size, Sort.Direction.fromString(sortDirection), sortBy);
 
         if (userContext.isAgencyUser()) {
             return ResponseEntity.ok(terminationService.getAllApplications(userContext.getCurrentUserId(), pageable, search)) ;
@@ -109,6 +127,16 @@ public class TerminationController {
                 Sort.Direction.fromString(sortDirection), sortBy);
 
         return ResponseEntity.ok(terminationService.getAllApplicationAdmin(pageable, search));
+    }
+
+    @GetMapping("/applications/{applicationNo}")
+    @Operation(summary = "Get application by number", description = "Get application details by application number. Agency users can view any application, others can only view their own.")
+    public ResponseEntity<SuccessResponse<TerminationApplicationResponse>> getApplicationByNumber(
+            @PathVariable String applicationNo) {
+
+        TerminationApplicationResponse response = terminationService.getApplicationByNumber(applicationNo);
+
+        return ResponseEntity.ok(new SuccessResponse<>("Application retrieved successfully", response));
     }
 
 }
