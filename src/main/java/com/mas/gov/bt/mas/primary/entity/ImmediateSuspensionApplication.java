@@ -35,14 +35,21 @@ public class ImmediateSuspensionApplication {
     @Column(name = "promoter_user_id")
     private Long promoterUserId;
 
-    @Column(name = "applicant_email", length = 255)
+    @Column(name = "applicant_cid")
+    private String applicantCid;
+
+    @Column(name = "applicant_email")
     private String applicantEmail;
 
-    @Column(name = "applicant_name", length = 255)
+    @Column(name = "applicant_name")
     private String applicantName;
 
     @Column(name = "suspension_reason_id")
     private Long suspensionReasonId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "suspension_reason_master_id")
+    private ImmediateSuspensionReasonMaster suspensionReasonMaster;
 
     @Column(name = "remarks_rc_mi")
     private String remarksRcMi;
@@ -56,11 +63,17 @@ public class ImmediateSuspensionApplication {
     @Column(name = "promoter_file_id")
     private Long promoterFileId;
 
+    @Column(name = "promoter_remarks")
+    private String promoterRemarks;
+
     @Column(name = "mi_reviewed_at")
     private LocalDateTime miReviewedAt;
 
     @Column(name = "mi_file_id")
     private Long miFileId;
+
+    @Column(name = "mi_remarks")
+    private String miRemarks;
 
     // ========== Status & Workflow ==========
     @Column(name = "current_status", length = 30)

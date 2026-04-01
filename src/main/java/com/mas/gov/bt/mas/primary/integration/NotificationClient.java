@@ -290,7 +290,7 @@ public class NotificationClient {
         String body = String.format("""
                 Dear %s,
 
-                Your mining lease application requires additional information.
+                Your temporary closure application requires additional information.
 
                 Application Number: %s
                 Review Stage: %s
@@ -440,7 +440,7 @@ public class NotificationClient {
 
     @Async
     public void sendTaskReassignmentNotification(String email, String officerName,
-                                                  String applicationNumber, String role) {
+                                                  String applicationNumber, String role, String remarks) {
         if (email == null) {
             log.info("No email provided for task reassignment notification. Application: {}, Role: {}", applicationNumber, role);
             return;
@@ -450,6 +450,32 @@ public class NotificationClient {
                 Dear %s,
 
                 A quarry lease application task has been reassigned to you.
+
+                Application Number: %s
+                Remarks: %s
+                Role: %s
+
+                Please log in to the system to review and take action.
+
+                Thank you,
+                Mines Administrative System
+                """, officerName != null ? officerName : "Officer", applicationNumber, remarks, role);
+
+        sendEmail(email, subject, body);
+    }
+
+    @Async
+    public void sendTaskReassignmentNotificationTermination(String email, String officerName,
+                                                 String applicationNumber, String role) {
+        if (email == null) {
+            log.info("No email provided for task reassignment termination notification. Application: {}, Role: {}", applicationNumber, role);
+            return;
+        }
+        String subject = "Task Reassigned - " + applicationNumber;
+        String body = String.format("""
+                Dear %s,
+
+                A termination application task has been reassigned to you.
 
                 Application Number: %s
                 Role: %s
@@ -550,6 +576,24 @@ public class NotificationClient {
                 A new quarry lease application has been assigned to you.
                 Assign MPCD and Geologist focal respectively.
 
+                Application Number: %s
+
+                Please log in to the system to review and take action.
+
+                Thank you,
+                Mines Administrative System
+                """, directorName, applicationNumber);
+
+        sendEmail(directorEmail, subject, body);
+    }
+
+    public void sendTerminationMailToCMSHeadAssigned(String directorEmail, String directorName, String applicationNumber) {
+        String subject = "New Application Assigned - " + applicationNumber;
+        String body = String.format("""
+                Dear %s,
+
+                A new termination application has been assigned to you by the system.
+                
                 Application Number: %s
 
                 Please log in to the system to review and take action.
