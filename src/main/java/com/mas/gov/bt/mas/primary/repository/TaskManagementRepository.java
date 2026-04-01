@@ -48,4 +48,6 @@ public interface TaskManagementRepository extends JpaRepository<TaskManagement, 
     List<TaskManagement> findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(String applicationNumber, String assigned, String mineEngineer, String serviceCode);
 
     TaskManagement findByAssignedToRoleAndTaskStatusAndServiceCode(String cmsHead, String submitted, String serviceCode);
+
+    TaskManagement findByApplicationNumberAndAssignedToRoleAndTaskStatusAndServiceCode(String applicationNumber, String cmsHead, String submitted, String serviceCode);
 }

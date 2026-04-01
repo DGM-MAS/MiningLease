@@ -128,7 +128,7 @@ public class MiningLeaseApplication {
     @JoinColumn(name = "village_id")
     private VillageLookup nearestVillage;
 
-    // =========== Client file uplaod =========== //
+    // =========== Client file upload =========== //
     @Column(name = "file_upload_id_gr")
     private Long fileUploadIdGr;
 

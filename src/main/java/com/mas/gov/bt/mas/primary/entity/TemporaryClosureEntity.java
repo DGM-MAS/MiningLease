@@ -36,6 +36,9 @@ public class TemporaryClosureEntity {
     @Column(name = "applicant_cid", length = 11)
     private String applicantCid;
 
+    @Column(name = "applicant_contact", length = 11)
+    private String applicantContact;
+
     @Column(name = "applicant_name", length = 255)
     private String applicantName;
 
@@ -44,7 +47,6 @@ public class TemporaryClosureEntity {
 
     @Column(name = "applicant_file_id")
     private Long applicantFileId;
-
 
     @Column(name = "reason_for_closure")
     private String reasonForClosure;
@@ -81,7 +83,7 @@ public class TemporaryClosureEntity {
     private Long fileIdMI;
 
     // RC Review
-    @Column(name = "remarks_rc")
+    @Column(name = "remarks_rc", columnDefinition = "TEXT")
     private String remarksRC;
 
     @Column(name = "rc_reviewed_at")

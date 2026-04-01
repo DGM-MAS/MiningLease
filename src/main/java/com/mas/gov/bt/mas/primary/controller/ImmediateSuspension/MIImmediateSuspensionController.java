@@ -1,7 +1,9 @@
 package com.mas.gov.bt.mas.primary.controller.ImmediateSuspension;
 
 import com.mas.gov.bt.mas.primary.config.UserContext;
+import com.mas.gov.bt.mas.primary.dto.request.AssignedTaskRC;
 import com.mas.gov.bt.mas.primary.dto.request.PromoterImmediateSuspensionRequest;
+import com.mas.gov.bt.mas.primary.dto.request.ReAssignedTaskMI;
 import com.mas.gov.bt.mas.primary.dto.request.ReviewTemporaryClosureRCRequest;
 import com.mas.gov.bt.mas.primary.dto.response.ImmediateSuspensionApplicationResponse;
 import com.mas.gov.bt.mas.primary.dto.response.TemporaryClosureNotificationResponse;
@@ -65,6 +67,18 @@ public class MIImmediateSuspensionController {
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new SuccessResponse<>("Application reviewed successfully", response));
+    }
+
+    @PostMapping("/assignTask")
+    @Operation(summary = "Assign application", description = "Assign immediate suspension application assign task to MI.")
+    public ResponseEntity<SuccessResponse<ImmediateSuspensionApplicationResponse>> assignApplication(
+            @Valid @RequestBody ReAssignedTaskMI request) {
+
+        Long userId = userContext.getCurrentUserId();
+        ImmediateSuspensionApplicationResponse response = immediateSuspensionService.assignApplicationMI(request, userId);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new SuccessResponse<>("Application assigned successfully", response));
     }
 
 }
