@@ -20,11 +20,16 @@ public class ImmediateSuspensionApplicationResponse {
 
     private Long promoterUserId;
 
+    private String applicantCid;
+
     private String applicantEmail;
 
     private String applicantName;
 
     private String remarksRcMi;
+
+    private Long suspensionReasonId;
+    private String suspensionReasonName;
 
     private LocalDateTime rcMiReviewedAt;
 
@@ -32,9 +37,13 @@ public class ImmediateSuspensionApplicationResponse {
 
     private Long promoterFileId;
 
+    private String promoterRemarks;
+
     private LocalDateTime miReviewedAt;
 
     private Long miFileId;
+
+    private String miRemarks;
 
     private String currentStatus;
     private String currentStatusDisplayName;
