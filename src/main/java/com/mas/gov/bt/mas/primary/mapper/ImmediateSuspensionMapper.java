@@ -11,6 +11,7 @@ import org.mapstruct.NullValuePropertyMappingStrategy;
 public interface ImmediateSuspensionMapper {
 
     @Mapping(target = "currentStatusDisplayName", expression = "java(getStatusDisplayName(immediateSuspensionApplication.getCurrentStatus()))")
+    @Mapping(target = "suspensionReasonName", source = "suspensionReasonMaster.reasonName")
     ImmediateSuspensionApplicationResponse toResponse(ImmediateSuspensionApplication immediateSuspensionApplication);
 
     // ========== Helper Methods ========== //
@@ -32,4 +33,8 @@ public interface ImmediateSuspensionMapper {
             default -> status.replace("_", " ");
         };
     }
+
+    @Mapping(target = "currentStatusDisplayName", expression = "java(getStatusDisplayName(immediateSuspensionApplication.getCurrentStatus()))")
+    @Mapping(target = "suspensionReasonName", source = "suspensionReasonMaster.reasonName")
+    ImmediateSuspensionApplicationResponse toListResponse(ImmediateSuspensionApplication immediateSuspensionApplication);
 }

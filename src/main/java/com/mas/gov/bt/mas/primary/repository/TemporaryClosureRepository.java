@@ -56,7 +56,7 @@ public interface TemporaryClosureRepository extends JpaRepository<TemporaryClosu
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationId
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('SUBMITTED', 'MI REVIEWED')
+    AND q.currentStatus IN ('SUBMITTED', 'MI REVIEWED', 'MI ASSIGNED')
 """)
     Page<TemporaryClosureEntity> findAssignedToUserRC(Long userId, Pageable pageable);
 
@@ -66,7 +66,7 @@ public interface TemporaryClosureRepository extends JpaRepository<TemporaryClosu
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationId
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('SUBMITTED', 'MI REVIEWED')
+    AND q.currentStatus IN ('SUBMITTED', 'MI REVIEWED', 'MI ASSIGNED')
     AND LOWER(q.applicationId) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<TemporaryClosureEntity> findAssignedToUserAndSearchRC(Long userId, String search, Pageable pageable);
@@ -91,6 +91,7 @@ public interface TemporaryClosureRepository extends JpaRepository<TemporaryClosu
         ON t.applicationNumber = q.applicationId
     WHERE t.assignedToUserId = :userId
     AND t.taskStatus IN ('MI ASSIGNED')
+    AND q.currentStatus IN ('MI ASSIGNED')
 """)
     Page<TemporaryClosureEntity> findAssignedToUserMI(Long userId, Pageable pageable);
 
