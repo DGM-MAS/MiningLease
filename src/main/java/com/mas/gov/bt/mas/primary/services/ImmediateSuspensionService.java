@@ -1,10 +1,7 @@
 package com.mas.gov.bt.mas.primary.services;
 
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
-import com.mas.gov.bt.mas.primary.dto.request.AssignedTaskRC;
-import com.mas.gov.bt.mas.primary.dto.request.ImmediateSuspensionApplicationRequest;
-import com.mas.gov.bt.mas.primary.dto.request.PromoterImmediateSuspensionRequest;
-import com.mas.gov.bt.mas.primary.dto.request.RcMeImmediateSuspensionRequest;
+import com.mas.gov.bt.mas.primary.dto.request.*;
 import com.mas.gov.bt.mas.primary.dto.response.ImmediateSuspensionApplicationResponse;
 import com.mas.gov.bt.mas.primary.entity.*;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
@@ -48,6 +45,9 @@ public class ImmediateSuspensionService {
 
     private final ImmediateSuspensionMapper immediateSuspensionMapper;
 
+    private final ImmediateSuspensionReasonRepository immediateSuspensionReasonRepository;
+
+    private final TerminationApplicationRepository terminationApplicationRepository;
 
     public ImmediateSuspensionApplicationResponse submitImmediateSuspensionApplication(@Valid ImmediateSuspensionApplicationRequest request, Long userId) {
         ImmediateSuspensionApplication immediateSuspensionApplication = new ImmediateSuspensionApplication();
@@ -63,12 +63,24 @@ public class ImmediateSuspensionService {
 
             immediateSuspensionApplication.setApplicationNumber(miningLeaseApplication1.getApplicationNumber());
             immediateSuspensionApplication.setApplicationFrom(request.getApplicationFrom());
+            immediateSuspensionApplication.setPromoterUserId(miningLeaseApplication1.getApplicantUserId());
             immediateSuspensionApplication.setApplicantName(miningLeaseApplication1.getApplicantName());
+            immediateSuspensionApplication.setApplicantCid(miningLeaseApplication1.getApplicantCid());
             immediateSuspensionApplication.setApplicantEmail(miningLeaseApplication1.getApplicantEmail());
             immediateSuspensionApplication.setApplicantName(miningLeaseApplication1.getApplicantName());
             immediateSuspensionApplication.setRemarksRcMi(request.getRcMiRemark());
-            immediateSuspensionApplication.setSuspensionReasonId(request.getSuspensionReasonId());
+            immediateSuspensionApplication.setCreatedBy(userId);
+            immediateSuspensionApplication.setCreatedAt(LocalDateTime.now());
+            immediateSuspensionApplication.setCurrentStatus("SUBMITTED");
 
+            if (request.getSuspensionReasonId() != null) {
+                ImmediateSuspensionReasonMaster suspensionReasonMaster = immediateSuspensionReasonRepository
+                        .findById(request.getSuspensionReasonId())
+                        .orElseThrow(() -> new RuntimeException("Invalid Immediate Suspension ID"));
+
+                immediateSuspensionApplication.setSuspensionReasonMaster(suspensionReasonMaster);
+            }
+            immediateSuspensionApplication.setSuspensionReasonId(request.getSuspensionReasonId());
 
             // Application master
             ApplicationMaster master = miningLeaseApplication1.getApplicationMaster();
@@ -109,9 +121,12 @@ public class ImmediateSuspensionService {
                 QuarryLeaseApplication quarryLeaseApplication = application.get();
                 immediateSuspensionApplication.setApplicationNumber(quarryLeaseApplication.getApplicationNumber());
                 immediateSuspensionApplication.setApplicationFrom(request.getApplicationFrom());
+                immediateSuspensionApplication.setPromoterUserId(quarryLeaseApplication.getApplicantUserId());
                 immediateSuspensionApplication.setApplicantName(quarryLeaseApplication.getApplicantName());
+                immediateSuspensionApplication.setApplicantCid(quarryLeaseApplication.getApplicantCid());
                 immediateSuspensionApplication.setApplicantEmail(quarryLeaseApplication.getApplicantEmail());
                 immediateSuspensionApplication.setRemarksRcMi(request.getRcMiRemark());
+                immediateSuspensionApplication.setCurrentStatus("SUBMITTED");
                 immediateSuspensionApplication.setSuspensionReasonId(request.getSuspensionReasonId());
 
                 // Application master
@@ -125,6 +140,23 @@ public class ImmediateSuspensionService {
                 immediateSuspensionApplicationRepository.save(immediateSuspensionApplication);
 
                 immediateSuspensionApplication.setApplicationMaster(master);
+
+                // Task creation
+                createTask(master, immediateSuspensionApplication, "APPLICANT", userId, quarryLeaseApplication.getApplicantUserId());
+
+                if (quarryLeaseApplication.getApplicantEmail() != null) {
+                    notificationClient.sendMiningLeaseMailToDirectorAssigned(
+                            quarryLeaseApplication.getApplicantEmail(),
+                            quarryLeaseApplication.getApplicantName(),
+                            request.getApplicationNumber());
+                }
+
+                if (quarryLeaseApplication.getApplicantUserId() != null) {
+                    String title = "Immediate Suspension application has been issued related to your lease.";
+                    String message = "Application No. " + request.getApplicationNumber();
+                    String serviceId = "116";
+                    notificationClient.sendUserNotification(title, message, immediateSuspensionApplication.getPromoterUserId(), serviceId);
+                }
             }
         }
         return immediateSuspensionMapper.toResponse(immediateSuspensionApplication);
@@ -190,6 +222,7 @@ public class ImmediateSuspensionService {
                 LocalDateTime now = LocalDateTime.now();
                 app.setCurrentStatus("RECTIFICATION BY PROMOTER");
                 app.setPromoterReviewedAt(now);
+                app.setPromoterRemarks(request.getRemarks());
                 app.setPromoterFileId(request.getFileId());
 
                 if (master != null) {
@@ -232,9 +265,9 @@ public class ImmediateSuspensionService {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
         }
         if (request.getMIFocalId() != null ) {
-            immediateSuspensionApplication.setCurrentStatus("ME ASSIGNED");
+            immediateSuspensionApplication.setCurrentStatus("MI ASSIGNED");
             immediateSuspensionApplication.setRemarksRcMi(request.getRemarksRC());
-            applicationMaster.setCurrentStatus("ME ASSIGNED");
+            applicationMaster.setCurrentStatus("MI ASSIGNED");
         }
         applicationMasterRepository.save(applicationMaster);
         immediateSuspensionApplicationRepository.save(immediateSuspensionApplication);
@@ -243,7 +276,7 @@ public class ImmediateSuspensionService {
             createTask(
                     applicationMaster,
                     immediateSuspensionApplication,
-                    "ME",
+                    "MI",
                     userId,
                     request.getMIFocalId());
 
@@ -255,7 +288,7 @@ public class ImmediateSuspensionService {
                         immediateSuspensionApplication.getApplicantName(),
                         immediateSuspensionApplication.getApplicationNumber(),
                         immediateSuspensionApplication.getCurrentStatus(),
-                        "ME ASSIGNED");
+                        "MI ASSIGNED");
             }
 
             if (userMI != null) {
@@ -263,7 +296,7 @@ public class ImmediateSuspensionService {
                         userMI.getEmail(),
                         userMI.getUsername(),
                         immediateSuspensionApplication.getApplicationNumber(),
-                        "ME ASSIGNED");
+                        "MI ASSIGNED");
 
                 String title = "A new immediate suspension application has been assigned.";
                 String message = "A new immediate suspension application has been assigned.";
@@ -303,7 +336,7 @@ public class ImmediateSuspensionService {
     }
 
     public ImmediateSuspensionApplicationResponse reviewApplicationMI(@Valid PromoterImmediateSuspensionRequest request, Long userId) {
-        log.info("Reviewing Termination application by Promoter: {}", userId);
+        log.info("Reviewing Termination application by MI: {}", userId);
 
         ImmediateSuspensionApplication app = findApplicationById(request.getId());
         ApplicationMaster master = app.getApplicationMaster();
@@ -313,8 +346,10 @@ public class ImmediateSuspensionService {
             if (request.getStatus().equals("Rectification")) {
                 LocalDateTime now = LocalDateTime.now();
                 app.setCurrentStatus("RECTIFICATION NEEDED");
-                app.setPromoterReviewedAt(now);
-                app.setPromoterFileId(request.getFileId());
+                app.setMiReviewedAt(now);
+                app.setMiRemarks(request.getRemarks());
+                app.setMiFileId(request.getFileId());
+                app.setPromoterFileId(null);
 
                 if (master != null) {
                     master.setCurrentStatus("RECTIFICATION NEEDED");
@@ -334,12 +369,13 @@ public class ImmediateSuspensionService {
                 createTask(master, app, "APPLICANT", userId, app.getPromoterUserId());
             } else if (request.getStatus().equals("Lifting")) {
                 LocalDateTime now = LocalDateTime.now();
-                app.setCurrentStatus("SUSPENSION LIFTED");
-                app.setPromoterReviewedAt(now);
-                app.setPromoterFileId(request.getFileId());
+                app.setCurrentStatus("SUSPENSION LIFTING");
+                app.setMiReviewedAt(now);
+                app.setMiFileId(request.getFileId());
+                app.setMiRemarks(request.getRemarks());
 
                 if (master != null) {
-                    master.setCurrentStatus("SUSPENSION LIFTED");
+                    master.setCurrentStatus("SUSPENSION LIFTING");
                     applicationMasterRepository.save(master);
                 }
 
@@ -361,7 +397,7 @@ public class ImmediateSuspensionService {
     }
 
     public ImmediateSuspensionApplicationResponse reviewApplicationRCME(@Valid RcMeImmediateSuspensionRequest request, Long userId) {
-        log.info("Reviewing Termination application by Promoter: {}", userId);
+        log.info("Reviewing Termination application by RC/ME: {}", userId);
 
         ImmediateSuspensionApplication app = findApplicationById(request.getId());
         ApplicationMaster master = app.getApplicationMaster();
@@ -437,5 +473,166 @@ public class ImmediateSuspensionService {
             immediateSuspensionApplicationRepository.save(app);
         }
         return immediateSuspensionMapper.toResponse(app);
+    }
+
+    public SuccessResponse<List<ImmediateSuspensionApplicationResponse>> getAllApplications(Long currentUserId, Pageable pageable, String search) {
+        Page<ImmediateSuspensionApplication> page;
+
+        if (search == null || search.isBlank()) {
+
+            page = immediateSuspensionApplicationRepository
+                    .findAssignedToUserRCME(currentUserId, pageable);
+
+        } else {
+
+            page = immediateSuspensionApplicationRepository
+                    .findAssignedToUserAndSearchRCME(
+                            currentUserId,
+                            search.trim(),
+                            pageable
+                    );
+        }
+
+        Page<ImmediateSuspensionApplicationResponse> responsePage =
+                page.map(immediateSuspensionMapper::toResponse);
+
+        return SuccessResponse.fromPage(
+                "Assigned applications fetched successfully",
+                responsePage
+        );
+    }
+
+    public Page<ImmediateSuspensionApplicationResponse> getArchivedApplications(Pageable pageable, String search, Long userId) {
+        List<String> archivedStatuses = List.of("SUSPENSION LIFTED", "SUSPENDED");
+        Page<ImmediateSuspensionApplication> applications;
+        List<Long> role_id = terminationApplicationRepository.findUserDetails(userId);
+        if (role_id != null && role_id.contains(22)){
+
+            if (search == null || search.isBlank()) {
+                applications = immediateSuspensionApplicationRepository.findArchivedAssignedToUserMI(
+                        userId,
+                        archivedStatuses,
+                        pageable);
+            } else {
+
+                applications = immediateSuspensionApplicationRepository.findArchivedAssignedToUserAndSearchMI(
+                        userId,
+                        search.trim(),
+                        archivedStatuses,
+                        pageable
+                );
+            }
+
+        }else {
+            if (search == null || search.isBlank()) {
+                applications = immediateSuspensionApplicationRepository.findArchivedAssignedToUser(
+                        userId,
+                        archivedStatuses,
+                        pageable);
+            }
+            else {
+
+                applications = immediateSuspensionApplicationRepository.findArchivedAssignedToUserAndSearch(
+                        userId,
+                        search.trim(),
+                        archivedStatuses,
+                        pageable
+                );
+            }
+        }
+        return applications.map(immediateSuspensionMapper::toListResponse);
+    }
+
+    public Page<ImmediateSuspensionApplicationResponse> getMyArchivedApplications(Long userId, Pageable pageable, String search) {
+        List<String> archivedStatuses = List.of("CMS HEAD APPROVED", "TERMINATION CANCELED");
+        Page<ImmediateSuspensionApplication> applications ;
+
+        if (search == null || search.isBlank()) {
+            applications =  immediateSuspensionApplicationRepository.findByApplicantUserIdAndStatusIn(userId, archivedStatuses, pageable);
+        } else {
+            applications = immediateSuspensionApplicationRepository.findByApplicantUserIdAndSearch(userId, archivedStatuses, search.trim(), pageable);
+        }
+
+        return applications.map(immediateSuspensionMapper::toListResponse);
+    }
+
+    public SuccessResponse<List<ImmediateSuspensionApplicationResponse>> getAllApplicationAdmin(Pageable pageable, String search) {
+        Page<ImmediateSuspensionApplication> page;
+
+        if (search == null || search.isBlank()) {
+            page = immediateSuspensionApplicationRepository.findAll(pageable);
+        } else {
+            page = immediateSuspensionApplicationRepository.findAllBySearch(search.trim(), pageable);
+        }
+
+        return SuccessResponse.fromPage("Applications fetched successfully", page.map(immediateSuspensionMapper::toResponse));
+    }
+
+    public ImmediateSuspensionApplicationResponse getApplicationByNumber(String applicationNo) {
+        ImmediateSuspensionApplication application = immediateSuspensionApplicationRepository.findByApplicationNumber(applicationNo)
+                .orElseThrow(() -> new ResourceNotFoundException("Application not found: " + applicationNo));
+
+        return immediateSuspensionMapper.toResponse(application);
+    }
+
+    public ImmediateSuspensionApplicationResponse assignApplicationMI(@Valid ReAssignedTaskMI request, Long userId) {
+        ImmediateSuspensionApplication immediateSuspensionApplication;
+
+        immediateSuspensionApplication = findApplicationById(request.getId());
+        ApplicationMaster applicationMaster ;
+        if(immediateSuspensionApplication != null) {
+            applicationMaster = immediateSuspensionApplication.getApplicationMaster();
+        }else {
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
+        }
+        if (request.getMIFocalId() != null ) {
+            immediateSuspensionApplication.setCurrentStatus("MI ASSIGNED");
+            immediateSuspensionApplication.setMiRemarks(request.getRemarksMI());
+            applicationMaster.setCurrentStatus("MI ASSIGNED");
+        }
+        applicationMasterRepository.save(applicationMaster);
+        immediateSuspensionApplicationRepository.save(immediateSuspensionApplication);
+
+        List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(immediateSuspensionApplication.getApplicationNumber(),"MI ASSIGNED","MI", SERVICE_CODE);
+
+        TaskManagement taskManagement = new TaskManagement();
+
+        if (task != null) {
+            taskManagement = task.getFirst();
+        }
+
+        taskManagement.setAssignedToUserId(request.getMIFocalId());
+        taskManagement.setAssignedByUserId(userId);
+        taskManagement.setAssignedAt(LocalDateTime.now());
+        taskManagement.setReassignmentCount(taskManagement.getReassignmentCount() + 1);
+        taskManagement.setActionRemarks(request.getRemarksMI());
+
+        taskManagementRepository.save(taskManagement);
+
+        UserWorkloadProjection userMI = immediateSuspensionApplicationRepository.findUserDetailsMI(request.getMIFocalId());
+
+            if (immediateSuspensionApplication.getApplicantEmail() != null) {
+                notificationClient.sendStatusUpdateNotification(
+                        immediateSuspensionApplication.getApplicantEmail(),
+                        immediateSuspensionApplication.getApplicantName(),
+                        immediateSuspensionApplication.getApplicationNumber(),
+                        immediateSuspensionApplication.getCurrentStatus(),
+                        "ME ASSIGNED");
+            }
+
+            if (userMI != null) {
+                notificationClient.sendAssignmentNotification(
+                        userMI.getEmail(),
+                        userMI.getUsername(),
+                        immediateSuspensionApplication.getApplicationNumber(),
+                        "ME ASSIGNED");
+
+                String title = "A new immediate suspension application has been assigned.";
+                String message = "A new immediate suspension application has been assigned.";
+                String serviceId = "116";
+                notificationClient.sendUserNotification(title, message, userMI.getUserId(), serviceId);
+            }
+        return immediateSuspensionMapper.toResponse(immediateSuspensionApplication);
+
     }
 }

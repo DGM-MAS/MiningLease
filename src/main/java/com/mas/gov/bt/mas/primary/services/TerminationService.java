@@ -1,6 +1,5 @@
 package com.mas.gov.bt.mas.primary.services;
 
-import com.mas.gov.bt.mas.primary.dto.TerminationGroupedProjection;
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
 import com.mas.gov.bt.mas.primary.dto.request.ReassignTaskRequest;
 import com.mas.gov.bt.mas.primary.dto.request.ReviewTerminationApplicationCMSHead;
@@ -21,7 +20,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,7 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.Year;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -104,7 +101,7 @@ public class TerminationService {
 
             // Notifications
             if (assignedCMSHead.getEmail() != null) {
-                notificationClient.sendMiningLeaseMailToDirectorAssigned(
+                notificationClient.sendTerminationMailToCMSHeadAssigned(
                         assignedCMSHead.getEmail(),
                         assignedCMSHead.getUsername(),
                         entity.getApplicationNumber());
@@ -113,7 +110,7 @@ public class TerminationService {
             if (assignedCMSHead.getUserId() != null) {
                 String title = "Termination application has been assigned.";
                 String message = "Application No. " + entity.getApplicationNumber() + " assigned for review.";
-                String serviceId = "108";
+                String serviceId = "112";
                 notificationClient.sendUserNotification(title, message, assignedCMSHead.getUserId(), serviceId);
             }
 
@@ -187,7 +184,7 @@ public class TerminationService {
     public void reassignTaskCMS(@Valid ReassignTaskRequest request, Long userId) {
         List<String> assignedRoles = new ArrayList<>();
         assignedRoles.add("CMS HEAD");
-        List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleInAndServiceCode(request.getApplicationNumber(),"ASSIGNED",assignedRoles, SERVICE_CODE);
+        List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleInAndServiceCode(request.getApplicationNumber(),"SUBMITTED",assignedRoles, SERVICE_CODE);
 
         TaskManagement taskManagement = new TaskManagement();
 
@@ -204,15 +201,16 @@ public class TerminationService {
         taskManagementRepository.save(taskManagement);
 
         UserWorkloadProjection userDetails = miningLeaseApplicationRepository.findUserDetails(request.getNewAssigneeUserId());
-        notificationClient.sendTaskReassignmentNotification(
-                userDetails.getEmail(), userDetails.getUsername(),
+        notificationClient.sendTaskReassignmentNotificationTermination(
+                userDetails.getEmail(),
+                userDetails.getUsername(),
                 taskManagement.getApplicationNumber(),
                 taskManagement.getAssignedToRole());
 
         if(userDetails.getUserId()!= null) {
             String title = "An new application has been reassigned.";
             String message = "An application for termination has been assigned for review. Application No. "+request.getApplicationNumber()+" Please login to review the application";
-            String serviceId = "108";
+            String serviceId = "112";
             notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId);
         }else {
             throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
@@ -295,7 +293,9 @@ public class TerminationService {
                     app.setCurrentStatus("TERMINATION CANCELED");
                     app.setRemarksCMSHead(request.getRemarks());
                     app.setCmsHeadReviewedAt(now);
-                    app.setCmsHeadFileId(request.getFileId());
+                    if (request.getFileId() != null) {
+                        app.setCmsHeadFileId(request.getFileId());
+                    }
                     app.setApprovedAt(now);
 
                     if (master != null) {
@@ -360,15 +360,12 @@ public class TerminationService {
         TerminationApplicationEntity app = findApplicationById(request.getId());
         ApplicationMaster master = app.getApplicationMaster();
 
-        TaskManagement taskManagement = taskManagementRepository.findByAssignedToRoleAndTaskStatusAndServiceCode("CMS HEAD", "SUBMITTED", SERVICE_CODE );
+        TaskManagement taskManagement = taskManagementRepository.findByApplicationNumberAndAssignedToRoleAndTaskStatusAndServiceCode(app.getApplicationNumber(),"CMS HEAD", "SUBMITTED", SERVICE_CODE );
         if (request.getStatus() != null) {
 
             if (request.getStatus().equals("Rectification")) {
-                LocalDateTime now = LocalDateTime.now();
                 app.setCurrentStatus("RECTIFICATION BY PROMOTER");
-                app.setRemarksCMSHead(request.getRemarks());
-                app.setCmsHeadReviewedAt(now);
-                app.setCmsHeadFileId(request.getFileId());
+                app.setPromoterFileId(request.getFileId());
 
                 if (master != null) {
                     master.setCurrentStatus("RECTIFICATION BY PROMOTER");
@@ -396,48 +393,67 @@ public class TerminationService {
 
     }
 
-    public SuccessResponse<List<TerminationApplicationResponse>> getAllApplications(
-            Long userId, Pageable pageable, String search) {
-
-        // Normalize search
-        if (search != null && search.isBlank()) {
-            search = null;
-        }
-
-        Page<TerminationGroupedProjection> page =
-                terminationApplicationRepository.findGroupedApplications(userId, search, pageable);
-
-        Page<TerminationApplicationResponse> responsePage = page.map(p -> {
-
-            TerminationApplicationResponse res = new TerminationApplicationResponse();
-
-            res.setTerminationId(p.getTerminationId());
-
-            // Convert array → List
-            if (p.getApplicationNumbers() != null) {
-                res.setApplicationNumbers(Arrays.asList(p.getApplicationNumbers()));
-            }
-
-            res.setCurrentStatus(p.getCurrentStatus());
-            res.setCreatedAt(p.getCreatedAt());
-
-            // ✅ NEW FIELDS
-            res.setApplicantName(p.getApplicantName());
-            res.setPromoterUserId(p.getPromoterUserId());
-
-            return res;
-        });
-
-        return SuccessResponse.fromPage(
-                "Assigned applications fetched successfully",
-                responsePage
-        );
-    }
+//    public SuccessResponse<List<TerminationApplicationResponse>> getAllApplications(
+//            Long userId, Pageable pageable, String search) {
+//
+//        // Normalize search
+//        if (search != null && search.isBlank()) {
+//            search = null;
+//        }
+//
+//        Page<TerminationGroupedProjection> page =
+//                terminationApplicationRepository.findGroupedApplications(userId, search, pageable);
+//
+//        Page<TerminationApplicationResponse> responsePage = page.map(p -> {
+//
+//            TerminationApplicationResponse res = new TerminationApplicationResponse();
+//
+//            res.setTerminationId(p.getTerminationId());
+//
+//            // Convert array → List
+//            if (p.getApplicationNumbers() != null) {
+//                res.setApplicationNumbers(Arrays.asList(p.getApplicationNumbers()));
+//            }
+//
+//            res.setCurrentStatus(p.getCurrentStatus());
+//            res.setCreatedAt(p.getCreatedAt());
+//
+//            // ✅ NEW FIELDS
+//            res.setApplicantName(p.getApplicantName());
+//            res.setPromoterUserId(p.getPromoterUserId());
+//
+//            return res;
+//        });
+//
+//        return SuccessResponse.fromPage(
+//                "Assigned applications fetched successfully",
+//                responsePage
+//        );
+//    }
 
     public Page<TerminationApplicationResponse> getArchivedApplications(Pageable pageable, String search, Long userId) {
-        List<String> archivedStatuses = List.of("CMS HEAD APPROVED");
+        List<String> archivedStatuses = List.of("CMS HEAD APPROVED", "TERMINATION CANCELED");
         Page<TerminationApplicationEntity> applications;
+        List<Long> role_id = terminationApplicationRepository.findUserDetails(userId);
+        if(role_id !=null && role_id.contains(35)){
 
+            if (search == null || search.isBlank()) {
+                applications = terminationApplicationRepository.findArchivedAssignedToUserCMSHead(
+                        userId,
+                        archivedStatuses,
+                        pageable);
+            }
+            else {
+
+                applications = terminationApplicationRepository.findArchivedAssignedToUserAndSearchCMSHead(
+                        userId,
+                        search.trim(),
+                        archivedStatuses,
+                        pageable
+                );
+            }
+
+        }else {
         if (search == null || search.isBlank()) {
             applications = terminationApplicationRepository.findArchivedAssignedToUser(
                     userId,
@@ -449,15 +465,17 @@ public class TerminationService {
             applications = terminationApplicationRepository.findArchivedAssignedToUserAndSearch(
                     userId,
                     search.trim(),
+                    archivedStatuses,
                     pageable
             );
+        }
         }
         return applications.map(terminationMapper::toListResponse);
     }
 
     @Transactional(readOnly = true)
     public Page<TerminationApplicationResponse> getMyArchivedApplications(Long userId, Pageable pageable, String search) {
-        List<String> archivedStatuses = List.of("CMS HEAD APPROVED");
+        List<String> archivedStatuses = List.of("CMS HEAD APPROVED", "TERMINATION CANCELED");
         Page<TerminationApplicationEntity> applications ;
 
         if (search == null || search.isBlank()) {
@@ -492,5 +510,39 @@ public class TerminationService {
         }
 
         return SuccessResponse.fromPage("Applications fetched successfully", page.map(terminationMapper::toResponse));
+    }
+
+    public TerminationApplicationResponse getApplicationByNumber(String applicationNo) {
+        TerminationApplicationEntity application = terminationApplicationRepository.findByApplicationNumber(applicationNo)
+                .orElseThrow(() -> new ResourceNotFoundException("Application not found: " + applicationNo));
+
+        return terminationMapper.toResponse(application);
+    }
+
+    public SuccessResponse<List<TerminationApplicationResponse>> getAllApplications(Long currentUserId, Pageable pageable, String search) {
+        Page<TerminationApplicationEntity> page;
+
+        if (search == null || search.isBlank()) {
+
+            page = terminationApplicationRepository
+                    .findAssignedToUserChiefMD(currentUserId, pageable);
+
+        } else {
+
+            page = terminationApplicationRepository
+                    .findAssignedToUserAndSearchChiefMD(
+                            currentUserId,
+                            search.trim(),
+                            pageable
+                    );
+        }
+
+        Page<TerminationApplicationResponse> responsePage =
+                page.map(terminationMapper::toResponse);
+
+        return SuccessResponse.fromPage(
+                "Assigned applications fetched successfully",
+                responsePage
+        );
     }
 }

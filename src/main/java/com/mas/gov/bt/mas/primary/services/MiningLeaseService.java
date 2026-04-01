@@ -548,25 +548,28 @@ public class MiningLeaseService {
         assignedRoles.add("GEOLOGIST");
         List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleIn(request.getApplicationNumber(),"ASSIGNED",assignedRoles);
 
-        TaskManagement taskManagement = new TaskManagement();
-
-        if (task != null) {
-            taskManagement = task.getFirst();
+        if (task == null) {
+            throw new BusinessException("No Task Found");
+        }
+        for(TaskManagement taskManagement : task) {
+            taskManagement.setAssignedToUserId(request.getNewAssigneeUserId());
+            taskManagement.setAssignedByUserId(userId);
+            taskManagement.setAssignedAt(LocalDateTime.now());
+            taskManagement.setReassignmentCount(taskManagement.getReassignmentCount() + 1);
+            taskManagement.setActionRemarks(request.getRemarks());
         }
 
-        taskManagement.setAssignedToUserId(request.getNewAssigneeUserId());
-        taskManagement.setAssignedByUserId(userId);
-        taskManagement.setAssignedAt(LocalDateTime.now());
-        taskManagement.setReassignmentCount(taskManagement.getReassignmentCount() + 1);
-        taskManagement.setActionRemarks(request.getRemarks());
 
-        taskManagementRepository.save(taskManagement);
+        taskManagementRepository.saveAll(task);
+
+        TaskManagement firstTask = task.getFirst();
 
         UserWorkloadProjection userDetails = miningLeaseApplicationRepository.findUserDetails(request.getNewAssigneeUserId());
         notificationClient.sendTaskReassignmentNotification(
                 userDetails.getEmail(), userDetails.getUsername(),
-                taskManagement.getApplicationNumber(),
-                taskManagement.getAssignedToRole());
+                firstTask.getApplicationNumber(),
+                firstTask.getAssignedToRole(),
+                request.getRemarks());
 
         if(userDetails.getUserId()!= null) {
             String title = "An new application has been reassigned.";
@@ -578,32 +581,34 @@ public class MiningLeaseService {
         }
 
 
-        log.info("Geologist task {} reassigned to user {}", taskManagement.getId(), request.getNewAssigneeUserId());
+        log.info("Geologist task {} reassigned to user {}", firstTask.getId(), request.getNewAssigneeUserId());
     }
 
     @Transactional
     public void reassignTaskMPCD(@Valid ReassignTaskRequest request, Long userId) {
         List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(),"MPCD ASSIGNED","MPCD_FOCAL", SERVICE_CODE);
-
-        TaskManagement taskManagement = new TaskManagement();
-
-        if (task != null) {
-            taskManagement = task.getFirst();
+        if (task == null) {
+           throw new BusinessException("No Task Found");
         }
 
-        taskManagement.setAssignedToUserId(request.getNewAssigneeUserId());
-        taskManagement.setAssignedByUserId(userId);
-        taskManagement.setAssignedAt(LocalDateTime.now());
-        taskManagement.setReassignmentCount(taskManagement.getReassignmentCount() + 1);
-        taskManagement.setActionRemarks(request.getRemarks());
+        for(TaskManagement taskManagement : task) {
+            taskManagement.setAssignedToUserId(request.getNewAssigneeUserId());
+            taskManagement.setAssignedByUserId(userId);
+            taskManagement.setAssignedAt(LocalDateTime.now());
+            taskManagement.setReassignmentCount(taskManagement.getReassignmentCount() + 1);
+            taskManagement.setActionRemarks(request.getRemarks());
+        }
 
-        taskManagementRepository.save(taskManagement);
+        taskManagementRepository.saveAll(task);
+
+        TaskManagement firstTask = task.getFirst();
 
         UserWorkloadProjection userDetails = miningLeaseApplicationRepository.findUserDetails(request.getNewAssigneeUserId());
         notificationClient.sendTaskReassignmentNotification(
                 userDetails.getEmail(), userDetails.getUsername(),
-                taskManagement.getApplicationNumber(),
-                taskManagement.getAssignedToRole());
+                firstTask.getApplicationNumber(),
+                firstTask.getAssignedToRole(),
+                request.getRemarks());
 
         if(userDetails.getUserId()!= null) {
             String title = "An new application has been reassigned.";
@@ -614,7 +619,7 @@ public class MiningLeaseService {
             throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
 
-        log.info("MPCD task {} reassigned to user {}", taskManagement.getId(), request.getNewAssigneeUserId());
+        log.info("MPCD task {} reassigned to user {}", firstTask.getId(), request.getNewAssigneeUserId());
     }
 
     @Transactional
@@ -630,8 +635,8 @@ public class MiningLeaseService {
             taskManagement.setAssignedToUserId(request.getNewAssigneeUserId());
             taskManagement.setAssignedByUserId(userId);
             taskManagement.setAssignedAt(LocalDateTime.now());
-            taskManagement.setReassignmentCount(
-                    taskManagement.getReassignmentCount() + 1);
+            taskManagement.setReassignmentCount
+                    (taskManagement.getReassignmentCount() + 1);
             taskManagement.setActionRemarks(request.getRemarks());
 
         }
@@ -644,7 +649,8 @@ public class MiningLeaseService {
         notificationClient.sendTaskReassignmentNotification(
                 userDetails.getEmail(), userDetails.getUsername(),
                 firstTask.getApplicationNumber(),
-                firstTask.getAssignedToRole());
+                firstTask.getAssignedToRole(),
+                request.getRemarks());
 
         if(userDetails.getUserId()!= null) {
             String title = "An new application has been reassigned.";
@@ -664,25 +670,30 @@ public class MiningLeaseService {
 
         List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(),"MINING_CHIEF_REVIEW","MINING_CHIEF_REVIEW", SERVICE_CODE);
 
-        TaskManagement taskManagement = new TaskManagement();
 
-        if (task != null) {
-            taskManagement = task.getFirst();
+        if (task == null) {
+            throw new BusinessException("No Task Found");
         }
 
-        taskManagement.setAssignedToUserId(request.getNewAssigneeUserId());
-        taskManagement.setAssignedByUserId(userId);
-        taskManagement.setAssignedAt(LocalDateTime.now());
-        taskManagement.setReassignmentCount(taskManagement.getReassignmentCount() + 1);
-        taskManagement.setActionRemarks(request.getRemarks());
+        for(TaskManagement taskManagement : task) {
+            taskManagement.setAssignedToUserId(request.getNewAssigneeUserId());
+            taskManagement.setAssignedByUserId(userId);
+            taskManagement.setAssignedAt(LocalDateTime.now());
+            taskManagement.setReassignmentCount(taskManagement.getReassignmentCount() + 1);
+            taskManagement.setActionRemarks(request.getRemarks());
+        }
 
-        taskManagementRepository.save(taskManagement);
+
+        taskManagementRepository.saveAll(task);
+
+        TaskManagement firstTask = task.getFirst();
 
         UserWorkloadProjection userDetails = miningLeaseApplicationRepository.findUserDetails(request.getNewAssigneeUserId());
         notificationClient.sendTaskReassignmentNotification(
                 userDetails.getEmail(), userDetails.getUsername(),
-                taskManagement.getApplicationNumber(),
-                taskManagement.getAssignedToRole());
+                firstTask.getApplicationNumber(),
+                firstTask.getAssignedToRole(),
+                request.getRemarks());
 
         if(userDetails.getUserId()!= null) {
             String title = "An new application has been reassigned.";
@@ -693,7 +704,7 @@ public class MiningLeaseService {
             throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
 
-        log.info("Task {} reassigned to user {}", taskManagement.getId(), request.getNewAssigneeUserId());
+        log.info("Task {} reassigned to user {}", firstTask.getId(), request.getNewAssigneeUserId());
     }
 
     @Transactional

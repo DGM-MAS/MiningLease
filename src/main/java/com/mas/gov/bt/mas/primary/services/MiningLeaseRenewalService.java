@@ -1750,7 +1750,8 @@ public class MiningLeaseRenewalService {
         notificationClient.sendTaskReassignmentNotification(
                 userDetails.getEmail(), userDetails.getUsername(),
                 firstTask.getApplicationNumber(),
-                firstTask.getAssignedToRole());
+                firstTask.getAssignedToRole(),
+                request.getRemarks());
 
         if(userDetails.getUserId()!= null) {
             String title = "An new application has been reassigned.";
@@ -1791,7 +1792,8 @@ public class MiningLeaseRenewalService {
         notificationClient.sendTaskReassignmentNotification(
                 userDetails.getEmail(), userDetails.getUsername(),
                 firstTask.getApplicationNumber(),
-                firstTask.getAssignedToRole());
+                firstTask.getAssignedToRole(),
+                request.getRemarks());
 
         if(userDetails.getUserId()!= null) {
             String title = "An new application has been reassigned.";
@@ -1834,7 +1836,8 @@ public class MiningLeaseRenewalService {
         notificationClient.sendTaskReassignmentNotification(
                 userDetails.getEmail(), userDetails.getUsername(),
                 firstTask.getApplicationNumber(),
-                firstTask.getAssignedToRole());
+                firstTask.getAssignedToRole(),
+                request.getRemarks());
 
         if(userDetails.getUserId()!= null) {
             String title = "An new application has been reassigned.";

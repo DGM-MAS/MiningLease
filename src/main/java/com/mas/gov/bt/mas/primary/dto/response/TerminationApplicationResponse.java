@@ -22,6 +22,8 @@ public class TerminationApplicationResponse {
 
     private Long promoterUserId;
 
+    private Long promoterFileId;
+
     private String applicantEmail;
 
     private String applicantName;
