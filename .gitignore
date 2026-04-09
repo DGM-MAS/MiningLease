@@ -1,10 +1,19 @@
-HELP.md
+# Maven build output
 target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
 
-### STS ###
+# Spring Boot
+HELP.md
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Eclipse / STS
 .apt_generated
 .classpath
 .factorypath
@@ -13,13 +22,10 @@ target/
 .springBeans
 .sts4-cache
 
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
+# VS Code
+.vscode/
 
-### NetBeans ###
+# NetBeans
 /nbproject/private/
 /nbbuild/
 /dist/
@@ -29,50 +35,29 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
-### VS Code ###
-.vscode/
-
-### Claude Code ###
-.claude/
-
-### Security Analysis ###
-*_vulnerability/
-.PVS-Studio/
-
-### Environment Variables ###
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env.template
-
-### Security Reports ###
-*_vul/
-*vulnerability*.html
-*security*.html
-*report*.html
-
-### Documentation and Planning Files ###
-*_GUIDE.md
-*_PLAN.md
-*.pdf
-*.docx
-*.md
-*.json
-
-### macOS ###
+# OS
 .DS_Store
 .AppleDouble
 .LSOverride
-
-### Windows ###
 Thumbs.db
 ehthumbs.db
 Desktop.ini
 
-### Logs ###
+# Logs
 *.log
 logs/
 
+# Environment / Secrets
+.env
+.env.*
+
+# JVM crash logs
+hs_err_pid*.log
+replay_pid*.log
+
+# Analysis tools
+.PVS-Studio/
 megalinter-reports/
+
+# Claude Code
+.claude/
