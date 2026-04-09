@@ -27,5 +27,6 @@ RUN mkdir -p /tmp && chown -R app:app /app /tmp
 
 USER app
 
+ENV SPRING_PROFILES_ACTIVE=prod
 
 ENTRYPOINT ["java","-jar","/app/app.jar"]
