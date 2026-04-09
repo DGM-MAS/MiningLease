@@ -61,3 +61,12 @@ megalinter-reports/
 
 # Claude Code
 .claude/
+
+# Office documents / data files (not source code)
+*.xlsx
+*.xls
+*.docx
+*.doc
+*.pdf
+*.pptx
+*.ppt
