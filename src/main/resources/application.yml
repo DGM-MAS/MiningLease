@@ -15,6 +15,7 @@ app:
 server:
   port: 8085
   address: 0.0.0.0
+#  address: 127.0.0.1  # Uncomment to accept connections only from this host (gateway on same machine); in Kubernetes use NetworkPolicy instead
   tomcat:
     relaxed-query-chars: "|,{,},[,],^,@,$,&,+,="
 
@@ -161,12 +162,37 @@ springdoc:
 jwt:
   secret: WFdz6u8hOXJD0ihDuRaZ+2dfkpWiDSlodyi78lBRJKpQwnMTwJCNiVCk2RW7mSzgeJdEHFsowE2CeutQvot9NQ==
 
-# Eureka Client
-#eureka:
-#  client:
-#    service-url:
-#      defaultZone: http://mas-eureka-server-service:8081/eureka/
-#    register-with-eureka: true
-#    fetch-registry: true
-#  instance:
-#    prefer-ip-address: true
+# Eureka Client — defaults to local; override with -Dspring.profiles.active=prod for Kubernetes
+eureka:
+  client:
+    service-url:
+      defaultZone: http://admin:admin123@localhost:8081/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+
+---
+# ── Production profile ── activate with SPRING_PROFILES_ACTIVE=prod in Kubernetes
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: jdbc:postgresql://postgres:5432/mas_db  # ClusterIP DNS — no NodePort needed inside the cluster
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        show_sql: false
+        format_sql: false
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false
+eureka:
+  client:
+    service-url:
+      defaultZone: http://admin:admin123@mas-eureka-server-service:8081/eureka/
