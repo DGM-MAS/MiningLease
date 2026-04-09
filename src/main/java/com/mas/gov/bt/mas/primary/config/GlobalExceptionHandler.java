@@ -34,7 +34,7 @@ public class GlobalExceptionHandler {
 
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .success(false)
-                .message("Resource not found")
+                .message(ex.getMessage())
                 .error(ex.getMessage())
                 .statusCode(HttpStatus.NOT_FOUND.value())
                 .timestamp(LocalDateTime.now())
@@ -54,7 +54,7 @@ public class GlobalExceptionHandler {
 
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .success(false)
-                .message("Duplicate resource")
+                .message(ex.getMessage())
                 .error(ex.getMessage())
                 .statusCode(HttpStatus.CONFLICT.value())
                 .timestamp(LocalDateTime.now())
@@ -74,7 +74,7 @@ public class GlobalExceptionHandler {
 
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .success(false)
-                .message("Invalid credentials")
+                .message(ex.getMessage())
                 .error(ex.getMessage())
                 .statusCode(HttpStatus.UNAUTHORIZED.value())
                 .timestamp(LocalDateTime.now())
@@ -94,7 +94,7 @@ public class GlobalExceptionHandler {
 
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .success(false)
-                .message("Account locked")
+                .message(ex.getMessage())
                 .error(ex.getMessage())
                 .statusCode(HttpStatus.FORBIDDEN.value())
                 .timestamp(LocalDateTime.now())
@@ -114,7 +114,7 @@ public class GlobalExceptionHandler {
 
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .success(false)
-                .message("Account inactive")
+                .message(ex.getMessage())
                 .error(ex.getMessage())
                 .statusCode(HttpStatus.FORBIDDEN.value())
                 .timestamp(LocalDateTime.now())
@@ -134,7 +134,7 @@ public class GlobalExceptionHandler {
 
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .success(false)
-                .message("Unauthorized operation")
+                .message(ex.getMessage())
                 .error(ex.getMessage())
                 .statusCode(HttpStatus.FORBIDDEN.value())
                 .timestamp(LocalDateTime.now())
@@ -207,8 +207,8 @@ public class GlobalExceptionHandler {
 
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .success(false)
-                .message("Operation failed")
-                .error(ex.getMessage())
+                .message("An error occurred while processing your request.")
+                .error("An error occurred while processing your request.")
                 .statusCode(HttpStatus.BAD_REQUEST.value())
                 .timestamp(LocalDateTime.now())
                 .path(request.getRequestURI())
