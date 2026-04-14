@@ -559,7 +559,6 @@ public class MiningLeaseService {
             taskManagement.setActionRemarks(request.getRemarks());
         }
 
-
         taskManagementRepository.saveAll(task);
 
         TaskManagement firstTask = task.getFirst();
@@ -857,6 +856,10 @@ public class MiningLeaseService {
             miningLeaseApplication.setPfsDocId(null);
         } else if (Objects.equals(request.getFileType(), "GR")) {
             miningLeaseApplication.setFileUploadIdGr(null);
+        } else if (Objects.equals(request.getFileType(), "PA")){
+            miningLeaseApplication.setFileUploadIdPA(null);
+        } else if (Objects.equals(request.getFileType(), "FC")){
+            miningLeaseApplication.setFileUploadIdFC(null);
         } else {
             miningLeaseApplication.setFmfsDocId(null);
         }
@@ -2099,6 +2102,7 @@ public class MiningLeaseService {
         }
 
         if(request.getFileType().equals("PFS")) {
+
             quarryLeaseApplication.setPfsDocId(request.getFileId());
 
             if(quarryLeaseApplication.getCurrentStatus().equals("RESUBMIT PFS GEOLOGIST")) {

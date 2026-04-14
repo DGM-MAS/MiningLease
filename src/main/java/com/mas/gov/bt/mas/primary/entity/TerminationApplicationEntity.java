@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -45,6 +46,12 @@ public class TerminationApplicationEntity {
 
     @Column(name = "field_id")
     private Long fileId;
+
+    @Column(name = "permanent_termination")
+    private boolean permanentTermination;
+
+    @Column(name = "termination_end_date")
+    private LocalDate terminationEndDate;
 
     @Column(name = "remarks_chief")
     private String remarksChief;
