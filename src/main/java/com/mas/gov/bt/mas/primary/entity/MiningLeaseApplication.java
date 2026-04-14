@@ -154,12 +154,12 @@ public class MiningLeaseApplication {
     @Column(name = "signed_pfs_id")
     private Long signedPFSId;
 
-    @Column(name = "remarks_mpcd")
+    @Column(name = "remarks_mpcd", columnDefinition = "TEXT")
     private String remarksMPCD;
 
     // ========== GEOLOGIST FOCAL =============== //
 
-    @Column(name = "remarks_geologist")
+    @Column(name = "remarks_geologist", columnDefinition = "TEXT")
     private String remarksGeologist;
 
     @Column(name = "geological_report_status", length = 30)
@@ -314,6 +314,6 @@ public class MiningLeaseApplication {
     @Column(name = "work_order_doc_id")
     private Long workOrderDocId;
 
-    @Column(name = "work_order_remarks")
+    @Column(name = "work_order_remarks" , columnDefinition = "TEXT")
     private String workOrderRemarks;
 }

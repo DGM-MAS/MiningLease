@@ -1,5 +1,6 @@
 package com.mas.gov.bt.mas.primary.integration;
 
+import com.mas.gov.bt.mas.primary.dto.request.EmailRequest;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +38,7 @@ public class NotificationClient {
     private static final Logger logger = LoggerFactory.getLogger(NotificationClient.class);
 
     private static final String NOTIFICATION_API_URL =  "http://localhost:8082/api/notifications";
+    private static final String NOTIFICATION_API_URL_EMAIL_BUILDER =  "http://localhost:8082/api/notifications/send";
     private final RestTemplate restTemplate;
 
     public NotificationClient(JavaMailSender mailSender, RestTemplate restTemplate) {
@@ -104,21 +106,25 @@ public class NotificationClient {
                                                       String applicationNumber) {
         String subject = "Mining Lease Application Submitted - " + applicationNumber;
         String body = String.format("""
-                Dear %s,
-
                 Your Mining lease application has been submitted successfully.
 
                 Application Number: %s
 
                 You can track your application status using this reference number.
                 We will notify you of any updates on your application.
+                """, applicationNumber);
 
-                Thank you,
-                Mines Administrative System
-                Ministry of Energy and Natural Resources
-                """, applicantName, applicationNumber);
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
 
-        sendEmail(email, subject, body);
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
     }
 
     /**
@@ -129,8 +135,6 @@ public class NotificationClient {
                                               String applicationNumber, String newStatus, String remarks) {
         String subject = "Application Status Update - " + applicationNumber;
         String body = String.format("""
-                Dear %s,
-
                 Your Mining lease application status has been updated.
 
                 Application Number: %s
@@ -138,14 +142,20 @@ public class NotificationClient {
                 %s
 
                 You can log in to the system to view more details.
-
-                Thank you,
-                Mines Administrative System
-                Ministry of Energy and Natural Resources
-                """, applicantName, applicationNumber, newStatus,
+                """,  applicationNumber, newStatus,
                 remarks != null ? "Remarks: " + remarks : "");
 
-        sendEmail(email, subject, body);
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
+
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
     }
 
     /**
@@ -156,8 +166,6 @@ public class NotificationClient {
                                           String applicationNumber) {
         String subject = "Congratulations! Mining Lease Application Approved - " + applicationNumber;
         String body = String.format("""
-                Dear %s,
-
                 We are pleased to inform you that your mining lease application has been approved.
 
                 Application Number: %s
@@ -168,13 +176,20 @@ public class NotificationClient {
                 3. Download your lease certificate
 
                 Thank you for using our services.
+                """, applicationNumber);
 
-                Best regards,
-                Mines Administrative System
-                Ministry of Energy and Natural Resources
-                """, applicantName, applicationNumber);
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
 
-        sendEmail(email, subject, body);
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+
     }
 
 
@@ -183,8 +198,6 @@ public class NotificationClient {
                                          String applicationNumber) {
         String subject = "Congratulations! Mining Lease Application uplifting suspension has be uplifted. - " + applicationNumber;
         String body = String.format("""
-                Dear %s,
-
                 We are pleased to inform you that your lease suspension application has been uplifted.
 
                 Application Number: %s
@@ -193,13 +206,19 @@ public class NotificationClient {
                 1. View your immediate suspension application details
                 
                 Thank you for using our services.
+                """, applicationNumber);
 
-                Best regards,
-                Mines Administrative System
-                Ministry of Energy and Natural Resources
-                """, applicantName, applicationNumber);
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
 
-        sendEmail(email, subject, body);
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
     }
 
     /**
@@ -210,21 +229,25 @@ public class NotificationClient {
                                            String applicationNumber, String reason) {
         String subject = "Mining Lease Application Update - " + applicationNumber;
         String body = String.format("""
-                Dear %s,
-
                 We regret to inform you that your mining lease application could not be approved.
 
                 Application Number: %s
                 Reason: %s
 
                 If you have any questions, please contact our support team.
+                """, applicationNumber, reason);
 
-                Thank you,
-                Mines Administrative System
-                Ministry of Energy and Natural Resources
-                """, applicantName, applicationNumber, reason);
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
 
-        sendEmail(email, subject, body);
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
     }
 
     /**
@@ -235,20 +258,25 @@ public class NotificationClient {
                                             String applicationNumber, String stepName) {
         String subject = "New Application Assigned - " + applicationNumber;
         String body = String.format("""
-                Dear %s,
-
                 A new quarry lease application has been assigned to you for review.
 
                 Application Number: %s
                 Current Step: %s
 
                 Please log in to the system to review and take action.
+                """, applicationNumber, stepName);
 
-                Thank you,
-                Mines Administrative System
-                """, officerName, applicationNumber, stepName);
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(officerName);
 
-        sendEmail(email, subject, body);
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
     }
 
 
@@ -263,8 +291,6 @@ public class NotificationClient {
         String subject = "Application Fee Required - Mining Lease Application " + applicationNumber;
 
         String body = String.format("""
-            Dear %s,
-
             Your mining lease application is pending for payment of the required application fee.
 
             Application Number: %s
@@ -274,13 +300,19 @@ public class NotificationClient {
             Your application will only be processed after successful payment of the application fee.
 
             If you have already made the payment, please ignore this message.
+            """, applicationNumber);
 
-            Thank you,
-            Mines Administrative System
-            Ministry of Energy and Natural Resources
-            """, applicantName, applicationNumber);
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
 
-        sendEmail(email, subject, body);
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
     }
 
     @Async
@@ -288,8 +320,6 @@ public class NotificationClient {
                                                  String applicationNumber, String stage, String remarks) {
         String subject = "Additional Information Required - " + applicationNumber;
         String body = String.format("""
-                Dear %s,
-
                 Your temporary closure application requires additional information.
 
                 Application Number: %s
@@ -297,13 +327,20 @@ public class NotificationClient {
                 Remarks: %s
 
                 Please log in to the system to provide the requested information and resubmit your application.
+                """, applicationNumber, stage, remarks != null ? remarks : "N/A");
 
-                Thank you,
-                Mines Administrative System
-                Ministry of Energy and Natural Resources
-                """, applicantName, applicationNumber, stage, remarks != null ? remarks : "N/A");
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
 
-        sendEmail(email, subject, body);
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+
     }
 
     @Async
@@ -311,8 +348,6 @@ public class NotificationClient {
                                                 String applicationNumber, String stage, String remarks) {
         String subject = "Additional Information Required for termination process - " + applicationNumber;
         String body = String.format("""
-                Dear %s,
-
                 Your mining lease application are under termination review please provide requires additional information.
 
                 Application Number: %s
@@ -320,13 +355,19 @@ public class NotificationClient {
                 Remarks: %s
 
                 Please log in to the system to provide the requested information and resubmit your additional information.
+                """, applicationNumber, stage, remarks != null ? remarks : "N/A");
 
-                Thank you,
-                Mines Administrative System
-                Ministry of Energy and Natural Resources
-                """, applicantName, applicationNumber, stage, remarks != null ? remarks : "N/A");
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
 
-        sendEmail(email, subject, body);
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
     }
 
 
@@ -335,8 +376,6 @@ public class NotificationClient {
                                                            String applicationNumber, String stage, String remarks) {
         String subject = "Rectification from promoter - " + applicationNumber;
         String body = String.format("""
-                Dear %s,
-
                 Additional information from promoter has been provided. Please login to review the application.
 
                 Application Number: %s
@@ -345,12 +384,20 @@ public class NotificationClient {
 
                 Please log in to the system to provide the requested information and resubmit your additional information.
 
-                Thank you,
-                Mines Administrative System
-                Ministry of Energy and Natural Resources
-                """, applicantName, applicationNumber, stage, remarks != null ? remarks : "N/A");
+                """, applicationNumber, stage, remarks != null ? remarks : "N/A");
 
-        sendEmail(email, subject, body);
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
+
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+
     }
 
     @Async
@@ -358,21 +405,26 @@ public class NotificationClient {
                                                       String applicationNumber, String deadline) {
         String subject = "Geological Report Submission Deadline - " + applicationNumber;
         String body = String.format("""
-                Dear %s,
-
-                This is a reminder that the geological report for your quarry lease application is due.
+                This is a reminder that the geological report for your mining lease application is due.
 
                 Application Number: %s
                 Deadline: %s
 
                 Please ensure the report is submitted before the deadline.
+                """, applicationNumber, deadline);
 
-                Thank you,
-                Mines Administrative System
-                Ministry of Energy and Natural Resources
-                """, applicantName, applicationNumber, deadline);
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
 
-        sendEmail(email, subject, body);
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+
     }
 
     @Async
@@ -380,62 +432,79 @@ public class NotificationClient {
                                                 String applicationNumber) {
         String subject = "FMFS Submission Required - " + applicationNumber;
         String body = String.format("""
-                Dear %s,
-
-                Your quarry lease application requires submission of the Final Mine Feasibility Study (FMFS).
+                Your mining lease application requires submission of the Final Mine Feasibility Study (FMFS).
 
                 Application Number: %s
 
                 Please log in to the system to upload the required document.
 
-                Thank you,
-                Mines Administrative System
-                Ministry of Energy and Natural Resources
-                """, applicantName, applicationNumber);
+                """, applicationNumber);
 
-        sendEmail(email, subject, body);
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
+
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+
     }
 
     @Async
     public void sendMLASigningNotification(String email, String applicantName,
                                             String applicationNumber) {
-        String subject = "MLA Signed - Quarry Lease Application " + applicationNumber;
+        String subject = "MLA Signed - Mining Lease Application " + applicationNumber;
         String body = String.format("""
-                Dear %s,
-
-                The Mining Lease Agreement (MLA) for your quarry lease application has been signed.
+                The Mining Lease Agreement (MLA) for your mining lease application has been signed.
 
                 Application Number: %s
 
                 Please log in to the system to download your signed MLA document.
 
-                Thank you,
-                Mines Administrative System
-                Ministry of Energy and Natural Resources
-                """, applicantName, applicationNumber);
+                """, applicationNumber);
 
-        sendEmail(email, subject, body);
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
+
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+
     }
 
     @Async
     public void sendWorkOrderNotification(String email, String applicantName,
                                            String applicationNumber) {
-        String subject = "Work Order Issued - Quarry Lease Application " + applicationNumber;
+        String subject = "Work Order Issued - Mining Lease Application " + applicationNumber;
         String body = String.format("""
-                Dear %s,
-
-                A work order has been issued for your quarry lease application.
+                A work order has been issued for your mining lease application.
 
                 Application Number: %s
 
                 Please log in to the system to view and download your work order.
+                """,  applicationNumber);
 
-                Thank you,
-                Mines Administrative System
-                Ministry of Energy and Natural Resources
-                """, applicantName, applicationNumber);
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
 
-        sendEmail(email, subject, body);
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+
     }
 
     @Async
@@ -447,21 +516,27 @@ public class NotificationClient {
         }
         String subject = "Task Reassigned - " + applicationNumber;
         String body = String.format("""
-                Dear %s,
-
-                A quarry lease application task has been reassigned to you.
+                A mining lease application task has been reassigned to you.
 
                 Application Number: %s
                 Remarks: %s
                 Role: %s
 
                 Please log in to the system to review and take action.
+                """, applicationNumber, remarks, role);
 
-                Thank you,
-                Mines Administrative System
-                """, officerName != null ? officerName : "Officer", applicationNumber, remarks, role);
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(officerName);
 
-        sendEmail(email, subject, body);
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+
     }
 
     @Async
@@ -473,8 +548,6 @@ public class NotificationClient {
         }
         String subject = "Task Reassigned - " + applicationNumber;
         String body = String.format("""
-                Dear %s,
-
                 A termination application task has been reassigned to you.
 
                 Application Number: %s
@@ -482,11 +555,20 @@ public class NotificationClient {
 
                 Please log in to the system to review and take action.
 
-                Thank you,
-                Mines Administrative System
-                """, officerName != null ? officerName : "Officer", applicationNumber, role);
+                """, applicationNumber, role);
 
-        sendEmail(email, subject, body);
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(officerName);
+
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+
     }
 
     @Async
@@ -498,19 +580,24 @@ public class NotificationClient {
         }
         String subject = "Termination Notification - " + applicationNumber;
         String body = String.format("""
-                Dear %s,
-
                 The termination of mining has been approved by CMS Head.
 
                 Application Number: %s
 
                 Please log in to the system to review the details of termination.
+                """,  applicationNumber);
 
-                Thank you,
-                Mines Administrative System
-                """, officerName != null ? officerName : "Officer", applicationNumber);
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(officerName);
 
-        sendEmail(email, subject, body);
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
     }
 
     @Async
@@ -522,19 +609,26 @@ public class NotificationClient {
         }
         String subject = "Termination Cancelled  - " + applicationNumber;
         String body = String.format("""
-                Dear %s,
-
                 The termination of mining lease has been cancelled by CMS Head.
 
                 Application Number: %s
 
                 Please log in to the system to review the details.
 
-                Thank you,
-                Mines Administrative System
-                """, officerName != null ? officerName : "Officer", applicationNumber);
+                """, applicationNumber);
 
-        sendEmail(email, subject, body);
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(officerName);
+
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+
     }
 
     public void sendUserNotification(String title, String message, Long userId, String serviceId) {
@@ -571,38 +665,49 @@ public class NotificationClient {
     public void sendMiningLeaseMailToDirectorAssigned(String directorEmail, String directorName, String applicationNumber) {
         String subject = "New Application Assigned - " + applicationNumber;
         String body = String.format("""
-                Dear %s,
-
-                A new quarry lease application has been assigned to you.
+                A new mining lease application has been assigned to you.
                 Assign MPCD and Geologist focal respectively.
 
                 Application Number: %s
 
                 Please log in to the system to review and take action.
+                """,  applicationNumber);
 
-                Thank you,
-                Mines Administrative System
-                """, directorName, applicationNumber);
+        EmailRequest request = new EmailRequest();
+        request.setTo(directorEmail);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(directorName);
 
-        sendEmail(directorEmail, subject, body);
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
     }
 
     public void sendTerminationMailToCMSHeadAssigned(String directorEmail, String directorName, String applicationNumber) {
         String subject = "New Application Assigned - " + applicationNumber;
         String body = String.format("""
-                Dear %s,
-
                 A new termination application has been assigned to you by the system.
                 
                 Application Number: %s
 
                 Please log in to the system to review and take action.
 
-                Thank you,
-                Mines Administrative System
-                """, directorName, applicationNumber);
+                """, applicationNumber);
 
-        sendEmail(directorEmail, subject, body);
+        EmailRequest request = new EmailRequest();
+        request.setTo(directorEmail);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(directorName);
+
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
     }
 
     /**
@@ -613,17 +718,23 @@ public class NotificationClient {
                                                      String applicationNumber) {
         String subject = "Mining Lease Application has been suspended - " + applicationNumber;
         String body = String.format("""
-                Dear %s,
-
                 Your Mining lease application has been suspended.
 
                 Application Number: %s
 
-                Thank you,
-                Mines Administrative System
-                Ministry of Energy and Natural Resources
-                """, applicantName, applicationNumber);
+                """, applicationNumber);
 
-        sendEmail(email, subject, body);
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
+
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+
     }
 }
