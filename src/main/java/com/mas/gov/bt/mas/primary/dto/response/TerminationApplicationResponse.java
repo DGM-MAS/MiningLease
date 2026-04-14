@@ -4,6 +4,7 @@ import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -29,6 +30,10 @@ public class TerminationApplicationResponse {
     private String applicantName;
 
     private Long fileId;
+
+    private boolean permanentTermination;
+
+    private LocalDate terminationEndDate;
 
     private String remarksChief;
 

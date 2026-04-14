@@ -69,18 +69,29 @@ public class TerminationService {
             }
 
             MiningLeaseApplication miningLeaseApplication1 = miningLeaseApplication.get();
+            if(miningLeaseApplication1.getCurrentStatus().equalsIgnoreCase("MINING LEASE APPROVED")){
+                miningLeaseApplication1.setCurrentStatus("Under-Review-Termination");
+                miningLeaseApplicationRepository.save(miningLeaseApplication1);
+            }else {
+                throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
+            }
 
             TerminationApplicationEntity entity = new TerminationApplicationEntity();
 
             entity.setTerminationId(terminationId);
             entity.setApplicationNumber(appNo);
             entity.setPromoterUserId(request.getPromoterUserId());
+
             entity.setFileId(request.getFileId());
             entity.setCreatedBy(userId);
             entity.setCreatedAt(LocalDateTime.now());
             entity.setRemarksChief(request.getRemarksChief());
             entity.setCurrentStatus("SUBMITTED");
-
+            entity.setPermanentTermination(request.isPermanentTermination());
+            if(!request.isPermanentTermination()) {
+               entity.setTerminationEndDate(request.getTerminationEndDate());
+            }
+            entity.setTerminationEndDate(request.getTerminationEndDate());
             entity.setApplicantName(miningLeaseApplication1.getApplicantName());
             entity.setApplicantEmail(miningLeaseApplication1.getApplicantEmail());
 
@@ -94,7 +105,12 @@ public class TerminationService {
 
             entity.setApplicationMaster(master);
 
-            terminationApplicationRepository.save(entity);
+            try {
+                terminationApplicationRepository.save(entity);
+            } catch (Exception e) {
+                throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
+            }
+
 
             // Task creation
             createTask(master, entity, "CMS HEAD", userId, assignedCMSHead.getUserId());
@@ -313,6 +329,15 @@ public class TerminationService {
                     }
                     assert master != null;
                     createTask( master, app, "TERMINATION CANCELED", userId, app.getCreatedBy());
+                    Optional<MiningLeaseApplication> miningLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(app.getApplicationNumber());
+
+                    MiningLeaseApplication miningLeaseApplicationEntity = null;
+                    if (miningLeaseApplication.isPresent()) {
+                        miningLeaseApplicationEntity = miningLeaseApplication.get();
+                    }
+                    assert miningLeaseApplicationEntity != null;
+                    miningLeaseApplicationEntity.setCurrentStatus("MINING LEASE APPROVED");
+                    miningLeaseApplicationRepository.save(miningLeaseApplicationEntity);
                 }
                 default -> throw new IllegalArgumentException("Application status not recognized");
             }
