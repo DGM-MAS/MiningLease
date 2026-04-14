@@ -23,4 +23,6 @@ public interface ApplicationMasterRepository extends JpaRepository<ApplicationMa
 
     @Query("SELECT COUNT(am) FROM ApplicationMaster am WHERE am.serviceCode = :serviceCode AND am.currentStatus = :status")
     Long countByServiceCodeAndStatus(@Param("serviceCode") String serviceCode, @Param("status") String status);
+
+    Optional<ApplicationMaster> findByApplicationNumberAndServiceCode(String applicationNumber, String surfaceCollectionPermit);
 }

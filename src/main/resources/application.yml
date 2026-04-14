@@ -162,11 +162,12 @@ jwt:
   secret: WFdz6u8hOXJD0ihDuRaZ+2dfkpWiDSlodyi78lBRJKpQwnMTwJCNiVCk2RW7mSzgeJdEHFsowE2CeutQvot9NQ==
 
 # Eureka Client
-#eureka:
-#  client:
-#    service-url:
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8081/eureka/
 #      defaultZone: http://mas-eureka-server-service:8081/eureka/
-#    register-with-eureka: true
-#    fetch-registry: true
-#  instance:
-#    prefer-ip-address: true
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
