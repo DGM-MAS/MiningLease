@@ -139,6 +139,18 @@ data-hub:
   ibls-business-license:
     url: https://staging-datahub-apim.tech.gov.bt/moea_businessinformationapi/1.0.0/businesslicensedetails
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+  health:
+    redis:
+      enabled: false
+
 # Swagger/OpenAPI Configuration
 springdoc:
   api-docs:
