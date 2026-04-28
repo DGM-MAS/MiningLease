@@ -33,10 +33,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         registry.addEndpoint("/gs-guide-websocket")
                 .setAllowedOriginPatterns("*")
                 .withSockJS()
+                .setSuppressCors(true)
                 .setClientLibraryUrl(
                         "https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"
                 );
 
-        logger.info("STOMP endpoint registered: /gs-guide-websocket with SockJS and open CORS");
+        logger.info("STOMP endpoint registered: /gs-guide-websocket (SockJS, CORS suppressed — gateway owns CORS)");
     }
 }
