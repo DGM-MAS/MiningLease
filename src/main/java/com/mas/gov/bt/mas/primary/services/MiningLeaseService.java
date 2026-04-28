@@ -1775,10 +1775,10 @@ public class MiningLeaseService {
                     app.setApprovedMineral(request.getApprovedMineral());
                     app.setMeReviewedAt(LocalDateTime.now());
 
-                    if (master != null) {
-                        master.setCurrentStatus("APPROVED");
-                        applicationMasterRepository.save(master);
-                    }
+                        if (master != null) {
+                            master.setCurrentStatus("APPROVED");
+                            applicationMasterRepository.save(master);
+                        }
 
                     // =====================================================
                     // 8. ASSIGN DIRECTOR + CREATE TASK
