@@ -21,7 +21,7 @@ public class ImmediateSuspensionApplication {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "application_number", unique = true, nullable = false, length = 30)
+    @Column(name = "application_number", nullable = false, length = 30)
     private String applicationNumber;
 
     @Column(name = "application_from")

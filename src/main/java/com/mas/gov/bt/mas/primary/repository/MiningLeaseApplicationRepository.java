@@ -280,6 +280,7 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     SELECT a
     FROM MiningLeaseApplication a
     WHERE a.currentStatus IN ('MINING LEASE APPROVED')
+    AND a.applicantUserId = :userId
     AND LOWER(a.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseApplication> findArchivedAssignedToUserAndSearch(Long userId, String search, Pageable pageable);
