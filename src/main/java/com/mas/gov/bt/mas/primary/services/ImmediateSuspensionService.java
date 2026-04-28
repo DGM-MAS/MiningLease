@@ -117,9 +117,6 @@ public class ImmediateSuspensionService {
     private ImmediateSuspensionApplicationResponse processQuarrySuspension(
             ImmediateSuspensionApplicationRequest request, Long userId) {
 
-        Optional<QuarryLeaseApplication> application =
-                quarryLeaseApplicationRepository.findByApplicationNumber(request.getApplicationNumber());
-
         QuarryLeaseApplication quarryLeaseApplication =
                 quarryLeaseApplicationRepository
                         .findByApplicationNumber(request.getApplicationNumber())
@@ -509,71 +506,97 @@ public class ImmediateSuspensionService {
 
         if (request.getStatus() != null) {
 
-            if (request.getStatus().equals("Suspended")) {
-                LocalDateTime now = LocalDateTime.now();
-                app.setCurrentStatus("SUSPENDED");
-                app.setPromoterReviewedAt(now);
+            switch (request.getStatus()) {
+                case "Suspended" -> {
+                    LocalDateTime now = LocalDateTime.now();
+                    app.setCurrentStatus("SUSPENDED");
+                    app.setPromoterReviewedAt(now);
 
-                if(app.getApplicationFrom().equalsIgnoreCase("M")){
-                    Optional<MiningLeaseApplication> miningLeaseApplication =
-                            miningLeaseApplicationRepository.findByApplicationNumber(app.getApplicationNumber());
+                    if (app.getApplicationFrom().equalsIgnoreCase("M")) {
+                        Optional<MiningLeaseApplication> miningLeaseApplication =
+                                miningLeaseApplicationRepository.findByApplicationNumber(app.getApplicationNumber());
 
-                    if (miningLeaseApplication.isEmpty()) {
-                        throw new RuntimeException("Invalid application number: " + app.getApplicationNumber());
+                        if (miningLeaseApplication.isEmpty()) {
+                            throw new RuntimeException("Invalid application number: " + app.getApplicationNumber());
+                        }
+
+                        MiningLeaseApplication miningLeaseApplication1 = miningLeaseApplication.get();
+
+                        miningLeaseApplication1.setCurrentStatus("SUSPENDED");
+                        miningLeaseApplicationRepository.save(miningLeaseApplication1);
+                    } else if (app.getApplicationFrom().equalsIgnoreCase("Q")) {
+                        Optional<QuarryLeaseApplication> application =
+                                quarryLeaseApplicationRepository.findByApplicationNumber(app.getApplicationNumber());
+
+                        if (application.isEmpty()) {
+                            throw new RuntimeException("Invalid application number: " + app.getApplicationNumber());
+                        }
+
+                        QuarryLeaseApplication quarryLeaseApplication = application.get();
+                        quarryLeaseApplication.setCurrentStatus("SUSPENDED");
+                        quarryLeaseApplicationRepository.save(quarryLeaseApplication);
                     }
 
-                    MiningLeaseApplication miningLeaseApplication1 = miningLeaseApplication.get();
-
-                    miningLeaseApplication1.setCurrentStatus("SUSPENDED");
-                    miningLeaseApplicationRepository.save(miningLeaseApplication1);
-                }else if(app.getApplicationFrom().equalsIgnoreCase("Q")){
-                    Optional<QuarryLeaseApplication> application =
-                            quarryLeaseApplicationRepository.findByApplicationNumber(app.getApplicationNumber());
-
-                    if (application.isEmpty()) {
-                        throw new RuntimeException("Invalid application number: " + app.getApplicationNumber());
+                    if (master != null) {
+                        master.setCurrentStatus("SUSPENDED");
+                        applicationMasterRepository.save(master);
                     }
 
-                    QuarryLeaseApplication quarryLeaseApplication = application.get();
-                    quarryLeaseApplication.setCurrentStatus("SUSPENDED");
-                    quarryLeaseApplicationRepository.save(quarryLeaseApplication);
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendApplicationSuspendedNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber());
+                    }
+
+                    assert master != null;
+                    createTask(master, app, "APPLICANT", userId, app.getPromoterUserId());
                 }
+                case "Rectification" -> {
+                    LocalDateTime now = LocalDateTime.now();
+                    app.setCurrentStatus("RECTIFICATION NEEDED");
+                    app.setRcMiReviewedAt(now);
+                    app.setRemarksRcMi(request.getRemarks());
+                    app.setPromoterFileId(null);
 
-                if (master != null) {
-                    master.setCurrentStatus("SUSPENDED");
-                    applicationMasterRepository.save(master);
+                    if (master != null) {
+                        master.setCurrentStatus("RECTIFICATION NEEDED");
+                        applicationMasterRepository.save(master);
+                    }
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendImmediateSuspensionRevisionRequestPromoterNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber(),
+                                app.getCurrentStatus(),
+                                "Rectification Needed");
+                    }
+
+                    assert master != null;
+                    createTask(master, app, "APPLICANT", userId, app.getPromoterUserId());
                 }
+                case "Lifting" -> {
+                    LocalDateTime now = LocalDateTime.now();
+                    app.setCurrentStatus("SUSPENSION LIFTED");
+                    app.setPromoterReviewedAt(now);
 
-                if (app.getApplicantEmail() != null) {
-                    notificationClient.sendApplicationSuspendedNotification(
-                            app.getApplicantEmail(),
-                            app.getApplicantName(),
-                            app.getApplicationNumber());
+                    if (master != null) {
+                        master.setCurrentStatus("SUSPENSION LIFTED");
+                        applicationMasterRepository.save(master);
+                    }
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendUpliftingSuspensionNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber());
+                    }
+
+                    assert master != null;
+                    createTask(master, app, "APPLICANT", userId, app.getCreatedBy());
                 }
-
-                assert master != null;
-                createTask(master, app, "APPLICANT", userId, app.getPromoterUserId());
-            } else if (request.getStatus().equals("Lifting")) {
-                LocalDateTime now = LocalDateTime.now();
-                app.setCurrentStatus("SUSPENSION LIFTED");
-                app.setPromoterReviewedAt(now);
-
-                if (master != null) {
-                    master.setCurrentStatus("SUSPENSION LIFTED");
-                    applicationMasterRepository.save(master);
-                }
-
-                if (app.getApplicantEmail() != null) {
-                    notificationClient.sendUpliftingSuspensionNotification(
-                            app.getApplicantEmail(),
-                            app.getApplicantName(),
-                            app.getApplicationNumber());
-                }
-
-                assert master != null;
-                createTask(master, app, "APPLICANT", userId, app.getCreatedBy());
-            } else {
-                throw new IllegalArgumentException("Application status not recognized");
+                default -> throw new IllegalArgumentException("Application status not recognized");
             }
             immediateSuspensionApplicationRepository.save(app);
         }
