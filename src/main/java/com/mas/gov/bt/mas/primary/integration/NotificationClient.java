@@ -128,6 +128,35 @@ public class NotificationClient {
     }
 
     /**
+     * Send application submitted notification to applicant.
+     */
+    @Async
+    public void sendApplicationSubmittedManualEntryNotification(String email, String applicantName,
+                                                     String applicationNumber) {
+        String subject = "Manual Entry Application Submitted - " + applicationNumber;
+        String body = String.format("""
+                Your Manual entry application has been submitted successfully.
+
+                Application Number: %s
+
+                You can track your application status using this reference number.
+                We will notify you of any updates on your application.
+                """, applicationNumber);
+
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
+
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+    }
+
+    /**
      * Send status update notification to applicant.
      */
     @Async
@@ -174,6 +203,72 @@ public class NotificationClient {
                 1. View your approved lease details
                 2. Complete any pending payments
                 3. Download your lease certificate
+
+                Thank you for using our services.
+                """, applicationNumber);
+
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
+
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+
+    }
+
+
+    /**
+     * Send approval notification to applicant.
+     */
+    @Async
+    public void sendApprovalManualEntryNotification(String email, String applicantName,
+                                         String applicationNumber) {
+        String subject = "Congratulations! Manual Entry Application Approved - " + applicationNumber;
+        String body = String.format("""
+                We are pleased to inform you that your manual entry application has been approved.
+
+                Application Number: %s
+
+                Please log in to the system to:
+                1. Upload MLA for Signing
+
+                Thank you for using our services.
+                """, applicationNumber);
+
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
+
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+
+    }
+
+    /**
+     * Send approval notification to applicant.
+     */
+    @Async
+    public void sendApprovalSampleTransportNotification(String email, String applicantName,
+                                         String applicationNumber) {
+        String subject = "Congratulations! Sample Transport clearance Application Approved - " + applicationNumber;
+        String body = String.format("""
+                We are pleased to inform you that your sample transport clearance application has been approved.
+
+                Application Number: %s
+
+                Please log in to the system to:
+                1. View your approved transport clearance details
+                2. Download your trasport clearance.
 
                 Thank you for using our services.
                 """, applicationNumber);
@@ -251,6 +346,91 @@ public class NotificationClient {
     }
 
     /**
+     * Send rejection notification to applicant.
+     */
+    @Async
+    public void sendRejectionSampleTransportNotification(String email, String applicantName,
+                                          String applicationNumber, String reason) {
+        String subject = "Sample Transport clearance Application Update - " + applicationNumber;
+        String body = String.format("""
+                We regret to inform you that your  application transport clearance could not be approved.
+
+                Application Number: %s
+                Reason: %s
+
+                If you have any questions, please contact our support team.
+                """, applicationNumber, reason);
+
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
+
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+    }
+
+    /**
+     * Send rejection notification to applicant.
+     */
+    @Async
+    public void sendRejectionManualEntryNotification(String email, String applicantName,
+                                          String applicationNumber, String reason) {
+        String subject = "Manual Entry Application Update - " + applicationNumber;
+        String body = String.format("""
+                We regret to inform you that your manual entry application could not be approved.
+
+                Application Number: %s
+                Reason: %s
+
+                If you have any questions, please contact our support team.
+                """, applicationNumber, reason);
+
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
+
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+    }
+
+
+    @Async
+    public void GSDFocalAcceptedReviewedNotification(
+            String email,
+            String chiefName,
+            String applicationNumber) {
+        String subject = "Sample Transport clearance Application has been reviewed - " + applicationNumber;
+        String body = String.format("""
+                GSD Focal has accepted the application. Please log in to the system to review and take action.
+
+                Application Number: %s
+
+                """, applicationNumber);
+
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(chiefName);
+
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+    }
+
+    /**
      * Send assignment notification to officer.
      */
     @Async
@@ -259,6 +439,35 @@ public class NotificationClient {
         String subject = "New Application Assigned - " + applicationNumber;
         String body = String.format("""
                 A new quarry lease application has been assigned to you for review.
+
+                Application Number: %s
+                Current Step: %s
+
+                Please log in to the system to review and take action.
+                """, applicationNumber, stepName);
+
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(officerName);
+
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+    }
+
+    /**
+     * Send assignment notification to officer.
+     */
+    @Async
+    public void sendAssignmentManualEntryNotification(String email, String officerName,
+                                           String applicationNumber, String stepName) {
+        String subject = "New Application Assigned - " + applicationNumber;
+        String body = String.format("""
+                A new manual entry application has been assigned to you for review.
 
                 Application Number: %s
                 Current Step: %s
