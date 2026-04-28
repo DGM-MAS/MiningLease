@@ -28,7 +28,7 @@ spring:
 
   datasource:
 #    url: jdbc:postgresql://localhost:5432/postgres
-    url: jdbc:postgresql://172.30.3.10:30432/mas_db
+    url: jdbc:postgresql://172.30.3.10:30432/mas_db?tcpKeepAlive=true&socketTimeout=300
     username: postgres
     password: 4GbRIVm8KuYXzEJB
 #    password: root
@@ -37,8 +37,9 @@ spring:
     hikari:
       maximum-pool-size: 20
       minimum-idle: 5
-      idle-timeout: 30000
-      max-lifetime: 1800000
+      idle-timeout: 600000
+      max-lifetime: 600000
+      keepalive-time: 60000
       connection-timeout: 30000
 
   jpa:
@@ -137,6 +138,18 @@ data-hub:
     url: https://staging-datahub-apim.tech.gov.bt/rbp_scs_details_api/1.0.0/latestscsdetailsbycid
   ibls-business-license:
     url: https://staging-datahub-apim.tech.gov.bt/moea_businessinformationapi/1.0.0/businesslicensedetails
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+  health:
+    redis:
+      enabled: false
 
 # Swagger/OpenAPI Configuration
 springdoc:
