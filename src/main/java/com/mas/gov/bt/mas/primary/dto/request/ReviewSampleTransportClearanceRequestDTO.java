@@ -1,15 +1,13 @@
 package com.mas.gov.bt.mas.primary.dto.request;
 
-import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 
-@Data
-@Getter
 @Setter
-public class RcMeImmediateSuspensionRequest {
+@Getter
+public class ReviewSampleTransportClearanceRequestDTO {
 
-    private Long id;
+    private String applicationNo;
     private String status;
     private String remarks;
 }

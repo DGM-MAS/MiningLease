@@ -184,6 +184,7 @@ eureka:
     fetch-registry: true
   instance:
     prefer-ip-address: true
+    ip-address: 192.168.123.44
 
 ---
 # ── Production profile ── activate with SPRING_PROFILES_ACTIVE=prod in Kubernetes
@@ -208,4 +209,5 @@ springdoc:
 eureka:
   client:
     service-url:
-      defaultZone: http://admin:admin123@mas-eureka-server-service:8081/eureka/
+      defaultZone: http://admin:admin123@172.30.3.10:30088/eureka/
+#      defaultZone: http://admin:admin123@mas-eureka-server-service:8081/eureka/
