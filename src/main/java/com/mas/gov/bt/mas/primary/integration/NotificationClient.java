@@ -463,6 +463,35 @@ public class NotificationClient {
      * Send assignment notification to officer.
      */
     @Async
+    public void sendEnvironmentalClearanceAssignmentNotification(String email, String officerName,
+                                           String applicationNumber, String stepName) {
+        String subject = "New Application Assigned - " + applicationNumber;
+        String body = String.format("""
+                A new environmental clearance application has been assigned to you for review.
+
+                Application Number: %s
+                Current Step: %s
+
+                Please log in to the system to review and take action.
+                """, applicationNumber, stepName);
+
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(officerName);
+
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+    }
+
+    /**
+     * Send assignment notification to officer.
+     */
+    @Async
     public void sendAssignmentManualEntryNotification(String email, String officerName,
                                            String applicationNumber, String stepName) {
         String subject = "New Application Assigned - " + applicationNumber;
@@ -726,6 +755,38 @@ public class NotificationClient {
         String subject = "Task Reassigned - " + applicationNumber;
         String body = String.format("""
                 A mining lease application task has been reassigned to you.
+
+                Application Number: %s
+                Remarks: %s
+                Role: %s
+
+                Please log in to the system to review and take action.
+                """, applicationNumber, remarks, role);
+
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(officerName);
+
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+
+    }
+
+    @Async
+    public void sendTaskRenewalEnvironmentalClearanceReassignmentNotification(String email, String officerName,
+                                                 String applicationNumber, String role, String remarks) {
+        if (email == null) {
+            log.info("No email provided for task reassignment notification. Application: {}, Role: {}", applicationNumber, role);
+            return;
+        }
+        String subject = "Task Reassigned - " + applicationNumber;
+        String body = String.format("""
+                A renewal environmental clearance application task has been reassigned to you.
 
                 Application Number: %s
                 Remarks: %s
