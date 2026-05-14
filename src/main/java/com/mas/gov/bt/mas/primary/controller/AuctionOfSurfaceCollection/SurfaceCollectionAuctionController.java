@@ -1,15 +1,25 @@
 package com.mas.gov.bt.mas.primary.controller.AuctionOfSurfaceCollection;
 
+import com.mas.gov.bt.mas.primary.config.UserContext;
 import com.mas.gov.bt.mas.primary.dto.request.BGRequestDTO;
 import com.mas.gov.bt.mas.primary.dto.request.BidWinnerRequestDTO;
+import com.mas.gov.bt.mas.primary.dto.request.SurfaceCollectionAuctionListResponseDTO;
 import com.mas.gov.bt.mas.primary.dto.request.SurfaceCollectionAuctionRequestDTO;
+import com.mas.gov.bt.mas.primary.dto.response.SurfaceCollectionAttachmentResponseDTO;
 import com.mas.gov.bt.mas.primary.dto.response.SurfaceCollectionAuctionResponseDTO;
 import com.mas.gov.bt.mas.primary.services.SurfaceCollectionAuctionService;
+import com.mas.gov.bt.mas.primary.utility.PageRequest1Based;
 import com.mas.gov.bt.mas.primary.utility.SuccessResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/surface-collection-auction")
@@ -18,15 +28,17 @@ public class SurfaceCollectionAuctionController {
 
     private final SurfaceCollectionAuctionService auctionService;
 
+    private final UserContext userContext;
+
     /**
      * BR-1
      * Create Auction Application
      */
     @PostMapping
     public ResponseEntity<SuccessResponse<SurfaceCollectionAuctionResponseDTO>> createAuction(
-            @RequestBody SurfaceCollectionAuctionRequestDTO dto,
-            @RequestParam Long userId
+            @RequestBody SurfaceCollectionAuctionRequestDTO dto
     ) {
+        Long userId = userContext.getCurrentUserId();
 
         SurfaceCollectionAuctionResponseDTO response =
                 auctionService.createAuction(dto, userId);
@@ -174,6 +186,93 @@ public class SurfaceCollectionAuctionController {
         return ResponseEntity.ok(
                 new SuccessResponse<>(
                         "Permit generated successfully",
+                        response
+                )
+        );
+    }
+
+    @GetMapping
+    public ResponseEntity<
+            SuccessResponse<Page<SurfaceCollectionAuctionListResponseDTO>>> getAllApplications(
+
+            @RequestParam(required = false) String search,
+
+            @RequestParam(defaultValue = "1") int page,
+
+            @RequestParam(defaultValue = "10") int size,
+
+            @RequestParam(defaultValue = "createdOn") String sortBy,
+
+            @RequestParam(defaultValue = "DESC") String sortDirection
+    ) {
+
+        Pageable pageable = PageRequest1Based.of(
+                page,
+                size,
+                Sort.Direction.fromString(sortDirection),
+                sortBy
+        );
+
+        Page<SurfaceCollectionAuctionListResponseDTO> response =
+                auctionService.getAllApplications(search, pageable);
+
+        return ResponseEntity.ok(
+                new SuccessResponse<>(
+                        "Applications fetched successfully",
+                        response
+                )
+        );
+    }
+
+    @GetMapping("/my-applitions")
+    public ResponseEntity<
+            SuccessResponse<Page<SurfaceCollectionAuctionListResponseDTO>>> getMyApplications(
+
+            @RequestParam(required = false) String search,
+
+            @RequestParam(defaultValue = "1") int page,
+
+            @RequestParam(defaultValue = "10") int size,
+
+            @RequestParam(defaultValue = "createdOn") String sortBy,
+
+            @RequestParam(defaultValue = "DESC") String sortDirection
+    ) {
+
+        Pageable pageable = PageRequest1Based.of(
+                page,
+                size,
+                Sort.Direction.fromString(sortDirection),
+                sortBy
+        );
+
+        Long userId = userContext.getCurrentUserId();
+
+        Page<SurfaceCollectionAuctionListResponseDTO> response =
+                auctionService.getMyApplications(search, pageable, userId);
+
+        return ResponseEntity.ok(
+                new SuccessResponse<>(
+                        "Applications fetched successfully",
+                        response
+                )
+        );
+    }
+
+    @GetMapping("/{auctionId}/attachments")
+    public ResponseEntity<
+            SuccessResponse<List<SurfaceCollectionAttachmentResponseDTO>>
+            > getAttachments(
+
+            @PathVariable Long auctionId
+    ) {
+
+        List<SurfaceCollectionAttachmentResponseDTO> response =
+                auctionService.getAttachmentsByAuctionId(auctionId);
+
+        return ResponseEntity.ok(
+                new SuccessResponse<>(
+                        "Attachments fetched successfully",
                         response
                 )
         );

@@ -8,7 +8,7 @@ import lombok.*;
 @AllArgsConstructor
 public class SurfaceCollectionAttachmentRequestDTO {
 
-    private String fileName;
-    private String filePath;
+    private String fileId;
+
     private String attachmentType;
 }
