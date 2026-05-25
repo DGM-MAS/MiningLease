@@ -11,5 +11,7 @@ public class BidWinnerRequestDTO {
     private String bidWinnerName;
     private String contactNumber;
     private String emailAddress;
-    private String otherDetails;
+    private String agencyName;
+    private String cidNumber;
+    private Long promoterId;
 }

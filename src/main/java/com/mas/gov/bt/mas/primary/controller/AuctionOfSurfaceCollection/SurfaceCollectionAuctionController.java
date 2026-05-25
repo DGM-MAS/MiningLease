@@ -1,10 +1,8 @@
 package com.mas.gov.bt.mas.primary.controller.AuctionOfSurfaceCollection;
 
 import com.mas.gov.bt.mas.primary.config.UserContext;
-import com.mas.gov.bt.mas.primary.dto.request.BGRequestDTO;
-import com.mas.gov.bt.mas.primary.dto.request.BidWinnerRequestDTO;
-import com.mas.gov.bt.mas.primary.dto.request.SurfaceCollectionAuctionListResponseDTO;
-import com.mas.gov.bt.mas.primary.dto.request.SurfaceCollectionAuctionRequestDTO;
+import com.mas.gov.bt.mas.primary.dto.request.*;
+import com.mas.gov.bt.mas.primary.dto.response.BGResponseDTO;
 import com.mas.gov.bt.mas.primary.dto.response.SurfaceCollectionAttachmentResponseDTO;
 import com.mas.gov.bt.mas.primary.dto.response.SurfaceCollectionAuctionResponseDTO;
 import com.mas.gov.bt.mas.primary.services.SurfaceCollectionAuctionService;
@@ -56,11 +54,12 @@ public class SurfaceCollectionAuctionController {
      */
     @PutMapping("/{auctionId}/submit-ec")
     public ResponseEntity<SuccessResponse<SurfaceCollectionAuctionResponseDTO>> submitForEC(
-            @PathVariable Long auctionId
+            @PathVariable Long auctionId,
+            @RequestBody String fileECid
     ) {
 
         SurfaceCollectionAuctionResponseDTO response =
-                auctionService.submitForEC(auctionId);
+                auctionService.submitForEC(auctionId, fileECid);
 
         return ResponseEntity.ok(
                 new SuccessResponse<>(
@@ -96,11 +95,14 @@ public class SurfaceCollectionAuctionController {
      */
     @PutMapping("/{auctionId}/approve-ec")
     public ResponseEntity<SuccessResponse<SurfaceCollectionAuctionResponseDTO>> approveEC(
-            @PathVariable Long auctionId
+            @PathVariable Long auctionId,
+            @RequestBody SurfaceCollectionAuctionECRequest fileECid
     ) {
 
+        Long userId = userContext.getCurrentUserId();
+
         SurfaceCollectionAuctionResponseDTO response =
-                auctionService.updateEcApproval(auctionId);
+                auctionService.updateEcApproval(auctionId, fileECid, userId);
 
         return ResponseEntity.ok(
                 new SuccessResponse<>(
@@ -150,6 +152,7 @@ public class SurfaceCollectionAuctionController {
                 )
         );
     }
+
 
     /**
      * BR-6
@@ -224,7 +227,7 @@ public class SurfaceCollectionAuctionController {
         );
     }
 
-    @GetMapping("/my-applitions")
+    @GetMapping("/my-applications")
     public ResponseEntity<
             SuccessResponse<Page<SurfaceCollectionAuctionListResponseDTO>>> getMyApplications(
 
@@ -259,6 +262,41 @@ public class SurfaceCollectionAuctionController {
         );
     }
 
+    @GetMapping("/my-archive")
+    public ResponseEntity<
+            SuccessResponse<Page<SurfaceCollectionAuctionListResponseDTO>>> getMyArchive(
+
+            @RequestParam(required = false) String search,
+
+            @RequestParam(defaultValue = "1") int page,
+
+            @RequestParam(defaultValue = "10") int size,
+
+            @RequestParam(defaultValue = "createdOn") String sortBy,
+
+            @RequestParam(defaultValue = "DESC") String sortDirection
+    ) {
+
+        Pageable pageable = PageRequest1Based.of(
+                page,
+                size,
+                Sort.Direction.fromString(sortDirection),
+                sortBy
+        );
+
+        Long userId = userContext.getCurrentUserId();
+
+        Page<SurfaceCollectionAuctionListResponseDTO> response =
+                auctionService.getMyArchive(search, pageable, userId);
+
+        return ResponseEntity.ok(
+                new SuccessResponse<>(
+                        "Applications fetched successfully",
+                        response
+                )
+        );
+    }
+
     @GetMapping("/{auctionId}/attachments")
     public ResponseEntity<
             SuccessResponse<List<SurfaceCollectionAttachmentResponseDTO>>
@@ -273,6 +311,22 @@ public class SurfaceCollectionAuctionController {
         return ResponseEntity.ok(
                 new SuccessResponse<>(
                         "Attachments fetched successfully",
+                        response
+                )
+        );
+    }
+
+    @GetMapping("/{auctionId}/bg")
+    public ResponseEntity<
+            SuccessResponse<List<BGResponseDTO>>
+            > getBgAttachment(@PathVariable Long auctionId ) {
+
+        List<BGResponseDTO> response =
+                auctionService.getBGAttachmentsByAuctionId(auctionId);
+
+        return ResponseEntity.ok(
+                new SuccessResponse<>(
+                        "BG Attachments fetched successfully",
                         response
                 )
         );

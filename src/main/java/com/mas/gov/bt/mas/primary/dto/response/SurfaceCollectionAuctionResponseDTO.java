@@ -26,6 +26,7 @@ public class SurfaceCollectionAuctionResponseDTO {
     private Boolean submittedForEc;
     private Boolean submittedForFc;
     private Boolean bgRequested;
+    private String bgInstruction;
     private Boolean permitGenerated;
 
     private LocalDateTime createdOn;
