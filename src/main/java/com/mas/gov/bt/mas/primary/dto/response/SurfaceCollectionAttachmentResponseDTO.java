@@ -6,10 +6,12 @@ import lombok.*;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class SurfaceCollectionAttachmentResponseDTO {
 
     private Long id;
-    private String fileName;
-    private String filePath;
+
     private String attachmentType;
+
+    private String uploadFileId;
 }
