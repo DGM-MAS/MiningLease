@@ -31,6 +31,10 @@ public class SurfaceCollectionBankGuarantee {
     @Column(name = "promoter_id")
     private Long promoterId;
 
+
+    @Column(name = "promoter_remarks", columnDefinition = "TEXT")
+    private String promoterRemarks;
+
     /**
      * BG file
      */

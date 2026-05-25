@@ -25,8 +25,12 @@ public class SurfaceCollectionBidWinner {
     @Column(name = "email_address")
     private String emailAddress;
 
-    @Column(name = "other_details", columnDefinition = "TEXT")
-    private String otherDetails;
+    @Column(name = "agency_name")
+    private String agencyName;
+
+    @Column(name = "cid_number")
+    private String cidNumber;
+
 
     /**
      * If bidder becomes promoter
