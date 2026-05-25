@@ -7,5 +7,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ResubmitBGRequestDTO {
+    private Long auctionId;
     private String bgFileId;
+    private String remarks;
 }

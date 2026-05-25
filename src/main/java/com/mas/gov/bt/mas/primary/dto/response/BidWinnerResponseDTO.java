@@ -6,11 +6,13 @@ import lombok.*;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class BidWinnerResponseDTO {
 
     private Long id;
     private String bidWinnerName;
     private String contactNumber;
     private String emailAddress;
-    private String otherDetails;
+    private String agencyName;
+    private String cidNumber;
 }
