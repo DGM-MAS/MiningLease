@@ -18,24 +18,9 @@ public class SurfaceCollectionPermitReview {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /**
-     * BG reference
-     */
-    @OneToOne
-    @JoinColumn(name = "bg_id")
-    private SurfaceCollectionBankGuarantee bankGuarantee;
 
-    /**
-     * Assigned ME
-     */
-    @Column(name = "assigned_me_id")
-    private Long assignedMeId;
-
-    /**
-     * Assigned by system
-     */
-    @Column(name = "assigned_on")
-    private LocalDateTime assignedOn;
+    @Column(name = "application_no", unique = true)
+    private String applicationNo;
 
     /**
      * Review action
@@ -50,14 +35,6 @@ public class SurfaceCollectionPermitReview {
     @Column(name = "remarks", columnDefinition = "TEXT")
     private String remarks;
 
-    /**
-     * Reassignment
-     */
-    @Column(name = "reassigned_to")
-    private Long reassignedTo;
-
-    @Column(name = "reassigned_on")
-    private LocalDateTime reassignedOn;
 
     /**
      * Review completion
