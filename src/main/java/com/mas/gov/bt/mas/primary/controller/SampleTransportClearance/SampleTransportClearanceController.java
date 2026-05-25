@@ -53,7 +53,8 @@ public class SampleTransportClearanceController {
     }
 
     @GetMapping("/my-applications")
-    @Operation(summary = "Get my applications", description = "Get list of applications. Agency users get all applications, others get only their own.")
+    @Operation(summary = "Get my applications",
+            description = "Get list of applications. Agency users get all applications, others get only their own.")
     public ResponseEntity<SuccessResponse<List<SampleTransportClearanceResponseDTO>>> getMyApplications(
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "1") int page,

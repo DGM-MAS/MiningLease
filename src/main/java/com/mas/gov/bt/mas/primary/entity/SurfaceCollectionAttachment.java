@@ -16,15 +16,12 @@ public class SurfaceCollectionAttachment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "file_name")
-    private String fileName;
-
-    @Column(name = "file_path")
-    private String filePath;
-
     @Column(name = "attachment_type")
     private String attachmentType;
     // MAP_KMZ / IEE / EMP / ADM_APPROVAL / FC
+
+    @Column(name = "upload_file_id")
+    private String uploadFileId;
 
     @ManyToOne
     @JoinColumn(name = "auction_id")
