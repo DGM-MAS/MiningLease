@@ -268,32 +268,57 @@ public class MiningLeaseService {
 
     @Transactional
     private void createTask(ApplicationMaster master, MiningLeaseApplication application, String role, Long userId, Long directorId) {
-        LocalDateTime now = LocalDateTime.now();
 
-        TaskManagement task = new TaskManagement();
-        task.setApplicationNumber(application.getApplicationNumber());
-        task.setServiceCode(SERVICE_CODE);
-        task.setAssignedToRole(role);
-        task.setAssignedByUserId(userId);
-        task.setAssignedToUserId(directorId);
-        task.setAssignedAt(now);
-        task.setTaskStatus(master.getCurrentStatus());
+        log.debug("Creating task for director ID: {}", directorId);
+        try {
+            LocalDateTime now = LocalDateTime.now();
 
-        task.setDeadlineDate(now.plusDays(DEFAULT_TAT_DAYS));
-        task.setCreatedBy(userId);
+            TaskManagement task = new TaskManagement();
+            task.setApplicationNumber(application.getApplicationNumber());
+            task.setServiceCode(SERVICE_CODE);
+            task.setAssignedToRole(role);
+            task.setAssignedByUserId(userId);
+            task.setAssignedToUserId(directorId);
+            task.setAssignedAt(now);
+            task.setTaskStatus(master.getCurrentStatus());
 
-        taskManagementRepository.save(task);
-        log.info("Created task for role {}", role);
+            task.setDeadlineDate(now.plusDays(DEFAULT_TAT_DAYS));
+            task.setCreatedBy(userId);
+
+            TaskManagement savedTask = taskManagementRepository.save(task);
+
+            log.info("Task created successfully for role {}: Task ID={}", role, savedTask.getId());
+
+        } catch (Exception ex) {
+            log.error("Error creating task for director", ex);
+            throw new BusinessException(
+                    ErrorCodes.DATABASE_CONNECTION_FAILED,
+                    "Failed to create task assignment",
+                    ex
+            );
+        }
     }
 
     @Transactional
     private ApplicationMaster createApplicationMaster(String applicationNumber, Long userId) {
-        ApplicationMaster master = new ApplicationMaster();
-        master.setApplicationNumber(applicationNumber);
-        master.setServiceCode(SERVICE_CODE);
-        master.setApplicantUserId(userId);
-        master.setCurrentStatus("GR SUBMITTED");
-        return applicationMasterRepository.save(master);
+        log.debug("Creating ApplicationMaster for application number: {}", applicationNumber);
+        try {
+            ApplicationMaster master = new ApplicationMaster();
+            master.setApplicationNumber(applicationNumber);
+            master.setServiceCode(SERVICE_CODE);
+            master.setApplicantUserId(userId);
+            master.setCurrentStatus("GR SUBMITTED");
+
+            ApplicationMaster savedMaster = applicationMasterRepository.save(master);
+            log.debug("Application Master created with ID: {}", savedMaster.getId());
+            return savedMaster;
+        } catch (Exception ex) {
+            log.error("Error creating application master", ex);
+            throw new BusinessException(
+                    ErrorCodes.DATABASE_CONNECTION_FAILED,
+                    "Failed to create application master",
+                    ex);
+        }
     }
 
     @Transactional
@@ -322,22 +347,13 @@ public class MiningLeaseService {
     }
 
     @Transactional
-    public UserWorkloadProjection assignDirector() {
-
-        UserWorkloadProjection director =
-                miningLeaseApplicationRepository.findDirectorQuarrying();
-
-        if (director == null) {
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
-        }
-        return director;
-    }
-
-    @Transactional
     public MiningLeaseResponse submitGR(@Valid MiningLeaseGRRequest request, Long userId) {
         // 1.
         // ======== SAVE MINING LEASE GR SUBMITTED BY APPLICANT ====== //
         MiningLeaseApplication miningLeaseApplication = new MiningLeaseApplication();
+
+        // Validate input
+        validateApplicationRequest(request);
 
         miningLeaseApplication.setExpPermitNo(request.getExpPermitNo());
         miningLeaseApplication.setFileUploadIdGr(request.getGRDocId());
@@ -354,7 +370,15 @@ public class MiningLeaseService {
         miningLeaseApplication.setCurrentStatus("GR SUBMITTED");
         miningLeaseApplication.setCreatedBy(userId);
 
-        miningLeaseApplicationRepository.save(miningLeaseApplication);
+        try {
+            miningLeaseApplicationRepository.save(miningLeaseApplication);
+        }catch (Exception ex) {
+            log.error("Error saving mining lease application", ex);
+            throw new BusinessException(
+                    ErrorCodes.DATABASE_CONNECTION_FAILED,
+                    "Failed to save mining lease application",
+                    ex);
+        }
 
         // =====================================================
         // 2. ASSIGN DIRECTOR
@@ -365,26 +389,135 @@ public class MiningLeaseService {
         // 3. Application master and create task for director
         // =====================================================
         ApplicationMaster master = createApplicationMaster(miningLeaseApplication.getApplicationNumber(), userId);
-        miningLeaseApplication.setApplicationMaster(master);
-        createTask(master,miningLeaseApplication,"DIRECTOR",userId,assignedDirector.getUserId());
 
-        if (assignedDirector.getEmail() != null) {
-            notificationClient.sendMiningLeaseMailToDirectorAssigned(
-                    assignedDirector.getEmail(),
-                    assignedDirector.getUsername(),
-                    miningLeaseApplication.getApplicationNumber());
-        }
+        miningLeaseApplication.setApplicationMaster(master);
+
+        createTask(master,miningLeaseApplication,"DIRECTOR",userId, assignedDirector.getUserId());
+
+        log.debug("Sending notifications to director: {}", assignedDirector.getUserId());
+
+        try {
+            if (assignedDirector.getEmail() != null || !assignedDirector.getEmail().trim().isEmpty()) {
+                try {
+                    notificationClient.sendMiningLeaseMailToDirectorAssigned(
+                            assignedDirector.getEmail(),
+                            assignedDirector.getUsername(),
+                            miningLeaseApplication.getApplicationNumber());
+                    log.info("Email notification sent to director: {}", assignedDirector.getEmail());
+                } catch (Exception ex) {
+                    log.warn("Failed to send email notification to director", ex);
+                    throw new BusinessException(
+                            ErrorCodes.RECORD_NOT_FOUND,
+                            "Director Email is missing",
+                            ex
+                    );
+                }
+            }
 
         if(assignedDirector.getUserId()!= null) {
-            String title = "Mining lease application has been assigned.";
-            String message = "An application for mining lease has been assigned for review. Application No. "+ miningLeaseApplication.getApplicationNumber()+" Please login in review the Geological report.";
-            String serviceId = "78";
-            notificationClient.sendUserNotification(title, message, assignedDirector.getUserId(), serviceId);
-        }else {
-            throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+            try {
+                String title = "Mining lease application has been assigned.";
+                String message = "An application for mining lease has been assigned for review. Application No. " + miningLeaseApplication.getApplicationNumber() + " Please login in review the Geological report.";
+                String serviceId = "78";
+                notificationClient.sendUserNotification(title, message, assignedDirector.getUserId(), serviceId);
+            }catch (Exception ex) {
+                log.warn("Failed to send in-app notification to director", ex);
+                throw new BusinessException(
+                        ErrorCodes.RECORD_NOT_FOUND,
+                        "Director User ID  is missing",
+                        ex
+                );
+            }
+        }
+        } catch (Exception ex) {
+            log.error("Unexpected error sending notifications", ex);
+            throw new BusinessException(
+                    ErrorCodes.EXTERNAL_SERVICE_ERROR,
+                    "Failed to send notifications to director",
+                    ex);
         }
 
         return mapper.toResponse(miningLeaseApplication);
+    }
+
+    @Transactional(readOnly = true)
+    public UserWorkloadProjection assignDirector() {
+
+        log.debug("Finding director with minimum workload");
+
+        try {
+            UserWorkloadProjection director =
+                    miningLeaseApplicationRepository.findDirectorQuarrying();
+
+            if (director == null) {
+
+                log.error("No eligible director found with required role and permissions");
+
+                throw new BusinessException(
+                        ErrorCodes.RECORD_NOT_FOUND,
+                        "No eligible director available for assignment. All directors are either inactive or lack required permissions.");
+            }
+
+            if (director.getUserId() == null) {
+
+                log.error("Assigned director has null user ID");
+
+                throw new BusinessException(
+                        ErrorCodes.DATA_TYPE_MISMATCH,
+                        "Director assignment failed: invalid director user ID"
+                );
+            }
+
+            log.debug("Director found: ID={}, workload={}", director.getUserId(), director.getWorkload());
+
+            return director;
+
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.error("Error assigning director", ex);
+            throw new BusinessException(
+                    ErrorCodes.DATABASE_CONNECTION_FAILED,
+                    "Failed to find eligible director",
+                    ex);
+        }
+    }
+
+    /**
+     * Validate application request data
+     */
+    private void validateApplicationRequest(MiningLeaseGRRequest request) {
+        if (request == null) {
+            throw new BusinessException(
+                    ErrorCodes.INVALID_INPUT_DATA,
+                    "Application request cannot be null");
+        }
+
+        if (request.getExpPermitNo() == null || request.getExpPermitNo().trim().isEmpty()) {
+            throw new BusinessException(
+                    ErrorCodes.MISSING_REQUIRED_FIELD,
+                    "Exploration permit number is required");
+        }
+
+        if (request.getGRDocId() == null) {
+            throw new BusinessException(
+                    ErrorCodes.MISSING_REQUIRED_FIELD,
+                    "GR document ID is required");
+        }
+
+        if (request.getApplicantCid() == null || request.getApplicantCid().trim().isEmpty()) {
+            throw new BusinessException(
+                    ErrorCodes.MISSING_REQUIRED_FIELD,
+                    "Applicant CID is required");
+        }
+
+        if (request.getApplicantEmail() == null || request.getApplicantEmail().trim().isEmpty()) {
+            throw new BusinessException(
+                    ErrorCodes.MISSING_REQUIRED_FIELD,
+                    "Applicant email is required");
+        }
+
+        log.debug("Application request validation passed");
     }
 
     /**
@@ -852,16 +985,12 @@ public class MiningLeaseService {
     public MiningLeaseResponse deleteFileUpload(DeleteFileRequest request) {
         MiningLeaseApplication miningLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationNumber()).orElseThrow();
 
-        if (Objects.equals(request.getFileType(), "PFS")) {
-            miningLeaseApplication.setPfsDocId(null);
-        } else if (Objects.equals(request.getFileType(), "GR")) {
-            miningLeaseApplication.setFileUploadIdGr(null);
-        } else if (Objects.equals(request.getFileType(), "PA")){
-            miningLeaseApplication.setFileUploadIdPA(null);
-        } else if (Objects.equals(request.getFileType(), "FC")){
-            miningLeaseApplication.setFileUploadIdFC(null);
-        } else {
-            miningLeaseApplication.setFmfsDocId(null);
+        switch (request.getFileType()) {
+            case "PFS" -> miningLeaseApplication.setPfsDocId(null);
+            case "GR" -> miningLeaseApplication.setFileUploadIdGr(null);
+            case "PA" -> miningLeaseApplication.setFileUploadIdPA(null);
+            case "FC" -> miningLeaseApplication.setFileUploadIdFC(null);
+            case null, default -> miningLeaseApplication.setFmfsDocId(null);
         }
         miningLeaseApplicationRepository.save(miningLeaseApplication);
         return mapper.toResponse(miningLeaseApplication);

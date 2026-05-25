@@ -9,9 +9,8 @@ import lombok.*;
 @Builder
 public class ReviewResponseDTO {
 
-    private Long reviewId;
-    private Long bgId;
-    private Long assignedMeId;
+    private Long auctionId;
+    private String applicationNo;
     private String reviewStatus;
     private String remarks;
 }

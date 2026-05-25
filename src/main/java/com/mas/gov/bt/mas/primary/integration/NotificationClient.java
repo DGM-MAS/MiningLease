@@ -956,6 +956,100 @@ public class NotificationClient {
         );
     }
 
+    public void sendSurfaceCollectionAuctionMailToMDAssigned(String directorEmail, String directorName, String applicationNumber) {
+        String subject = "New Application Assigned - " + applicationNumber;
+        String body = String.format("""
+                A new surface collection auction application has been assigned to you.
+                Once the offline auction data are completed review the bank guarantor details. 
+
+                Application Number: %s
+
+                Please log in to the system to review and take action.
+                """,  applicationNumber);
+
+        EmailRequest request = new EmailRequest();
+        request.setTo(directorEmail);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(directorName);
+
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+    }
+
+    public void sendSurfaceCollectionAuctionMailToMDBGSubmitted(String directorEmail, String directorName, String applicationNumber) {
+        String subject = "BG Submitted  - " + applicationNumber;
+        String body = String.format("""
+                Bank guarantor details has been submitted for surface collection auction application.
+
+                Application Number: %s
+
+                Please log in to the system to review and take action.
+                """,  applicationNumber);
+
+        EmailRequest request = new EmailRequest();
+        request.setTo(directorEmail);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(directorName);
+
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+    }
+
+    public void sendSurfaceCollectionAuctionMailToPromoterBGResubmit(String directorEmail, String directorName, String applicationNumber) {
+        String subject = "BG Resubmit requested  - " + applicationNumber;
+        String body = String.format("""
+                Bank guarantor details has been reviewed for surface collection auction application. Please resubmit the bank guarantor details.
+
+                Application Number: %s
+
+                Please log in to the system to review and take action.
+                """,  applicationNumber);
+
+        EmailRequest request = new EmailRequest();
+        request.setTo(directorEmail);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(directorName);
+
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+    }
+
+    public void sendSurfaceCollectionAuctionWinnerEmail(String directorEmail, String directorName, String applicationNumber) {
+        String subject = "Congratulation. You are the Winner - " + applicationNumber;
+        String body = String.format("""
+                Surface collection auction application has been won by you. Congratulations
+                Upload the bank guarantor details to proceed further.
+
+                Application Number: %s
+
+                Please log in to the system to review and take action.
+                """,  applicationNumber);
+
+        EmailRequest request = new EmailRequest();
+        request.setTo(directorEmail);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(directorName);
+
+        restTemplate.postForObject(
+                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                request,
+                String.class
+        );
+    }
+
     public void sendTerminationMailToCMSHeadAssigned(String directorEmail, String directorName, String applicationNumber) {
         String subject = "New Application Assigned - " + applicationNumber;
         String body = String.format("""
