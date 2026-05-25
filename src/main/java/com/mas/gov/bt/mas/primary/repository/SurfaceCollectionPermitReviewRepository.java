@@ -8,5 +8,4 @@ import java.util.List;
 public interface SurfaceCollectionPermitReviewRepository
         extends JpaRepository<SurfaceCollectionPermitReview, Long> {
 
-    List<SurfaceCollectionPermitReview> findByAssignedMeId(Long meId);
 }
