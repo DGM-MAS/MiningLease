@@ -2,8 +2,14 @@ package com.mas.gov.bt.mas.primary.services;
 
 import com.mas.gov.bt.mas.primary.dto.request.BGRequestDTO;
 import com.mas.gov.bt.mas.primary.dto.request.BidWinnerRequestDTO;
+import com.mas.gov.bt.mas.primary.dto.request.SurfaceCollectionAuctionListResponseDTO;
 import com.mas.gov.bt.mas.primary.dto.request.SurfaceCollectionAuctionRequestDTO;
+import com.mas.gov.bt.mas.primary.dto.response.SurfaceCollectionAttachmentResponseDTO;
 import com.mas.gov.bt.mas.primary.dto.response.SurfaceCollectionAuctionResponseDTO;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
+import java.util.List;
 
 public interface SurfaceCollectionAuctionService {
 
@@ -31,4 +37,12 @@ public interface SurfaceCollectionAuctionService {
     );
 
     SurfaceCollectionAuctionResponseDTO generatePermit(Long auctionId);
+
+    Page<SurfaceCollectionAuctionListResponseDTO> getAllApplications(
+            String search,
+            Pageable pageable);
+
+    List<SurfaceCollectionAttachmentResponseDTO> getAttachmentsByAuctionId(Long auctionId);
+
+    Page<SurfaceCollectionAuctionListResponseDTO> getMyApplications(String search, Pageable pageable, Long userId);
 }

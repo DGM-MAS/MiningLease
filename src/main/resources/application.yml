@@ -184,7 +184,7 @@ eureka:
     fetch-registry: true
   instance:
     prefer-ip-address: true
-    ip-address: 192.168.123.147
+    ip-address: 192.168.137.1
 
 ---
 # ── Production profile ── activate with SPRING_PROFILES_ACTIVE=prod in Kubernetes
