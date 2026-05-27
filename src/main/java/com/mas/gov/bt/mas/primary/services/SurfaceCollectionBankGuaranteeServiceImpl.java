@@ -1,5 +1,9 @@
 package com.mas.gov.bt.mas.primary.services;
 
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.client.j2se.MatrixToImageWriter;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
 import com.mas.gov.bt.mas.primary.dto.request.ResubmitBGRequestDTO;
 import com.mas.gov.bt.mas.primary.dto.request.SubmitBGRequestDTO;
@@ -18,6 +22,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayOutputStream;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -31,8 +36,6 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
     private final SurfaceCollectionBankGuaranteeRepository bgRepository;
 
     private final SurfaceCollectionAuctionRepository surfaceCollectionAuctionRepository;
-
-    private final SurfaceCollectionBidWinnerRepository surfaceCollectionBidWinnerRepository;
 
     private final ApplicationMasterRepository applicationMasterRepository;
 
@@ -48,7 +51,7 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
     public BGInstructionViewResponseDTO viewInstructions(Long promoterId) {
 
         SurfaceCollectionBankGuarantee bg = bgRepository.findByPromoterId(promoterId)
-                .orElseThrow(() -> new RuntimeException("BG request not found"));
+                .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "BG request not found based on promoter ID"));
 
         return new BGInstructionViewResponseDTO(
                 bg.getAuctionApplication().getId(),
@@ -66,12 +69,12 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
         Optional<SurfaceCollectionAuctionApplication> surfaceCollectionAuctionApplication =
                 surfaceCollectionAuctionRepository.findById(dto.getAuctionId());
 
-        SurfaceCollectionAuctionApplication surfaceCollectionAuctionApplication1 = null;
+        SurfaceCollectionAuctionApplication surfaceCollectionAuctionApplication1;
 
-        if  (surfaceCollectionAuctionApplication.isPresent() ) {
+        if  (surfaceCollectionAuctionApplication.isPresent()) {
             surfaceCollectionAuctionApplication1 = surfaceCollectionAuctionApplication.get();
         }else {
-            throw new BusinessException(ErrorCodes.BAD_REQUEST, "No Auction application found.");
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "No Auction application found.");
         }
 
         surfaceCollectionAuctionApplication1.setAuctionStatus("BG SUBMITTED");
@@ -80,6 +83,7 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
 
         ApplicationMaster applicationMaster = surfaceCollectionAuctionApplication1.getApplicationMaster();
         applicationMaster.setCurrentStatus("BG SUBMITTED");
+
         applicationMasterRepository.save(applicationMaster);
 
         createTask(applicationMaster , surfaceCollectionAuctionApplication1,"MINING_DIRECTOR", promoterId, surfaceCollectionAuctionApplication1.getAssignedMdUserId() );
@@ -104,6 +108,8 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
                     userMDDetails.getEmail(),
                     userMDDetails.getUsername(),
                     surfaceCollectionAuctionApplication1.getApplicationNo());
+        }else {
+           throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "User Email ID not found");
         }
 
         if(userMDDetails.getUserId()!= null) {
@@ -112,7 +118,7 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
             String serviceId = "71";
             notificationClient.sendUserNotification(title, message, userMDDetails.getUserId(), serviceId);
         }else {
-            throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "User ID not found.");
         }
 
         return map(bg);
@@ -147,7 +153,7 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
         Optional<SurfaceCollectionAuctionApplication> surfaceCollectionAuctionApplication =
                 surfaceCollectionAuctionRepository.findById(dto.getAuctionId());
 
-        SurfaceCollectionAuctionApplication surfaceCollectionAuctionApplication1 = null;
+        SurfaceCollectionAuctionApplication surfaceCollectionAuctionApplication1;
 
         if  (surfaceCollectionAuctionApplication.isPresent() ) {
             surfaceCollectionAuctionApplication1 = surfaceCollectionAuctionApplication.get();
@@ -190,6 +196,8 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
                     userMDDetails.getEmail(),
                     userMDDetails.getUsername(),
                     surfaceCollectionAuctionApplication1.getApplicationNo());
+        }else {
+            throw new BusinessException(ErrorCodes.BAD_REQUEST, "User Email address not found.");
         }
 
         if(userMDDetails.getUserId()!= null) {
@@ -198,7 +206,7 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
             String serviceId = "71";
             notificationClient.sendUserNotification(title, message, userMDDetails.getUserId(), serviceId);
         }else {
-            throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "MD User ID not found.");
         }
 
         return map(surfaceCollectionBankGuarantee);
@@ -222,6 +230,82 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
         page = surfaceCollectionAuctionRepository.findByBidWinnerPromoterIdAndAuctionStatusIn(userId,archivedStatuses,pageable);
 
         return page.map(this::mapListResponse);
+    }
+
+    @Override
+    public SurfaceCollectionAuctionListResponseDTO viewApplicationDetails(Long userId, String applicationNo) {
+        Optional<SurfaceCollectionAuctionApplication> surfaceCollectionAuctionApplication =
+                surfaceCollectionAuctionRepository.findByApplicationNoAndAuctionStatusAndBidWinnerPromoterId(applicationNo, "APPROVED", userId);
+
+        SurfaceCollectionAuctionApplication surfaceCollectionAuctionApplication1;
+        if(surfaceCollectionAuctionApplication.isEmpty()) {
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Application No. details not found.");
+        }else {
+            surfaceCollectionAuctionApplication1 = surfaceCollectionAuctionApplication.get();
+        }
+        SurfaceCollectionAuctionListResponseDTO surfaceCollectionAuctionListResponseDTO = new SurfaceCollectionAuctionListResponseDTO();
+
+        surfaceCollectionAuctionListResponseDTO.setApplicationNo(applicationNo);
+        surfaceCollectionAuctionListResponseDTO.setArea(surfaceCollectionAuctionApplication1.getArea());
+        surfaceCollectionAuctionListResponseDTO.setAuctionStatus(surfaceCollectionAuctionApplication1.getAuctionStatus());
+        surfaceCollectionAuctionListResponseDTO.setPermitGenerated(surfaceCollectionAuctionApplication1.getPermitGenerated());
+        surfaceCollectionAuctionListResponseDTO.setBgInstruction(surfaceCollectionAuctionApplication1.getBgInstruction());
+        surfaceCollectionAuctionListResponseDTO.setBgRequested(surfaceCollectionAuctionApplication1.getBgRequested());
+        surfaceCollectionAuctionListResponseDTO.setLocation( surfaceCollectionAuctionApplication1.getLocation());
+        surfaceCollectionAuctionListResponseDTO.setAssignedMdUserId( surfaceCollectionAuctionApplication1.getAssignedMdUserId());
+        surfaceCollectionAuctionListResponseDTO.setCreatedOn(surfaceCollectionAuctionApplication1.getCreatedOn());
+        surfaceCollectionAuctionListResponseDTO.setEcStatus(surfaceCollectionAuctionApplication1.getEcStatus());
+        surfaceCollectionAuctionListResponseDTO.setMaterial(surfaceCollectionAuctionApplication1.getMaterial());
+        surfaceCollectionAuctionListResponseDTO.setId( surfaceCollectionAuctionApplication1.getId());
+
+        if(surfaceCollectionAuctionApplication1.getAssignedMdUserId()!=null) {
+            UserWorkloadProjection MDUserDetails =
+                    surfaceCollectionAuctionRepository
+                            .findUserDetails(
+                                    surfaceCollectionAuctionApplication1.getAssignedMdUserId()
+                            );
+
+            surfaceCollectionAuctionListResponseDTO.setAssignedMdUserName(MDUserDetails.getUsername());
+        }else {
+            surfaceCollectionAuctionListResponseDTO.setAssignedMdUserName(null);
+        }
+
+        return surfaceCollectionAuctionListResponseDTO;
+    }
+
+    @Override
+    public byte[] generateApplicationQr(Long userId, String applicationNo) throws Exception {
+
+        SurfaceCollectionAuctionListResponseDTO dto =
+                viewApplicationDetails(userId, applicationNo);
+
+        String qrContent =
+                "Application No: " + dto.getApplicationNo() + "\n" +
+                        "Location: " + dto.getLocation() + "\n" +
+                        "Material: " + dto.getMaterial() + "\n" +
+                        "Area: " + dto.getArea() + "\n" +
+                        "Auction Status: " + dto.getAuctionStatus() + "\n" +
+                        "Permit Generated: " + dto.getPermitGenerated() + "\n" +
+                        "Created On: " + dto.getCreatedOn();
+
+        QRCodeWriter qrCodeWriter = new QRCodeWriter();
+
+        BitMatrix bitMatrix = qrCodeWriter.encode(
+                qrContent,
+                BarcodeFormat.QR_CODE,
+                300,
+                300
+        );
+
+        ByteArrayOutputStream pngOutputStream = new ByteArrayOutputStream();
+
+        MatrixToImageWriter.writeToStream(
+                bitMatrix,
+                "PNG",
+                pngOutputStream
+        );
+
+        return pngOutputStream.toByteArray();
     }
 
     private SurfaceCollectionAuctionListResponseDTO mapListResponse(

@@ -87,4 +87,6 @@ public interface SurfaceCollectionAuctionRepository
     );
 
     Page<SurfaceCollectionAuctionApplication> findByBidWinnerPromoterIdAndAuctionStatusIn(Long userId, List<String> archivedStatuses, Pageable pageable);
+
+    Optional<SurfaceCollectionAuctionApplication> findByApplicationNoAndAuctionStatusAndBidWinnerPromoterId(String applicationNo, String approved, Long userId);
 }
