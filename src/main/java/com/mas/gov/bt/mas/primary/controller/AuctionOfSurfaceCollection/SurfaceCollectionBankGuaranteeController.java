@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -144,4 +146,36 @@ public class SurfaceCollectionBankGuaranteeController {
                 )
         );
     }
+
+    @GetMapping("/{applicationNo}")
+    public ResponseEntity<SuccessResponse<SurfaceCollectionAuctionListResponseDTO>> viewApplicationDetails(
+            @PathVariable String applicationNo
+    ) {
+
+        Long userId = userContext.getCurrentUserId();
+
+        return ResponseEntity.ok(
+                new SuccessResponse<>(
+                        "Application details fetched successfully",
+                        bgService.viewApplicationDetails(userId, applicationNo)
+                )
+        );
+    }
+
+    @GetMapping(value = "/qr/{applicationNo}", produces = MediaType.IMAGE_PNG_VALUE)
+    public ResponseEntity<byte[]> generateQr(
+            @PathVariable String applicationNo
+    ) throws Exception {
+
+        Long userId = userContext.getCurrentUserId();
+
+        byte[] qrCode = bgService.generateApplicationQr(userId, applicationNo);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "inline; filename=" + applicationNo + "_qr.png")
+                .contentType(MediaType.IMAGE_PNG)
+                .body(qrCode);
+    }
+
 }

@@ -13,6 +13,7 @@ import com.mas.gov.bt.mas.primary.repository.*;
 import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -45,12 +46,13 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
     private static final int DEFAULT_TAT_DAYS = 2;
 
     @Override
+    @Transactional
     public SurfaceCollectionAuctionResponseDTO createAuction(
             SurfaceCollectionAuctionRequestDTO dto,
             Long userId
     ) {
-
-        SurfaceCollectionAuctionApplication entity =
+        try {
+            SurfaceCollectionAuctionApplication entity =
                 SurfaceCollectionAuctionApplication.builder()
                         .applicationNo(generateApplicationNo())
                         .location(dto.getLocation())
@@ -84,9 +86,18 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
         // =====================================================
         // 3. Application master and create task for director
         // =====================================================
-        ApplicationMaster master = createApplicationMaster(entity.getApplicationNo(), userId);
+        ApplicationMaster master;
+        try
+        {
+            master = createApplicationMaster(entity.getApplicationNo(), userId);
+        }catch (BusinessException ex){
+            throw new BusinessException(ex.getErrorCode(), "The application master could not be created");
+        }
+
         entity.setApplicationMaster(master);
+
         auctionRepository.save(entity);
+
         createTask(master,entity,"MINING_DIRECTOR",userId, assignedMD.getUserId());
 
         // Notification and Email
@@ -95,7 +106,10 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                     assignedMD.getEmail(),
                     assignedMD.getUsername(),
                     entity.getApplicationNo());
+        }else {
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND,"Assigned MD Email ID not Found");
         }
+
 
         if(assignedMD.getUserId()!= null) {
             String title = "Surface Collection Auction application has been assigned.";
@@ -103,13 +117,27 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
             String serviceId = "71";
             notificationClient.sendUserNotification(title, message, assignMD().getUserId(), serviceId);
         }else {
-            throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND,"Assigned MD user ID not Found");
         }
 
         return mapToResponse(entity);
+
+        } catch (DataIntegrityViolationException ex) {
+
+            throw new BusinessException(
+                    ErrorCodes.DATA_INTEGRITY_VIOLATION,
+                    "Failed to save application due to database constraint issue."
+            );
+
+        } catch (Exception ex) {
+
+            throw new BusinessException(
+                    ErrorCodes.INTERNAL_SERVER_ERROR,
+                    "Failed to create auction application."
+            );
+        }
     }
 
-    @Transactional
     private void createTask(ApplicationMaster master, SurfaceCollectionAuctionApplication application, String role, Long userId, Long directorId) {
         LocalDateTime now = LocalDateTime.now();
 
@@ -145,8 +173,8 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
         UserWorkloadProjection miningDirector =
                 auctionRepository.findMDSurfaceCollection();
 
-        if (miningDirector == null) {
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
+        if (miningDirector == null || miningDirector.getUserId() == null) {
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Mining Engineer with required permission and role not found.");
         }
         return miningDirector;
     }
@@ -192,6 +220,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
 
         ApplicationMaster applicationMaster = entity.getApplicationMaster();
         applicationMaster.setCurrentStatus("EC_APPROVED");
+
         applicationMasterRepository.save(applicationMaster);
 
         createTask(entity.getApplicationMaster(), entity, "MPCD", userId, entity.getCreatedBy());
@@ -204,7 +233,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
             String serviceId = "71";
             notificationClient.sendUserNotification(title, message, entity.getCreatedBy(), serviceId);
         }else {
-            throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "MPCD User details not present for notification.");
         }
 
         return mapToResponse(entity);
@@ -250,6 +279,10 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
         auctionRepository.save(entity);
 
         UserWorkloadProjection assignedUser = auctionRepository.findUserDetailsByEmail(dto.getEmailAddress());
+
+        if(assignedUser == null || assignedUser.getUserId() == null) {
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Bid winner details not found.");
+        }
         // =====================================================
         // 3. Application master and create task for director
         // =====================================================
@@ -267,7 +300,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                     assignedUser.getUsername(),
                     entity.getApplicationNo());
         }else {
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Bid winner Email address not found.");
         }
 
         if(assignedUser.getUserId()!= null) {
@@ -276,7 +309,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
             String serviceId = "71";
             notificationClient.sendUserNotification(title, message, assignedUser.getUserId(), serviceId);
         }else {
-            throw new RuntimeException(ErrorCodes.RECORD_NOT_FOUND);
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Bid winner user ID not present for notification.");
         }
 
         return mapToResponse(entity);
@@ -318,7 +351,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
 
     private SurfaceCollectionAuctionApplication getAuction(Long id) {
         return auctionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Auction not found"));
+                .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND,"Auction data not found. Auction Id is missing"));
     }
 
     private String generateApplicationNo() {
@@ -430,13 +463,12 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
 
     @Override
     public List<BGResponseDTO> getBGAttachmentsByAuctionId(Long auctionId) {
+
         Optional<SurfaceCollectionBankGuarantee> attachments =surfaceCollectionBankGuaranteeRepository
                 .findByAuctionApplicationId(auctionId);
 
-        SurfaceCollectionBankGuarantee guarantee = null;
-
-        if (attachments.isPresent()) {
-             guarantee = attachments.get();
+        if (attachments.isEmpty()) {
+             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "No surface collection bank guarantee found");
         }
 
         return attachments.stream()

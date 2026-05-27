@@ -20,4 +20,8 @@ public interface SurfaceCollectionBankGuaranteeService {
     Page<SurfaceCollectionAuctionListResponseDTO> getMyApplications(String search, Pageable pageable, Long userId);
 
     Page<SurfaceCollectionAuctionListResponseDTO> getMyArchive(String search, Pageable pageable, Long userId);
+
+    SurfaceCollectionAuctionListResponseDTO viewApplicationDetails(Long userId, String applicationNo);
+
+    byte[] generateApplicationQr(Long userId, String applicationNo) throws Exception;
 }
