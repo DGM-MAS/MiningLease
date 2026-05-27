@@ -37,4 +37,8 @@ public class SurfaceCollectionAuctionListResponseDTO {
     private Boolean permitGenerated;
 
     private LocalDateTime createdOn;
+
+    private Long assignedMdUserId;
+
+    private String assignedMdUserName;
 }
