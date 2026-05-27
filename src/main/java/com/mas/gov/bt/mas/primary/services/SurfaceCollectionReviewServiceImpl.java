@@ -88,7 +88,7 @@ public class SurfaceCollectionReviewServiceImpl
         SurfaceCollectionAuctionApplication surfaceCollectionAuctionApplication1 = null;
 
         if (surfaceCollectionAuctionApplication.isEmpty()) {
-            throw new BusinessException(ErrorCodes.BAD_REQUEST, "No Auction application found.");
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "No Auction application found with the given ID.");
         } else {
             surfaceCollectionAuctionApplication1 = surfaceCollectionAuctionApplication.get();
         }
@@ -112,14 +112,17 @@ public class SurfaceCollectionReviewServiceImpl
             surfaceCollectionBankGuarantee1.setRemarks(dto.getRemarks());
 
             bgRepository.save(surfaceCollectionBankGuarantee1);
+        }else {
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "No Bank Guarantee details found with the given ID.");
         }
+
         ApplicationMaster applicationMaster = surfaceCollectionAuctionApplication1.getApplicationMaster();
+
         applicationMaster.setCurrentStatus("BG RESUBMIT");
         applicationMasterRepository.save(applicationMaster);
 
         Long promoterId = surfaceCollectionAuctionApplication1.getBidWinner().getPromoterId();
         createTask(applicationMaster , surfaceCollectionAuctionApplication1,"PROMOTER", promoterId, surfaceCollectionAuctionApplication1.getAssignedMdUserId() );
-
 
         UserWorkloadProjection userPromoterDetails =
                 auctionRepository.findUserDetails(promoterId);
@@ -131,14 +134,19 @@ public class SurfaceCollectionReviewServiceImpl
         review.setApplicationNo(surfaceCollectionAuctionApplication1.getApplicationNo());
         review.setReviewStatus("BG RESUBMIT");
 
-        reviewRepository.save(review);
-
+        try {
+            reviewRepository.save(review);
+        }catch (BusinessException e){
+            throw new BusinessException(ErrorCodes.DATA_INTEGRITY_VIOLATION, "Data VIOLATION. While saving reviews for this application.", e.getCause());
+        }
         // Notification and Email
         if (userPromoterDetails.getEmail() != null) {
             notificationClient.sendSurfaceCollectionAuctionMailToPromoterBGResubmit(
                     userPromoterDetails.getEmail(),
                     userPromoterDetails.getUsername(),
                     surfaceCollectionAuctionApplication1.getApplicationNo());
+        }else {
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "No Email address found for promoter.");
         }
 
         if(userPromoterDetails.getUserId()!= null) {
@@ -147,7 +155,7 @@ public class SurfaceCollectionReviewServiceImpl
             String serviceId = "71";
             notificationClient.sendUserNotification(title, message, userPromoterDetails.getUserId(), serviceId);
         }else {
-            throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Promoter Email Address not found.");
         }
 
         return map(review);
