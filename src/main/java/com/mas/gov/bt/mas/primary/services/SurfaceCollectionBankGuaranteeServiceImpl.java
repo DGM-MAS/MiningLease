@@ -308,6 +308,49 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
         return pngOutputStream.toByteArray();
     }
 
+    @Override
+    public byte[] generateQrWithLink(
+            Long userId,
+            String applicationNo
+    ) throws Exception {
+
+        SurfaceCollectionAuctionApplication application =
+                surfaceCollectionAuctionRepository
+                        .findByApplicationNoAndAuctionStatusAndBidWinnerPromoterId(
+                                applicationNo,
+                                "APPROVED",
+                                userId
+                        )
+                        .orElseThrow(() ->
+                                new BusinessException(
+                                        ErrorCodes.RECORD_NOT_FOUND,
+                                        "Application not found"));
+
+        String angularUrl =
+                "http://localhost:4200/Verifedscpermitcertificate/" +
+                        application.getApplicationNo();
+
+        QRCodeWriter qrCodeWriter = new QRCodeWriter();
+
+        BitMatrix bitMatrix = qrCodeWriter.encode(
+                angularUrl,
+                BarcodeFormat.QR_CODE,
+                300,
+                300
+        );
+
+        ByteArrayOutputStream outputStream =
+                new ByteArrayOutputStream();
+
+        MatrixToImageWriter.writeToStream(
+                bitMatrix,
+                "PNG",
+                outputStream
+        );
+
+        return outputStream.toByteArray();
+    }
+
     private SurfaceCollectionAuctionListResponseDTO mapListResponse(
             SurfaceCollectionAuctionApplication entity
     ) {
