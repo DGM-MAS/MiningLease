@@ -3,8 +3,11 @@ package com.mas.gov.bt.mas.primary.services;
 
 import com.mas.gov.bt.mas.primary.dto.request.ReassignRequestDTO;
 import com.mas.gov.bt.mas.primary.dto.request.ResubmitRequestDTO;
-import com.mas.gov.bt.mas.primary.dto.response.PermitResponseDTO;
+import com.mas.gov.bt.mas.primary.dto.request.SurfaceCollectionAuctionListResponseDTO;
 import com.mas.gov.bt.mas.primary.dto.response.ReviewResponseDTO;
+import com.mas.gov.bt.mas.primary.dto.response.SurfaceCollectionAuctionResponseDTO;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface SurfaceCollectionReviewService {
 
@@ -12,7 +15,11 @@ public interface SurfaceCollectionReviewService {
 
     ReviewResponseDTO reassign(Long reviewId, ReassignRequestDTO dto);
 
-    ReviewResponseDTO requestResubmission(Long reviewId, ResubmitRequestDTO dto);
+    ReviewResponseDTO requestResubmission(Long reviewId, ResubmitRequestDTO dto, Long userId);
 
-    PermitResponseDTO issuePermit(Long reviewId, Long mdUserId);
+    SurfaceCollectionAuctionResponseDTO issuePermit(Long reviewId, Long mdUserId);
+
+    Page<SurfaceCollectionAuctionListResponseDTO> getMyApplicationsMD(String search, Pageable pageable, Long userId);
+
+    Page<SurfaceCollectionAuctionListResponseDTO> getMyArchiveMD(String search, Pageable pageable, Long userId);
 }
