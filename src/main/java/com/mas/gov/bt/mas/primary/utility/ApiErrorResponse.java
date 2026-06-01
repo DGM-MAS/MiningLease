@@ -19,4 +19,12 @@ public class ApiErrorResponse {
         this.message = message;
         this.details = details;
     }
+
+    /**
+     * Validate that all required fields are present
+     */
+    public boolean isValid() {
+        return errorCode != null && !errorCode.isEmpty() &&
+                message != null && !message.isEmpty();
+    }
 }
