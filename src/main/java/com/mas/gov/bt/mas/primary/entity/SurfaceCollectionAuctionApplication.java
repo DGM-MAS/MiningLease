@@ -26,6 +26,11 @@ public class SurfaceCollectionAuctionApplication {
     @Column(name = "application_no", unique = true)
     private String applicationNo;
 
+    // Reference to master application
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "application_master_id")
+    private ApplicationMaster applicationMaster;
+
     @Column(name = "location")
     private String location;
 
@@ -38,6 +43,10 @@ public class SurfaceCollectionAuctionApplication {
     /**
      * EC / FC Workflow Tracking
      */
+
+    @Column(name = "ec_file_id")
+    private String fileECid;
+
     @Column(name = "ec_status")
     private String ecStatus; // PENDING / APPROVED / REJECTED
 
@@ -80,6 +89,18 @@ public class SurfaceCollectionAuctionApplication {
      */
     @Column(name = "permit_generated")
     private Boolean permitGenerated = false;
+
+    /**
+     * Assigned Focal
+     */
+    @Column(name = "assigned_md_user_id")
+    private Long assignedMdUserId;
+
+    @Column(name = "md_reviewed_on")
+    private LocalDateTime md_reviewed_on;
+
+    @Column(name = "md_remarks", columnDefinition = "TEXT")
+    private String mdRemarks;
 
     /**
      * Audit Fields

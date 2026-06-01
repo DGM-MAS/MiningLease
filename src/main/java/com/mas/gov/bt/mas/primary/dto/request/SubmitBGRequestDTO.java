@@ -8,4 +8,6 @@ import lombok.*;
 @AllArgsConstructor
 public class SubmitBGRequestDTO {
     private String bgFileId;
+    private String promoterRemarks;
+    private Long auctionId;
 }
