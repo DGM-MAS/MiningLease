@@ -178,4 +178,22 @@ public class SurfaceCollectionBankGuaranteeController {
                 .body(qrCode);
     }
 
+    @GetMapping(
+            value = "/qr-link/{applicationNo}",
+            produces = MediaType.IMAGE_PNG_VALUE
+    )
+    public ResponseEntity<byte[]> generateQrWithLink(
+            @PathVariable String applicationNo
+    ) throws Exception {
+
+        Long userId = userContext.getCurrentUserId();
+
+        byte[] qrCode =
+                bgService.generateQrWithLink(userId, applicationNo);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_PNG)
+                .body(qrCode);
+    }
+
 }

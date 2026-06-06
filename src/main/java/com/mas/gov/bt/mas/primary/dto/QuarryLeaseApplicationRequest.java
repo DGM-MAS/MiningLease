@@ -1,20 +1,19 @@
-package com.mas.gov.bt.mas.primary.dto.request;
+package com.mas.gov.bt.mas.primary.dto;
 
-import jakarta.persistence.Column;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 /**
- * Request DTO for creating/updating a Mining Lease Application.
+ * Request DTO for creating/updating a Quarry Lease Application.
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class MiningLeaseApplicationRequest {
+public class QuarryLeaseApplicationRequest {
 
     private String applicationNo;
 
@@ -88,11 +87,11 @@ public class MiningLeaseApplicationRequest {
     private String geologicalReportDocId;
     private String fmfsDocId;
 
+    private Long bankGuarantorDocId;
 
-    // =========== Client file upload =========== //
-    private Long fileUploadIdGr;
+    private BigDecimal upfrontPaymentAmount;
 
-    private Long fileUploadIdKmz;
+    private BigDecimal applicationFeesAmount;
 
     private String fileUploadIdPA;
 
@@ -100,21 +99,5 @@ public class MiningLeaseApplicationRequest {
 
     private String fileUploadIdPublicClearance;
 
-    // =========== MPCD Focal =================
-    private Long mpcdFileUploadIdPA;
-
-    private Long mpcdFileUploadIdMa;
-
-    private Long signedPFSId;
-
-    private String llcDocId;
-
-    private String notesheetDocId;
-
-    private String mlaDocId;
-
-    private Long bankGuarantorDocId;
-
     private Long workOrderDocId;
-
 }

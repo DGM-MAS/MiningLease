@@ -316,4 +316,8 @@ public class MiningLeaseApplication {
 
     @Column(name = "work_order_remarks" , columnDefinition = "TEXT")
     private String workOrderRemarks;
+
+    // IS MANUAL ENTRY
+    @Column(name = "is_manual_entry")
+    private String isManualEntry;
 }
