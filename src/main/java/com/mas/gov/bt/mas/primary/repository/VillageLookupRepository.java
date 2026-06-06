@@ -10,5 +10,5 @@ import java.util.Optional;
 @Repository
 public interface VillageLookupRepository extends JpaRepository<VillageLookup, Integer> {
 
-    Optional<Object> findByVillageSerialNo(@Size(max = 100, message = "Village must not exceed 100 characters") Integer nearestVillage);
+    Optional<VillageLookup> findByVillageSerialNo(@Size(max = 100, message = "Village must not exceed 100 characters") Integer nearestVillage);
 }

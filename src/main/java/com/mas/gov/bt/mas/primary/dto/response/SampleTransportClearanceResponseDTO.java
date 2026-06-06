@@ -1,6 +1,5 @@
 package com.mas.gov.bt.mas.primary.dto.response;
 
-import jakarta.persistence.Column;
 import lombok.*;
 
 import java.time.LocalDateTime;
