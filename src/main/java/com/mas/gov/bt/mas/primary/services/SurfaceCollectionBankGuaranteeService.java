@@ -24,4 +24,6 @@ public interface SurfaceCollectionBankGuaranteeService {
     SurfaceCollectionAuctionListResponseDTO viewApplicationDetails(Long userId, String applicationNo);
 
     byte[] generateApplicationQr(Long userId, String applicationNo) throws Exception;
+
+    byte[] generateQrWithLink(Long userId, String applicationNo) throws Exception;
 }
