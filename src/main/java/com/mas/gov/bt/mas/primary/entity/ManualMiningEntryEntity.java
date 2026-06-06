@@ -38,6 +38,9 @@ public class ManualMiningEntryEntity {
     @Column(name = "activity_type", nullable = false, length = 50)
     private String activityType;
 
+    @Column(name = "eligible_for_export")
+    private String eligibleForExport;
+
     // Assigned Focal Details
 
     @Column(name = "assigned_chief_id")
