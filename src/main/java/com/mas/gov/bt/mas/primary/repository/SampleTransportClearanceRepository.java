@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -34,8 +35,8 @@ public interface SampleTransportClearanceRepository extends JpaRepository<Sample
         ON u.id = ur.user_id
     LEFT JOIN mas_db.role_permissions t
         ON t.role_id = ur.role_id
-    WHERE ur.role_id = 21
-      AND t.permission_id = 37
+    WHERE ur.role_id = 39
+      AND t.permission_id = 149
       AND u.account_status = 'ACTIVE'
     GROUP BY u.id, u.email, u.username
     ORDER BY workload ASC
@@ -48,9 +49,14 @@ public interface SampleTransportClearanceRepository extends JpaRepository<Sample
     @Query("""
     SELECT q FROM SampleTransportClearanceEntity q
     WHERE q.createdBy = :userId
+    AND q.status IN :statuses
     AND LOWER(q.applicationNo) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
-    Page<SampleTransportClearanceEntity> findByAssignedToUserAndSearch(Long userId, String search, Pageable pageable);
+    Page<SampleTransportClearanceEntity> findByAssignedToUserAndSearch(
+            @Param("userId") Long userId,
+            @Param("statuses") List<String> statuses,
+            @Param("search") String search,
+            Pageable pageable);
 
     @Query("""
     SELECT a
@@ -82,7 +88,7 @@ public interface SampleTransportClearanceRepository extends JpaRepository<Sample
     GROUP BY u.id, u.email, u.username
     LIMIT 1
     """, nativeQuery = true)
-    UserWorkloadProjection findUserDetails(Long createdBy);
+    UserWorkloadProjection findUserDetails(@Param("userId") Long userId);
 
    Optional<SampleTransportClearanceEntity> findByApplicationNo(String applicationNo);
 
