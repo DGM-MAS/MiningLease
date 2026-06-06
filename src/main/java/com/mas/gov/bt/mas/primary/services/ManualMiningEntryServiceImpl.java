@@ -59,11 +59,12 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
 
         // 2. Generate Application Number
         entity.setApplicationNo(generateApplicationNumber());
+
         // 3. Audit fields
         entity.setCreatedBy(userId);
         entity.setCreatedOn(LocalDateTime.now());
         entity.setStatus("SUBMITTED");
-
+        entity.setEligibleForExport(request.getEligibleForExport());
         // 4. Save parent first
         ManualMiningEntryEntity savedEntity = entryRepository.save(entity);
 
