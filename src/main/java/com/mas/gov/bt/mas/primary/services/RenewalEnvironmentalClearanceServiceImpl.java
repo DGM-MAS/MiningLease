@@ -61,6 +61,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
     }
 
     @Override
+    @Transactional
     public EnvironmentClearanceRenewalResponseDTO submitApplication(EnvironmentClearanceRenewalRequestDTO request, Long userId) {
         validateSubmission(request);
 
@@ -123,7 +124,6 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         return environmentClearanceRenewalMapper.toResponseDTO(saved);
     }
 
-    @Transactional
     private ApplicationMaster createApplicationMaster(String applicationNumber, Long userId, String status) {
         ApplicationMaster master = new ApplicationMaster();
         master.setApplicationNumber(applicationNumber);
@@ -188,16 +188,19 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         }
     }
 
-    @Transactional
     private synchronized String generateApplicationNumber() {
 
         int year = Year.now().getValue();
 
         String prefix = String.format("ECR-%d-", year);
 
+        // Query t_application_master — it is always written first,
+        // so it is the authoritative source of which numbers are taken.
+        // Querying the service table would miss numbers from failed
+        // transactions where ApplicationMaster committed but the entity did not.
         Integer maxSequence =
-                renewalEnvironmentalClearanceRepository
-                        .findMaxSequenceByPrefix(prefix);
+                applicationMasterRepository
+                        .findMaxSequenceByApplicationNumberPrefix(prefix);
 
         long nextSequence =
                 (maxSequence == null ? 0 : maxSequence) + 1;
@@ -209,31 +212,30 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         );
     }
 
-    @Transactional
-    public UserWorkloadProjection assignMD() {
+    private UserWorkloadProjection assignMD() {
 
         UserWorkloadProjection md =
                 renewalEnvironmentalClearanceRepository.findMDEnvironmentalClearance();
 
         if (md == null) {
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND,
+                    "No active MD engineer available for assignment. Please ensure an MD engineer is registered in the system.");
         }
         return md;
     }
 
-    @Transactional
-    public UserWorkloadProjection assignMPCD() {
+    private UserWorkloadProjection assignMPCD() {
 
         UserWorkloadProjection mpcd =
                 renewalEnvironmentalClearanceRepository.findMPCDEnvironmentalClearance();
 
         if (mpcd == null) {
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND,
+                    "No active MPCD officer available for assignment. Please ensure an MPCD officer is registered in the system.");
         }
         return mpcd;
     }
 
-    @Transactional
     private void createTask(ApplicationMaster master, EnvironmentClearanceRenewal application, String role, Long userId, Long directorId) {
         LocalDateTime now = LocalDateTime.now();
 
@@ -285,39 +287,43 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             );
         }
 
-        if (Boolean.TRUE.equals(
-                request.getApproveApplication())) {
-
-            entity.setStatus("APPROVED_BY_MPCD");
-            entity.setMpcdApprovedOn(
-                    LocalDateTime.now()
-            );
-        } else {
-            entity.setStatus("UNDER_MPCD_REVIEW");
-        }
-
         if (Boolean.TRUE.equals(request.getSubmitIOM())) {
 
             validateIOMSubmission(request);
 
-            entity.setIomFileId(
-                    request.getIomFileId()
-            );
-
-            entity.setIomSubmittedOn(
-                    LocalDateTime.now()
-            );
-
+            entity.setIomFileId(request.getIomFileId());
+            entity.setIomSubmittedOn(LocalDateTime.now());
             entity.setStatus("IOM_SUBMITTED_TO_MD");
 
-        } else if (Boolean.TRUE.equals(
-                request.getApproveApplication())) {
+            UserWorkloadProjection assignedMD = assignMD();
+            entity.setAssignedMDId(assignedMD.getUserId());
+
+            applicationMaster.setCurrentStatus(entity.getStatus());
+            applicationMasterRepository.save(applicationMaster);
+
+            EnvironmentClearanceRenewal saved =
+                    renewalEnvironmentalClearanceRepository.save(entity);
+
+            createTask(applicationMaster, saved, "MINING ENGINEER", userId, assignedMD.getUserId());
+
+            notificationClient.sendEnvironmentalClearanceAssignmentNotification(
+                    assignedMD.getEmail(),
+                    assignedMD.getUsername(),
+                    entity.getApplicationNo(),
+                    "REVIEW IOM");
+
+            notificationClient.sendUserNotification(
+                    "Renewal environmental clearance IOM has been assigned.",
+                    "An IOM for environmental clearance renewal has been forwarded for your review. Application No. " + entity.getApplicationNo(),
+                    assignedMD.getUserId(),
+                    "78");
+
+            return environmentClearanceRenewalMapper.toResponseDTO(saved);
+
+        } else if (Boolean.TRUE.equals(request.getApproveApplication())) {
 
             entity.setStatus("APPROVED_BY_MPCD");
-
-            entity.setMpcdApprovedOn(
-                    LocalDateTime.now()
-            );
+            entity.setMpcdApprovedOn(LocalDateTime.now());
 
         } else {
 
@@ -467,34 +473,21 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
     @Override
     public Page<EnvironmentClearanceRenewalResponseDTO> getMyApplications(Long userId, Pageable pageable, String search) {
         List<String> ApplicationStatus = List.of(
-                "GR SUBMITTED",
-                "LLC UPLOADED",
-                "SUBMITTED",
-                "ASSIGNED",
                 "DRAFT",
-                "PAYMENT PENDING",
-                "GEOLOGIST_REVIEW",
-                "ACCEPTED PFS",
-                "ADDITIONAL DATA NEEDED",
-                "MA SUBMITTED",
-                "PA/FC SUBMITTED",
-                "APPROVED GR",
-                "NOTE SHEET UPLOADED",
-                "GR SUBMITTED",
-                "FMFS SUBMITTED",
-                "MLA SUBMITTED",
-                "APPROVED BY DIRECTOR",
-                "RESUBMITTED PFS",
-                "RESUBMIT GR",
-                "RESUBMITTED GR",
-                "RESUBMIT FMFS",
-                "MPCD ASSIGNED",
-                "RESUBMITTED FMFS",
-                "RESUBMIT APPLICATION",
-                "RESUBMIT PFS GEOLOGIST",
-                "RESUBMIT PFS MPCD",
-                "RESUBMIT PA/FC",
-                "APPROVED PA/FC");
+                "ASSIGNED TO MD",
+                "ASSIGNED TO MPCD",
+                "UNDER_MPCD_REVIEW",
+                "APPROVED_BY_MPCD",
+                "IOM_SUBMITTED_TO_MD",
+                "RESUBMISSION_REQUIRED",
+                "ASSIGNED_TO_RC",
+                "RC_REPORT_SUBMITTED",
+                "ASSIGNED_TO_MI",
+                "MI_REPORT_SUBMITTED",
+                "UNDER_MD_REVIEW",
+                "PAID",
+                "FORWARDED_TO_DECC",
+                "EC_RENEWED");
         Page<EnvironmentClearanceRenewal> applications;
 
         if (search == null || search.isBlank()) {
@@ -521,11 +514,17 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                 renewalEnvironmentalClearanceRepository
                         .findById(id)
                         .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Application not found"
-                                ));
+                                new RuntimeException("Application not found"));
 
-        validateOwnership(entity, userId);
+        boolean isCreator   = userId.equals(entity.getCreatedBy());
+        boolean isAssignedMPCD = userId.equals(entity.getAssignedMPCDId());
+        boolean isAssignedRC   = userId.equals(entity.getAssignedRCId());
+        boolean isAssignedMI   = userId.equals(entity.getAssignedMIId());
+        boolean isAssignedMD   = userId.equals(entity.getAssignedMDId());
+
+        if (!isCreator && !isAssignedMPCD && !isAssignedRC && !isAssignedMI && !isAssignedMD) {
+            throw new RuntimeException("You are not authorized to access this application");
+        }
 
         return environmentClearanceRenewalMapper
                 .toResponseDTO(entity);
@@ -1022,6 +1021,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         List<String> statuses = List.of(
                 "ASSIGNED_TO_MD",
                 "UNDER_MD_REVIEW",
+                "IOM_SUBMITTED_TO_MD",
                 "PAID"
         );
 

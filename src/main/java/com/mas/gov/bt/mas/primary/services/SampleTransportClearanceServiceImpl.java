@@ -84,7 +84,7 @@ public class SampleTransportClearanceServiceImpl
     @Override
     public Page<SampleTransportClearanceResponseDTO> getMyApplications(Long userId, Pageable pageable, String search) {
         List<String> ApplicationStatus = List.of(
-                "SUBMITTED");
+                "SUBMITTED", "ASSIGNED", "ACCEPTED");
         Page<SampleTransportClearanceEntity> applications;
 
         if (search == null || search.isBlank()) {
@@ -96,6 +96,7 @@ public class SampleTransportClearanceServiceImpl
 
             applications = repository.findByAssignedToUserAndSearch(
                     userId,
+                    ApplicationStatus,
                     search.trim(),
                     pageable
             );
@@ -137,6 +138,7 @@ public class SampleTransportClearanceServiceImpl
         List<String> ApplicationStatus = List.of(
                 "SUBMITTED",
                 "ASSIGNED",
+                "ACCEPTED",
                 "DRAFT",
                 "PAYMENT PENDING");
 
@@ -183,6 +185,13 @@ public class SampleTransportClearanceServiceImpl
         }
 
         repository.save(sampleTransportClearanceEntity);
+
+        completeCurrentTask(sampleTransportClearanceEntity.getApplicationNo(), "GSD_CHIEF", "ASSIGNED", null);
+
+        if (applicationMaster != null) {
+            applicationMaster.setCurrentStatus("ASSIGNED");
+            applicationMasterRepository.save(applicationMaster);
+        }
 
         if (request.getGsdFocalId() != null) {
             createTask(
@@ -247,6 +256,8 @@ public class SampleTransportClearanceServiceImpl
                     sampleTransportClearanceEntity.setAssignedGSDChiefRemarks(request.getRemarks());
                     repository.save(sampleTransportClearanceEntity);
 
+                    completeCurrentTask(sampleTransportClearanceEntity.getApplicationNo(), "GSD_CHIEF", "REJECTED", request.getRemarks());
+
                     if (applicationMaster != null) {
                         applicationMaster.setCurrentStatus("REJECTED");
                         applicationMaster.setRejectionRemarks(request.getRemarks());
@@ -271,11 +282,13 @@ public class SampleTransportClearanceServiceImpl
                     }
 
                 }
-                case "Approved" -> {
+                case "APPROVED" -> {
                     sampleTransportClearanceEntity.setStatus("APPROVED");
                     sampleTransportClearanceEntity.setAssignedGSDChiefRemarks(request.getRemarks());
 
                     repository.save(sampleTransportClearanceEntity);
+
+                    completeCurrentTask(sampleTransportClearanceEntity.getApplicationNo(), "GSD_CHIEF", "APPROVED", request.getRemarks());
 
                     if (applicationMaster != null) {
                         applicationMaster.setCurrentStatus("APPROVED");
@@ -301,6 +314,7 @@ public class SampleTransportClearanceServiceImpl
                         throw new BusinessException("Assigned GHD Chief details not found for notification");
                     }
                 }
+                default -> throw new BusinessException("Invalid status value");
             }
         }
         return sampleTransportClearanceMapper.toListResponse(sampleTransportClearanceEntity);
@@ -360,7 +374,8 @@ public class SampleTransportClearanceServiceImpl
 
         List<String> ApplicationStatus = List.of(
                 "SUBMITTED",
-                "ASSIGNED");
+                "ASSIGNED",
+                "ACCEPTED");
 
         if (search == null || search.isBlank()) {
 
@@ -405,6 +420,8 @@ public class SampleTransportClearanceServiceImpl
                     sampleTransportClearanceEntity.setAssignedGSDFocalRemarks(request.getRemarksGSDFocal());
                     repository.save(sampleTransportClearanceEntity);
 
+                    completeCurrentTask(sampleTransportClearanceEntity.getApplicationNo(), "GSD_FOCAL", "REJECTED", request.getRemarksGSDFocal());
+
                     if (applicationMaster != null) {
                         applicationMaster.setCurrentStatus("REJECTED");
                         applicationMaster.setRejectionRemarks(request.getRemarksGSDFocal());
@@ -429,10 +446,12 @@ public class SampleTransportClearanceServiceImpl
                     }
 
                 }
-                case "Accepted" -> {
+                case "ACCEPTED" -> {
                     sampleTransportClearanceEntity.setStatus("ACCEPTED");
                     sampleTransportClearanceEntity.setAssignedGSDFocalRemarks(request.getRemarksGSDFocal());
                     repository.save(sampleTransportClearanceEntity);
+
+                    completeCurrentTask(sampleTransportClearanceEntity.getApplicationNo(), "GSD_FOCAL", "ACCEPTED", request.getRemarksGSDFocal());
 
                     if (applicationMaster != null) {
                         applicationMaster.setCurrentStatus("ACCEPTED");
@@ -470,6 +489,110 @@ public class SampleTransportClearanceServiceImpl
             }
         }
         return sampleTransportClearanceMapper.toListResponse(sampleTransportClearanceEntity);
+    }
+
+    @Override
+    public SuccessResponse<List<SampleTransportClearanceResponseDTO>> getArchivedForGSDChief(Long userId, Pageable pageable, String search) {
+        List<String> terminalStatuses = List.of("APPROVED", "REJECTED");
+        Page<SampleTransportClearanceEntity> page;
+
+        if (search == null || search.isBlank()) {
+            page = repository.findByAssignedGSDChiefIdAndStatusIn(userId, pageable, terminalStatuses);
+        } else {
+            page = repository.findByAssignedGSDChiefIdAndApplicationNoContainingIgnoreCaseAndStatusIn(
+                    userId, search.trim(), pageable, terminalStatuses);
+        }
+
+        return SuccessResponse.fromPage("Archived applications fetched successfully",
+                page.map(sampleTransportClearanceMapper::toListResponse));
+    }
+
+    @Override
+    public SuccessResponse<List<SampleTransportClearanceResponseDTO>> getArchivedForGSDFocal(Long userId, Pageable pageable, String search) {
+        List<String> terminalStatuses = List.of("APPROVED", "REJECTED");
+        Page<SampleTransportClearanceEntity> page;
+
+        if (search == null || search.isBlank()) {
+            page = repository.findByAssignedGSDFocalIdAndStatusIn(userId, pageable, terminalStatuses);
+        } else {
+            page = repository.findByAssignedGSDFocalIdAndApplicationNoContainingIgnoreCaseAndStatusIn(
+                    userId, search.trim(), pageable, terminalStatuses);
+        }
+
+        return SuccessResponse.fromPage("Archived applications fetched successfully",
+                page.map(sampleTransportClearanceMapper::toListResponse));
+    }
+
+    @Override
+    public SampleTransportClearanceResponseDTO getApplicationByNo(String applicationNo) {
+        SampleTransportClearanceEntity entity = repository.findByApplicationNo(applicationNo)
+                .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
+        return sampleTransportClearanceMapper.toResponseDTO(entity);
+    }
+
+    @Override
+    public void reassignTaskGSDFocal(ReassignTaskRequest request, Long userId) {
+        log.info("GSD focal reassigning task: {} by user: {}", request.getApplicationNumber(), userId);
+
+        List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+                request.getApplicationNumber(), "ASSIGNED", "GSD_FOCAL", SERVICE_CODE);
+
+        SampleTransportClearanceEntity entity = repository.findByApplicationNo(request.getApplicationNumber())
+                .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
+
+        entity.setAssignedGSDFocalId(request.getNewAssigneeUserId());
+        repository.save(entity);
+
+        if (task == null || task.isEmpty()) {
+            throw new BusinessException("No Task Found");
+        }
+
+        for (TaskManagement taskManagement : task) {
+            taskManagement.setAssignedToUserId(request.getNewAssigneeUserId());
+            taskManagement.setAssignedByUserId(userId);
+            taskManagement.setAssignedAt(LocalDateTime.now());
+            taskManagement.setReassignmentCount(taskManagement.getReassignmentCount() + 1);
+            taskManagement.setActionRemarks(request.getRemarks());
+        }
+
+        taskManagementRepository.saveAll(task);
+
+        UserWorkloadProjection userDetails = repository.findUserDetails(request.getNewAssigneeUserId());
+
+        if (userDetails == null || userDetails.getUserId() == null) {
+            throw new BusinessException("New assignee user not found");
+        }
+
+        notificationClient.sendTaskReassignmentNotification(
+                userDetails.getEmail(), userDetails.getUsername(),
+                request.getApplicationNumber(),
+                "GSD_FOCAL",
+                request.getRemarks());
+
+        String title = "A new application has been reassigned.";
+        String message = "An application for sample transport clearance has been assigned for review. Application No. "
+                + request.getApplicationNumber() + " Please login to review the application";
+        String serviceId = "78";
+        notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId);
+
+        log.info("Task reassigned by focal to user {}", request.getNewAssigneeUserId());
+    }
+
+    private void completeCurrentTask(String applicationNo, String role, String actionTaken, String remarks) {
+        List<TaskManagement> tasks = taskManagementRepository.findByApplicationNumber(applicationNo);
+        List<TaskManagement> toUpdate = tasks.stream()
+                .filter(t -> role.equals(t.getAssignedToRole())
+                          && SERVICE_CODE.equals(t.getServiceCode())
+                          && !"COMPLETED".equals(t.getTaskStatus()))
+                .toList();
+        toUpdate.forEach(t -> {
+            t.setTaskStatus("COMPLETED");
+            t.setActionTaken(actionTaken);
+            t.setActionRemarks(remarks);
+        });
+        if (!toUpdate.isEmpty()) {
+            taskManagementRepository.saveAll(toUpdate);
+        }
     }
 
     private synchronized String generateApplicationNumber() {

@@ -37,6 +37,24 @@ public class SampleTransportClearanceGSDChiefController {
     private final UserContext userContext;
     private final SampleTransportClearanceService sampleTransportClearanceService;
 
+    @GetMapping("/archived")
+    @Operation(summary = "Get archived applications", description = "Get approved/rejected applications assigned to this GSD Chief")
+    public ResponseEntity<SuccessResponse<List<SampleTransportClearanceResponseDTO>>> getArchivedApplications(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdOn") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection) {
+
+        Pageable pageable = PageRequest1Based.of(page, size,
+                Sort.Direction.fromString(sortDirection), sortBy);
+
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(
+                sampleTransportClearanceService.getArchivedForGSDChief(userId, pageable, search)
+        );
+    }
+
     @GetMapping("/assigned")
     public ResponseEntity<SuccessResponse<List<SampleTransportClearanceResponseDTO>>> assignedToGSDChief(
             @RequestParam(required = false) String search,
