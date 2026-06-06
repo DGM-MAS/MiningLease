@@ -96,6 +96,17 @@ public class SampleTransportClearanceController {
         return ResponseEntity.ok(SuccessResponse.fromPage("Archived applications retrieved successfully", applications));
     }
 
+    @GetMapping("/applications/{applicationNo}")
+    @Operation(summary = "Get application by number", description = "Get a single sample transport clearance application by its application number")
+    public ResponseEntity<SuccessResponse<SampleTransportClearanceResponseDTO>> getApplicationByNo(
+            @PathVariable String applicationNo) {
+
+        SampleTransportClearanceResponseDTO response =
+                sampleTransportClearanceService.getApplicationByNo(applicationNo);
+
+        return ResponseEntity.ok(new SuccessResponse<>("Application retrieved successfully", response));
+    }
+
     @GetMapping("/all")
     @Operation(summary = "Get all sample transport applications", description = "Get paginated list of all transport clearance (admin view)")
     public ResponseEntity<SuccessResponse<List<SampleTransportClearanceResponseDTO>>> getAllApplications(
