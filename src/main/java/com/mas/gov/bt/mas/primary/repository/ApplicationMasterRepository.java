@@ -25,4 +25,15 @@ public interface ApplicationMasterRepository extends JpaRepository<ApplicationMa
     Long countByServiceCodeAndStatus(@Param("serviceCode") String serviceCode, @Param("status") String status);
 
     Optional<ApplicationMaster> findByApplicationNumberAndServiceCode(String applicationNumber, String surfaceCollectionPermit);
+
+    @Query("""
+       SELECT MAX(
+           CAST(
+               SUBSTRING(am.applicationNumber, LENGTH(:prefix) + 1)
+           AS integer)
+       )
+       FROM ApplicationMaster am
+       WHERE am.applicationNumber LIKE CONCAT(:prefix, '%')
+       """)
+    Integer findMaxSequenceByApplicationNumberPrefix(@Param("prefix") String prefix);
 }

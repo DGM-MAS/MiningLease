@@ -31,4 +31,12 @@ public interface SampleTransportClearanceService {
     SuccessResponse<List<SampleTransportClearanceResponseDTO>> getAssignedToGSDFocal(Long userId, Pageable pageable, String search);
 
     SampleTransportClearanceResponseDTO reviewApplicationGSDFocal(@Valid SampleTransportClearanceGSDFocalReviewRequestDTO request, Long userId);
+
+    SampleTransportClearanceResponseDTO getApplicationByNo(String applicationNo);
+
+    void reassignTaskGSDFocal(@Valid ReassignTaskRequest request, Long userId);
+
+    SuccessResponse<List<SampleTransportClearanceResponseDTO>> getArchivedForGSDChief(Long userId, Pageable pageable, String search);
+
+    SuccessResponse<List<SampleTransportClearanceResponseDTO>> getArchivedForGSDFocal(Long userId, Pageable pageable, String search);
 }

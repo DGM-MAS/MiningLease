@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 public class SampleTransportClearanceResponseDTO {
 
     private Long id;
+    private String applicationNo;
     private String applicantName;
     private String contactNo;
     private String emailAddress;
