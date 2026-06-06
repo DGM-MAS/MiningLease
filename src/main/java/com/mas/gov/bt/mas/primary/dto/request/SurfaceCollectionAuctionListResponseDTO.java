@@ -1,7 +1,5 @@
 package com.mas.gov.bt.mas.primary.dto.request;
 
-import com.mas.gov.bt.mas.primary.dto.response.BGResponseDTO;
-import com.mas.gov.bt.mas.primary.entity.SurfaceCollectionBankGuarantee;
 import lombok.*;
 
 import java.math.BigDecimal;

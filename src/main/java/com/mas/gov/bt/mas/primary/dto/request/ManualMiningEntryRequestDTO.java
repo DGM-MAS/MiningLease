@@ -13,7 +13,7 @@ public class ManualMiningEntryRequestDTO {
 
     private String details;
     private String activityType;
-
+    private String eligibleForExport;
     private Long promoterId;
     // multiple uploaded file references
     private List<String> fileIds;
