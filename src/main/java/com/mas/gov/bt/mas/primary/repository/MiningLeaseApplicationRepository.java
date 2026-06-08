@@ -317,4 +317,8 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     WHERE household_number = :houseHoldNumber
     """, nativeQuery = true)
     Integer findLeaseCountForMining(String houseHoldNumber);
+
+    List<MiningLeaseApplication> findByIsManualEntry(String isManualEntry);
+
+    List<MiningLeaseApplication> findByIsManualEntryAndManualEntryBy(String isManualEntry, Long manualEntryBy);
 }
