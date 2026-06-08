@@ -248,7 +248,7 @@ public class ManualEntryFieldConfigService {
                         field("proposedAreaStateLand",    "Proposed Area — State Land",  "DECIMAL",      false, null),
                         field("proposedAreaPrivate",      "Proposed Area — Private",     "DECIMAL",      false, null),
                         field("proposedAreaRow",          "Proposed Area — ROW",         "DECIMAL",      false, null),
-                        field("permitNo",                 "Permit Number",               "TEXT",         true,  null),
+                        field("permitNo",                 "Permit Number",               "TEXT",         false,  null),
                         field("ecNo",                     "EC Number",                   "TEXT",         false, null),
                         field("securityClearanceValidity","Security Clearance Validity", "TEXT",         false, null),
                         field("taxClearanceValidity",     "Tax Clearance Validity",      "TEXT",         false, null),

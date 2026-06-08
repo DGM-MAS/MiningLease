@@ -320,4 +320,10 @@ public class MiningLeaseApplication {
     // IS MANUAL ENTRY
     @Column(name = "is_manual_entry")
     private String isManualEntry;
+
+    @Column(name = "manual_entry_by")
+    private Long manualEntryBy;
+
+    @Column(name = "manual_entry_on")
+    private LocalDateTime manualEntryOn;
 }

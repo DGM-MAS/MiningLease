@@ -19,6 +19,9 @@ public class ManualMiningAttachmentEntity {
     @Column(name = "file_id")
     private String fileId;
 
-    @Column(name = "manual_entry_id", nullable = false)
+    @Column(name = "manual_entry_id")
     private Long manualMiningEntryId;
+
+    @Column(name = "application_no")
+    private String applicationNo;
 }
