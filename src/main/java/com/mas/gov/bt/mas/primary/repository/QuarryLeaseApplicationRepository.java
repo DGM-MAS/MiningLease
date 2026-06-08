@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+
 /**
  * Repository for QuarryLeaseApplication entity.
  */
@@ -338,4 +339,15 @@ public interface QuarryLeaseApplicationRepository extends JpaRepository<QuarryLe
     LIMIT 1
     """, nativeQuery = true)
     UserWorkloadProjection findUserDetails(Long directorId);
+
+    @Query("""
+        SELECT MAX(CAST(SUBSTRING(a.applicationNumber, LENGTH(:prefix) + 1) AS int))
+        FROM QuarryLeaseApplication a
+        WHERE a.applicationNumber LIKE CONCAT(:prefix, '%')
+    """)
+    Integer findMaxManualEntrySequenceByPrefix(@Param("prefix") String prefix);
+
+    List<QuarryLeaseApplication> findByIsManualEntry(String isManualEntry);
+
+    List<QuarryLeaseApplication> findByIsManualEntryAndManualEntryBy(String isManualEntry, Long manualEntryBy);
 }
