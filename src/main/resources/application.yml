@@ -24,6 +24,7 @@ spring:
     inetutils:
       preferred-networks:
         - 192.168
+        - 172
   jackson:
     time-zone: Asia/Thimphu
 
