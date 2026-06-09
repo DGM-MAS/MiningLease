@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public interface StockLiftingRepository extends JpaRepository<StockLiftingApplication, Long> {
 
@@ -16,4 +17,8 @@ public interface StockLiftingRepository extends JpaRepository<StockLiftingApplic
     long countByMonth(
             @Param("monthStart") LocalDateTime monthStart,
             @Param("monthEnd") LocalDateTime monthEnd);
+
+    List<StockLiftingApplication> findByIsManualEntry(String isManual);
+
+    List<StockLiftingApplication> findByIsManualEntryAndManualEntryBy(String isManual, Long userId);
 }

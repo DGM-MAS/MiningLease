@@ -133,6 +133,15 @@ public class StockLiftingApplication {
     @Column(name = "company_type", length = 255)
     private String companyType;
 
+    @Column(name = "is_manual_entry")
+    private String isManualEntry;
+
+    @Column(name = "manual_entry_by")
+    private Long manualEntryBy;
+
+    @Column(name = "manual_entry_on")
+    private LocalDateTime manualEntryOn;
+
     @PrePersist
     public void onCreate() {
         this.createdOn = LocalDateTime.now();
