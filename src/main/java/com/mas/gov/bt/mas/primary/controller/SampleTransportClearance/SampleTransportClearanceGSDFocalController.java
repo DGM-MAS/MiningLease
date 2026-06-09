@@ -1,6 +1,7 @@
 package com.mas.gov.bt.mas.primary.controller.SampleTransportClearance;
 
 import com.mas.gov.bt.mas.primary.config.UserContext;
+import com.mas.gov.bt.mas.primary.dto.request.ReassignTaskRequest;
 import com.mas.gov.bt.mas.primary.dto.request.SampleTransportClearanceGSDFocalReviewRequestDTO;
 import com.mas.gov.bt.mas.primary.dto.response.SampleTransportClearanceResponseDTO;
 import com.mas.gov.bt.mas.primary.services.SampleTransportClearanceService;
@@ -12,6 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
@@ -33,6 +35,24 @@ public class SampleTransportClearanceGSDFocalController{
 
     private final UserContext userContext;
     private final SampleTransportClearanceService sampleTransportClearanceService;
+    @GetMapping("/archived")
+    @Operation(summary = "Get archived applications", description = "Get approved/rejected applications assigned to this GSD Focal")
+    public ResponseEntity<SuccessResponse<List<SampleTransportClearanceResponseDTO>>> getArchivedApplications(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdOn") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection) {
+
+        Pageable pageable = PageRequest1Based.of(page, size,
+                Sort.Direction.fromString(sortDirection), sortBy);
+
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(
+                sampleTransportClearanceService.getArchivedForGSDFocal(userId, pageable, search)
+        );
+    }
+
     @GetMapping("/assigned")
     public ResponseEntity<SuccessResponse<List<SampleTransportClearanceResponseDTO>>> assignedToGSDChief(
             @RequestParam(required = false) String search,
@@ -61,6 +81,17 @@ public class SampleTransportClearanceGSDFocalController{
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new SuccessResponse<>("Application reviewed successfully", response));
+    }
+
+    @PutMapping("/tasks/reassignGSDFocal")
+    @Operation(summary = "Reassign task", description = "Reassign a pending GSD Focal task to another user")
+    public ResponseEntity<SuccessResponse<Void>> reassignTaskGSDFocal(
+            @Valid @RequestBody ReassignTaskRequest request) {
+
+        Long userId = userContext.getCurrentUserId();
+        sampleTransportClearanceService.reassignTaskGSDFocal(request, userId);
+
+        return SuccessResponse.buildSuccessResponse("Task reassigned successfully");
     }
 
 }

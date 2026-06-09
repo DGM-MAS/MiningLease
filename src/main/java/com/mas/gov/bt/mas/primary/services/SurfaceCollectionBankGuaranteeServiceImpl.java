@@ -235,12 +235,17 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
     @Override
     public SurfaceCollectionAuctionListResponseDTO viewApplicationDetails(Long userId, String applicationNo) {
         Optional<SurfaceCollectionAuctionApplication> surfaceCollectionAuctionApplication =
-                surfaceCollectionAuctionRepository.findByApplicationNoAndAuctionStatusAndBidWinnerPromoterId(applicationNo, "APPROVED", userId);
+                surfaceCollectionAuctionRepository.findByApplicationNoAndBidWinnerPromoterId(applicationNo, userId);
+
+        if (surfaceCollectionAuctionApplication.isEmpty()) {
+            surfaceCollectionAuctionApplication =
+                    surfaceCollectionAuctionRepository.findByApplicationNoAndCreatedBy(applicationNo, userId);
+        }
 
         SurfaceCollectionAuctionApplication surfaceCollectionAuctionApplication1;
-        if(surfaceCollectionAuctionApplication.isEmpty()) {
+        if (surfaceCollectionAuctionApplication.isEmpty()) {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Application No. details not found.");
-        }else {
+        } else {
             surfaceCollectionAuctionApplication1 = surfaceCollectionAuctionApplication.get();
         }
         SurfaceCollectionAuctionListResponseDTO surfaceCollectionAuctionListResponseDTO = new SurfaceCollectionAuctionListResponseDTO();

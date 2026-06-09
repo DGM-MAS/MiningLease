@@ -9,15 +9,17 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface ManualMiningEntryMapper {
 
-    // DTO → Entity
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "applicationNo", ignore = true)
+    @Mapping(target = "applicationMaster", ignore = true)
+    @Mapping(target = "status", ignore = true)
+    @Mapping(target = "isManualEntry", ignore = true)
     @Mapping(target = "createdOn", ignore = true)
     @Mapping(target = "createdBy", ignore = true)
     @Mapping(target = "updatedOn", ignore = true)
     @Mapping(target = "updatedBy", ignore = true)
     ManualMiningEntryEntity toEntity(ManualMiningEntryRequestDTO dto);
 
-    // Entity → Response DTO
+    @Mapping(target = "fileIds", ignore = true)
     ManualMiningEntryResponseDTO toResponse(ManualMiningEntryEntity entity);
 }

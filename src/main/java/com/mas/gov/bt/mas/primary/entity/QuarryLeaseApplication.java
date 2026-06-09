@@ -312,4 +312,13 @@ public class QuarryLeaseApplication {
 
     @Column(name = "work_order_remarks")
     private String workOrderRemarks;
+
+    @Column(name = "is_manual_entry")
+    private String isManualEntry;
+
+    @Column(name = "manual_entry_by")
+    private Long manualEntryBy;
+
+    @Column(name = "manual_entry_on")
+    private LocalDateTime manualEntryOn;
 }

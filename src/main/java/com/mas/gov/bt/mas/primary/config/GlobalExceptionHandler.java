@@ -197,6 +197,26 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handle BusinessException — surfaces errorCode and safe detail message
+     */
+    @ExceptionHandler(com.mas.gov.bt.mas.primary.exception.BusinessException.class)
+    public ResponseEntity<ErrorResponse> handleBusinessException(
+            com.mas.gov.bt.mas.primary.exception.BusinessException ex, HttpServletRequest request) {
+        log.error("BusinessException [{}]: {}", ex.getErrorCode(), ex.getDetails());
+
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .success(false)
+                .message(ex.getDetails() != null ? ex.getDetails() : "Request could not be processed.")
+                .error(ex.getErrorCode())
+                .statusCode(HttpStatus.BAD_REQUEST.value())
+                .timestamp(LocalDateTime.now())
+                .path(request.getRequestURI())
+                .build();
+
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
+    /**
      * Handle RuntimeException
      */
     @ExceptionHandler(RuntimeException.class)

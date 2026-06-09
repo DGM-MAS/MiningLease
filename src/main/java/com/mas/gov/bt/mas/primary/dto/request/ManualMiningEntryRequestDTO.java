@@ -1,7 +1,10 @@
 package com.mas.gov.bt.mas.primary.dto.request;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @Getter
@@ -11,10 +14,137 @@ import java.util.List;
 @Builder
 public class ManualMiningEntryRequestDTO {
 
-    private String details;
+    // MINING_LEASE | QUARRY_LEASE | SURFACE_COLLECTION | STOCK_LIFTING
+    @NotBlank(message = "Activity type is required")
     private String activityType;
+
+    // -------------------------------------------------------
+    // Applicant / Company Details  (all types)
+    // -------------------------------------------------------
+    private String applicantType;
+    private String applicantCid;
+    private String applicantName;
+    private String applicantContact;
+    private String applicantEmail;
+    private String postalAddress;
+    private String telephoneNo;
+    private String licenseNo;
+    private String businessLicenseNo;
+    private String companyRegistrationNo;
+    private String companyName;
+    private String companyType;
+
+    // -------------------------------------------------------
+    // Location (all types)
+    // -------------------------------------------------------
+    private String dzongkhag;
+    private String gewog;
+    private String nearestVillage;
+    private String placeOfActivity;
+    private String dungkhag;
+
+    // -------------------------------------------------------
+    // Mining Lease / Quarry Lease — Mine Details
+    // -------------------------------------------------------
+    private String typeOfMines;
+    private String typeOfMinerals;
+    private String requiredInvestment;
+    private String sourceOfFinance;
+    private String technicalCompetenceExperience;
+    private String workforceRequirementRecruitment;
+    private String proposedLeasePeriod;
+    private String srf;
+    private String landPrivate;
+    private String totalLand;
+
+    // -------------------------------------------------------
+    // Mining Lease / Quarry Lease — Approved / Final Details
+    // -------------------------------------------------------
+    private String approvedArea;
+    private String approvedErb;
+    private String approvedLeasePeriod;
+    private String approvedMineral;
+    private LocalDate leaseStartDate;
+    private LocalDate leaseEndDate;
+    private Integer leasePeriodYears;
+    private BigDecimal upfrontPaymentAmount;
+    private String fmfsStatus;
+    private String fmfsId;
+    private String ecStatus;
+    private LocalDate ecExpiryDate;
+    private String mlaStatus;
+    private String geologicalReportStatus;
+
+    // -------------------------------------------------------
+    // Mining Lease / Quarry Lease — Documents
+    // -------------------------------------------------------
+    private String pfsDocId;
+    private String locationMapDocId;
+    private String financialCapabilityDocId;
+    private String explorationReportDocId;
+    private String consentLetterDocId;
+    private String geologicalReportDocId;
+    private String fmfsDocId;
+    private String llcDocId;
+    private String notesheetDocId;
+    private String mlaDocId;
+    private Long fileUploadIdGr;
+    private Long fileUploadIdKmz;
+    private String fileUploadIdPA;
+    private String fileUploadIdFC;
+    private String fileUploadIdPublicClearance;
+    private Long mpcdFileUploadIdPA;
+    private Long mpcdFileUploadIdMa;
+    private Long signedPFSId;
+    private Long bankGuarantorDocId;
+    private Long workOrderDocId;
+
+    // -------------------------------------------------------
+    // Surface Collection / Stock Lifting — Activity Details
+    // -------------------------------------------------------
+    // comma-separated: Surface collection, Dredging, Stock lifting, Migration works
+    private String typeOfActivity;
+    // comma-separated: Stones, Sand, Boulder, Minerals
+    private String typeOfMaterials;
+    // comma-separated: Land surface, Riverbeds/Riverbanks, Road Right of Way, Land Developments, Others
+    private String collectionSite;
+    private Double proposedAreaSrf;
+    private Double proposedAreaStateLand;
+    private Double proposedAreaPrivate;
+    private Double proposedAreaRow;
+    private String permitNo;
+    private String ecNo;
+    private String securityClearanceValidity;
+    private String taxClearanceValidity;
+    private Boolean isStateOwned;
     private String eligibleForExport;
+    private Boolean isRpBased;
+
+    // -------------------------------------------------------
+    // Surface Collection / Stock Lifting — Documents
+    // -------------------------------------------------------
+    private String attachmentMapFileId;
+    private String recommendationLetterFileId;
+    private String scConsentLetterFileId;
+    private String fcFileId;
+    private String ieeFileId;
+    private String empFileId;
+    private String admApprovalFileId;
+    private String undertakingFileId;
+    private String bgFileId;
+    private String mpcdReportFileId;
+    private String iomFileId;
+    private String rcReportFileId;
+    private String miReportFileId;
+    private String meReportFileId;
+    private String scEcFileId;
+
+    // -------------------------------------------------------
+    // General
+    // -------------------------------------------------------
+    private String details;
     private Long promoterId;
-    // multiple uploaded file references
+
+    // Additional file attachments (generic)
     private List<String> fileIds;
 }

@@ -9,4 +9,8 @@ public interface ManualMiningAttachmentRepository
         extends JpaRepository<ManualMiningAttachmentEntity, Long> {
 
     List<ManualMiningAttachmentEntity> findByManualMiningEntryIdIn(List<Long> entryIds);
+
+    List<ManualMiningAttachmentEntity> findByApplicationNo(String applicationNo);
+
+    List<ManualMiningAttachmentEntity> findByApplicationNoIn(List<String> applicationNos);
 }

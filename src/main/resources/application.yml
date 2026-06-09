@@ -20,6 +20,11 @@ server:
     relaxed-query-chars: "|,{,},[,],^,@,$,&,+,="
 
 spring:
+  cloud:
+    inetutils:
+      preferred-networks:
+        - 192.168
+        - 172
   jackson:
     time-zone: Asia/Thimphu
 
@@ -150,6 +155,8 @@ management:
   health:
     redis:
       enabled: false
+    mail:
+      enabled: false
 
 # Swagger/OpenAPI Configuration
 springdoc:
@@ -184,7 +191,6 @@ eureka:
     fetch-registry: true
   instance:
     prefer-ip-address: true
-    ip-address: 192.168.137.1
 
 ---
 # ── Production profile ── activate with SPRING_PROFILES_ACTIVE=prod in Kubernetes
