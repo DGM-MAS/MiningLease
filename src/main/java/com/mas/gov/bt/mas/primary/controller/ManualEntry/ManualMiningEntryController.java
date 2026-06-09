@@ -62,7 +62,7 @@ public class ManualMiningEntryController {
                 .body(new SuccessResponse<>("Application created successfully", response));
     }
 
-    @PostMapping("/qurry-applications")
+    @PostMapping("/manual-quarry-applications")
     @Operation(summary = "Create new application", description = "Create a new quarry lease application in draft state")
     public ResponseEntity<SuccessResponse<QuarryLeaseResponse>> createApplication(
             @Valid @RequestBody QuarryLeaseApplicationRequest request) {
@@ -75,7 +75,7 @@ public class ManualMiningEntryController {
     }
 
 
-    @GetMapping("/archived-applications")
+    @GetMapping("/manual-mining-archived-applications")
     @Operation(summary = "Get archived applications", description = "Get list of archived (APPROVED/REJECTED) applications. Agency users get all archived applications, others get only their own.")
     public ResponseEntity<SuccessResponse<List<ApplicationListResponse>>> getArchivedApplications(
             @RequestParam(required = false) String search,
