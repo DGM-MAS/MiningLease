@@ -1,4 +1,9 @@
 app:
+  masters:
+    base-url: http://localhost:8082
+  self:
+    base-url: http://localhost:8085
+
   notification:
     cleanup:
       enabled: true
@@ -23,10 +28,14 @@ spring:
   cloud:
     inetutils:
       preferred-networks:
-        - 192.168
+        - 10.10
         - 172
   jackson:
     time-zone: Asia/Thimphu
+  data:
+    web:
+      pageable:
+        one-indexed-parameters: true
 
   application:
     name: mas-backend-mining-lease
