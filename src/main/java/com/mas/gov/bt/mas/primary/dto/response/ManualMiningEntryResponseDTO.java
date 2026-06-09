@@ -107,6 +107,12 @@ public class ManualMiningEntryResponseDTO {
     private String eligibleForExport;
     private Boolean isRpBased;
 
+    // STOCK LIFTING FIELDS ----------------
+    private String applicationFileId;
+    private String rcReportFileId;
+    private String iomFileId;
+    private String permitFileId;
+
     // Surface Collection / Stock Lifting — Documents
     private String attachmentMapFileId;
     private String recommendationLetterFileId;
@@ -118,8 +124,6 @@ public class ManualMiningEntryResponseDTO {
     private String undertakingFileId;
     private String bgFileId;
     private String mpcdReportFileId;
-    private String iomFileId;
-    private String rcReportFileId;
     private String miReportFileId;
     private String meReportFileId;
     private String scEcFileId;
