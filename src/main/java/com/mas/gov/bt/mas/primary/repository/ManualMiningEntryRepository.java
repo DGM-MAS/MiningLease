@@ -6,80 +6,62 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface ManualMiningEntryRepository extends JpaRepository<ManualMiningEntryEntity, Long> {
+
     @Query("""
-    SELECT MAX(CAST(SUBSTRING(a.applicationNo, 14) AS int))
-    FROM ManualMiningEntryEntity a
-    WHERE a.applicationNo LIKE CONCAT(:prefix, '%')
-""")
-    Integer findMaxSequenceByPrefix(String prefix);
+        SELECT MAX(CAST(SUBSTRING(a.applicationNo, :startIndex) AS int))
+        FROM ManualMiningEntryEntity a
+        WHERE a.applicationNo LIKE CONCAT(:prefix, '%')
+    """)
+    Integer findMaxSequenceByPrefixAndStartIndex(@Param("prefix") String prefix,
+                                                 @Param("startIndex") int startIndex);
 
     @Query(value = """
-    SELECT
-        u.id AS userId,
-        u.email AS email,
-        u.username AS userName,
-        COUNT(u.id) AS workload
-    FROM mas_db.users u
-    JOIN mas_db.user_roles ur
-        ON u.id = ur.user_id
-    LEFT JOIN mas_db.role_permissions t
-        ON t.role_id = ur.role_id
-    WHERE ur.role_id = 21
-      AND t.permission_id = 37
-      AND u.account_status = 'ACTIVE'
-    GROUP BY u.id, u.email, u.username
-    ORDER BY workload ASC
-    LIMIT 1
+        SELECT
+            u.id        AS userId,
+            u.email     AS email,
+            u.username  AS userName
+        FROM mas_db.users u
+        WHERE u.id = :userId
+          AND u.account_status = 'ACTIVE'
+        LIMIT 1
     """, nativeQuery = true)
-    UserWorkloadProjection findChiefManualEntry();
-
-    @Query(value = """
-    SELECT 
-        u.id AS userId,
-        u.email AS email,
-        u.username AS userName
-    FROM mas_db.users u
-    WHERE u.id = :userId
-      AND u.account_status = 'ACTIVE'
-    GROUP BY u.id, u.email, u.username
-    LIMIT 1
-    """, nativeQuery = true)
-    UserWorkloadProjection findUserDetails(Long userId);
-
-    Page<ManualMiningEntryEntity> findByAssignedChiefIdAndStatusIn(Long userId, Pageable pageable, List<String> applicationStatus);
-
-    Page<ManualMiningEntryEntity> findByAssignedChiefIdAndApplicationNoContainingIgnoreCaseAndStatusIn(Long userId, String trim, Pageable pageable, List<String> applicationStatus);
+    UserWorkloadProjection findUserDetails(@Param("userId") Long userId);
 
     Optional<ManualMiningEntryEntity> findByApplicationNo(String applicationNo);
 
-    @Query(value = """
-    SELECT
-        u.id AS userId,
-        u.email AS email,
-        u.username AS userName,
-        COUNT(u.id) AS workload
-    FROM mas_db.users u
-    JOIN mas_db.user_roles ur
-        ON u.id = ur.user_id
-    LEFT JOIN mas_db.role_permissions t
-        ON t.role_id = ur.role_id
-    WHERE ur.role_id = 21
-      AND t.permission_id = 37
-      AND u.account_status = 'ACTIVE'
-    GROUP BY u.id, u.email, u.username
-    ORDER BY workload ASC
-    LIMIT 1
-    """, nativeQuery = true)
-    UserWorkloadProjection findDirectorManualEntry();
+    Page<ManualMiningEntryEntity> findByCreatedByAndActivityTypeAndStatusIn(
+            Long createdBy, String activityType, List<String> statuses, Pageable pageable);
 
-    Page<ManualMiningEntryEntity> findByAssignedDirectorIdAndStatusIn(Long userId, Pageable pageable, List<String> applicationStatus);
+    Page<ManualMiningEntryEntity> findByActivityTypeAndStatusIn(
+            String activityType, List<String> statuses, Pageable pageable);
 
-    Page<ManualMiningEntryEntity> findByAssignedDirectorIdAndApplicationNoContainingIgnoreCaseAndStatusIn(Long userId, String trim, Pageable pageable, List<String> applicationStatus);
+    Page<ManualMiningEntryEntity> findByCreatedByAndStatusIn(
+            Long createdBy, List<String> statuses, Pageable pageable);
 
+    Page<ManualMiningEntryEntity> findByStatusIn(List<String> statuses, Pageable pageable);
+
+    @Query("""
+        SELECT e FROM ManualMiningEntryEntity e
+        WHERE e.createdBy = :createdBy
+          AND (:search IS NULL OR e.applicationNo LIKE CONCAT('%', :search, '%')
+               OR e.applicantName LIKE CONCAT('%', :search, '%'))
+    """)
+    Page<ManualMiningEntryEntity> findByCreatedByAndSearch(@Param("createdBy") Long createdBy,
+                                                           @Param("search") String search,
+                                                           Pageable pageable);
+
+    @Query("""
+        SELECT e FROM ManualMiningEntryEntity e
+        WHERE (:search IS NULL OR e.applicationNo LIKE CONCAT('%', :search, '%')
+               OR e.applicantName LIKE CONCAT('%', :search, '%'))
+    """)
+    Page<ManualMiningEntryEntity> findAllBySearch(@Param("search") String search, Pageable pageable);
 }
