@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -314,6 +315,10 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         sl.setApplicationNo(generateSLApplicationNumber());
         sl.setStatus(status);
 
+        sl.setManualEntryOn(now);
+        sl.setManualEntryBy(userId);
+        sl.setIsManualEntry(IS_MANUAL);
+
         sl.setCreatedBy(userId);
 
         sl.setIsActive(true);
@@ -336,7 +341,8 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         List<MiningLeaseApplication> mlList = mlRepo.findByIsManualEntryAndManualEntryBy(IS_MANUAL, userId);
         List<QuarryLeaseApplication> qlList = qlRepo.findByIsManualEntryAndManualEntryBy(IS_MANUAL, userId);
         List<SurfaceCollectionPermitEntity> scList = scRepo.findByIsManualEntryAndManualEntryBy(IS_MANUAL, userId);
-        return buildPagedResponse(combine(mlList, qlList, scList, search), pageable);
+        List<StockLiftingApplication> slList = stockLiftingRepository.findByIsManualEntryAndManualEntryBy(IS_MANUAL, userId);
+        return buildPagedResponse(combine(mlList, qlList, scList, slList, search), pageable);
     }
 
     @Override
@@ -345,7 +351,8 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         List<MiningLeaseApplication> mlList = mlRepo.findByIsManualEntry(IS_MANUAL);
         List<QuarryLeaseApplication> qlList = qlRepo.findByIsManualEntry(IS_MANUAL);
         List<SurfaceCollectionPermitEntity> scList = scRepo.findByIsManualEntry(IS_MANUAL);
-        return buildPagedResponse(combine(mlList, qlList, scList, search), pageable);
+        List<StockLiftingApplication> slList = stockLiftingRepository.findByIsManualEntry(IS_MANUAL);
+        return buildPagedResponse(combine(mlList, qlList, scList,slList, search), pageable);
     }
 
     // -------------------------------------------------------
@@ -606,15 +613,20 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
             List<MiningLeaseApplication> mlList,
             List<QuarryLeaseApplication> qlList,
             List<SurfaceCollectionPermitEntity> scList,
+            List<StockLiftingApplication> slList,
             String search) {
 
-        List<ManualMiningEntryResponseDTO> combined = Stream.concat(
-                        Stream.concat(
-                                mlList.stream().map(ml -> toResponseFromMl(ml, null)),
-                                qlList.stream().map(ql -> toResponseFromQl(ql, null))),
-                        scList.stream().map(sc -> toResponseFromSc(sc, null)))
-                .sorted(Comparator.comparing(ManualMiningEntryResponseDTO::getCreatedOn,
-                        Comparator.nullsLast(Comparator.reverseOrder())))
+        List<ManualMiningEntryResponseDTO> combined = Stream.of(
+                        mlList.stream().map(ml -> toResponseFromMl(ml, null)),
+                        qlList.stream().map(ql -> toResponseFromQl(ql, null)),
+                        slList.stream().map(sl -> toResponseFromSL(sl, null)),
+                        scList.stream().map(sc -> toResponseFromSc(sc, null))
+                )
+                .flatMap(Function.identity())
+                .sorted(Comparator.comparing(
+                        ManualMiningEntryResponseDTO::getCreatedOn,
+                        Comparator.nullsLast(Comparator.reverseOrder())
+                ))
                 .collect(Collectors.toList());
 
         if (search != null && !search.isBlank()) {
