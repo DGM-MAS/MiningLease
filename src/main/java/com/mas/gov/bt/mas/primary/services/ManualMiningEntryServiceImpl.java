@@ -11,17 +11,17 @@ import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
 import com.mas.gov.bt.mas.primary.utility.SuccessResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.Year;
-import java.time.ZoneId;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -38,6 +38,9 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
     private final NotificationClient notificationClient;
     private final ManualEntryValidator validator;
     private final ManualMiningEntryRepository entryRepository; // user lookup only
+
+    @Autowired
+    private StockLiftingRepository stockLiftingRepository;
 
     private static final String SERVICE_CODE = "MANUAL_ENTRY_SERVICE";
     private static final String IS_MANUAL = "TRUE";
@@ -59,7 +62,8 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         return switch (type) {
             case "MINING_LEASE" -> createMlEntry(request, userId, prefix, finalStatus, now);
             case "QUARRY_LEASE" -> createQlEntry(request, userId, prefix, finalStatus, now);
-            case "SURFACE_COLLECTION", "STOCK_LIFTING" -> createScEntry(request, userId, prefix, finalStatus, now);
+            case "SURFACE_COLLECTION" -> createScEntry(request, userId, prefix, finalStatus, now);
+            case "STOCK_LIFTING" -> createSLEntry(request, userId, prefix, finalStatus, now);
             default -> throw new BusinessException(ErrorCodes.INVALID_REQUEST, "Unknown activityType: " + type);
         };
     }
@@ -284,6 +288,49 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         return toResponseFromSc(saved, req.getFileIds());
     }
 
+
+    private ManualMiningEntryResponseDTO createSLEntry(ManualMiningEntryRequestDTO req, Long userId,
+                                                       String prefix, String status, LocalDateTime now) {
+        StockLiftingApplication sl = new StockLiftingApplication();
+
+        sl.setApplicantCid(req.getApplicantCid());
+        sl.setApplicantName(req.getApplicantName());
+        sl.setApplicantType(req.getApplicantType());
+        sl.setApplicantEmail(req.getApplicantEmail());
+        sl.setApplicantCid(req.getApplicantCid());
+        sl.setApplicantContact(req.getApplicantContact());
+        sl.setPostalAddress(req.getPostalAddress());
+        sl.setTelephoneNo(req.getTelephoneNo());
+        sl.setLicenseNo(req.getLicenseNo());
+        sl.setBusinessLicenseNo(req.getBusinessLicenseNo());
+        sl.setCompanyRegistrationNo(req.getCompanyRegistrationNo());
+        sl.setCompanyName(req.getCompanyName());
+        sl.setCompanyType(req.getCompanyType());
+
+        sl.setStockLiftingPermitNo(generatePermitNumber());
+        sl.setApplicationFileId(req.getApplicationFileId());
+        sl.setPermitFileId(req.getPermitFileId());
+        sl.setIomFileId(req.getIomFileId());
+        sl.setRcReportFileId(req.getRcReportFileId());
+        sl.setApplicationNo(generateSLApplicationNumber());
+        sl.setStatus(status);
+
+        sl.setManualEntryOn(now);
+        sl.setManualEntryBy(userId);
+        sl.setIsManualEntry(IS_MANUAL);
+
+        sl.setCreatedBy(userId);
+
+        sl.setIsActive(true);
+
+        StockLiftingApplication saved = stockLiftingRepository.save(sl);
+        saveAttachments(req.getFileIds(), saved.getApplicationNo());
+        createApplicationMaster(saved.getApplicationNo(), userId, status, now);
+        notifyPromoter(req.getPromoterId(), saved.getApplicationNo());
+
+        return toResponseFromSL(saved, req.getFileIds());
+    }
+
     // -------------------------------------------------------
     // GET LIST
     // -------------------------------------------------------
@@ -294,7 +341,8 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         List<MiningLeaseApplication> mlList = mlRepo.findByIsManualEntryAndManualEntryBy(IS_MANUAL, userId);
         List<QuarryLeaseApplication> qlList = qlRepo.findByIsManualEntryAndManualEntryBy(IS_MANUAL, userId);
         List<SurfaceCollectionPermitEntity> scList = scRepo.findByIsManualEntryAndManualEntryBy(IS_MANUAL, userId);
-        return buildPagedResponse(combine(mlList, qlList, scList, search), pageable);
+        List<StockLiftingApplication> slList = stockLiftingRepository.findByIsManualEntryAndManualEntryBy(IS_MANUAL, userId);
+        return buildPagedResponse(combine(mlList, qlList, scList, slList, search), pageable);
     }
 
     @Override
@@ -303,7 +351,8 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         List<MiningLeaseApplication> mlList = mlRepo.findByIsManualEntry(IS_MANUAL);
         List<QuarryLeaseApplication> qlList = qlRepo.findByIsManualEntry(IS_MANUAL);
         List<SurfaceCollectionPermitEntity> scList = scRepo.findByIsManualEntry(IS_MANUAL);
-        return buildPagedResponse(combine(mlList, qlList, scList, search), pageable);
+        List<StockLiftingApplication> slList = stockLiftingRepository.findByIsManualEntry(IS_MANUAL);
+        return buildPagedResponse(combine(mlList, qlList, scList,slList, search), pageable);
     }
 
     // -------------------------------------------------------
@@ -526,6 +575,36 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
                 .build();
     }
 
+    private ManualMiningEntryResponseDTO toResponseFromSL(StockLiftingApplication ql, List<String> fileIds) {
+        return ManualMiningEntryResponseDTO.builder()
+                .id(ql.getId())
+                .applicationNo(ql.getApplicationNo())
+                .activityType("STOCK_LIFTING")
+                .status(ql.getStatus())
+                .isManualEntry(true)
+                .applicantType(ql.getApplicantType())
+                .applicantCid(ql.getApplicantCid())
+                .applicantName(ql.getApplicantName())
+                .applicantContact(ql.getApplicantContact())
+                .applicantEmail(ql.getApplicantEmail())
+                .postalAddress(ql.getPostalAddress())
+                .telephoneNo(ql.getTelephoneNo())
+                .licenseNo(ql.getLicenseNo())
+                .businessLicenseNo(ql.getBusinessLicenseNo())
+                .companyRegistrationNo(ql.getCompanyRegistrationNo())
+                .companyName(ql.getCompanyName())
+                .companyType(ql.getCompanyType())
+                .fileIds(fileIds != null ? fileIds : Collections.emptyList())
+                .createdBy(ql.getCreatedBy())
+                .createdOn(ql.getCreatedOn())
+                .applicationFileId(ql.getApplicationFileId())
+                .rcReportFileId(ql.getRcReportFileId())
+                .iomFileId(ql.getIomFileId())
+                .permitFileId(ql.getPermitFileId())
+                .build();
+    }
+
+
     // -------------------------------------------------------
     // Helpers
     // -------------------------------------------------------
@@ -534,15 +613,20 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
             List<MiningLeaseApplication> mlList,
             List<QuarryLeaseApplication> qlList,
             List<SurfaceCollectionPermitEntity> scList,
+            List<StockLiftingApplication> slList,
             String search) {
 
-        List<ManualMiningEntryResponseDTO> combined = Stream.concat(
-                        Stream.concat(
-                                mlList.stream().map(ml -> toResponseFromMl(ml, null)),
-                                qlList.stream().map(ql -> toResponseFromQl(ql, null))),
-                        scList.stream().map(sc -> toResponseFromSc(sc, null)))
-                .sorted(Comparator.comparing(ManualMiningEntryResponseDTO::getCreatedOn,
-                        Comparator.nullsLast(Comparator.reverseOrder())))
+        List<ManualMiningEntryResponseDTO> combined = Stream.of(
+                        mlList.stream().map(ml -> toResponseFromMl(ml, null)),
+                        qlList.stream().map(ql -> toResponseFromQl(ql, null)),
+                        slList.stream().map(sl -> toResponseFromSL(sl, null)),
+                        scList.stream().map(sc -> toResponseFromSc(sc, null))
+                )
+                .flatMap(Function.identity())
+                .sorted(Comparator.comparing(
+                        ManualMiningEntryResponseDTO::getCreatedOn,
+                        Comparator.nullsLast(Comparator.reverseOrder())
+                ))
                 .collect(Collectors.toList());
 
         if (search != null && !search.isBlank()) {
@@ -653,6 +737,18 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         return prefix + String.format("%06d", (max == null ? 0L : max) + 1L);
     }
 
+    private String generateSLApplicationNumber() {
+        String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        return "APPSL-" + date + String.format("%05d", monthlySequence());
+    }
+
+    private long monthlySequence() {
+        YearMonth currentMonth = YearMonth.now();
+        LocalDateTime monthStart = currentMonth.atDay(1).atStartOfDay();
+        LocalDateTime monthEnd = currentMonth.atEndOfMonth().atTime(23, 59, 59);
+        return stockLiftingRepository.countByMonth(monthStart, monthEnd) + 1;
+    }
+
     private String resolveFinalStatus(String activityType) {
         return switch (activityType) {
             case "MINING_LEASE" -> "MINING LEASE APPROVED";
@@ -672,5 +768,11 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
             case "STOCK_LIFTING" -> String.format("MAN-SL-%d-", year);
             default -> String.format("MAN-ENTRY-%d-", year);
         };
+    }
+
+    // STOCK LIFTING PERMIT NUMBER GENERATOR
+    private String generatePermitNumber() {
+        String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        return "SLP-" + date + String.format("%05d", monthlySequence());
     }
 }
