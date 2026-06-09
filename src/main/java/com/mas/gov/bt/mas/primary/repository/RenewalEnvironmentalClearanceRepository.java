@@ -34,14 +34,14 @@ public interface RenewalEnvironmentalClearanceRepository extends JpaRepository<E
         u.id AS userId,
         u.email AS email,
         u.username AS userName,
-        COUNT(u.id) AS workload
+        COUNT(ecr.id) AS workload
     FROM mas_db.users u
     JOIN mas_db.user_roles ur
         ON u.id = ur.user_id
-    LEFT JOIN mas_db.role_permissions t
-        ON t.role_id = ur.role_id
+    LEFT JOIN mas_db.t_environment_clearance_renewal ecr
+        ON ecr.assignedmdid = u.id
+        AND ecr.status NOT IN ('APPROVED', 'REJECTED', 'EC_RENEWED')
     WHERE ur.role_id = 21
-      AND t.permission_id = 37
       AND u.account_status = 'ACTIVE'
     GROUP BY u.id, u.email, u.username
     ORDER BY workload ASC
@@ -54,14 +54,14 @@ public interface RenewalEnvironmentalClearanceRepository extends JpaRepository<E
         u.id AS userId,
         u.email AS email,
         u.username AS userName,
-        COUNT(u.id) AS workload
+        COUNT(ecr.id) AS workload
     FROM mas_db.users u
     JOIN mas_db.user_roles ur
         ON u.id = ur.user_id
-    LEFT JOIN mas_db.role_permissions t
-        ON t.role_id = ur.role_id
-    WHERE ur.role_id = 21
-      AND t.permission_id = 37
+    LEFT JOIN mas_db.t_environment_clearance_renewal ecr
+        ON ecr.assignedmpcdid = u.id
+        AND ecr.status NOT IN ('APPROVED', 'REJECTED', 'EC_RENEWED')
+    WHERE ur.role_id = 23
       AND u.account_status = 'ACTIVE'
     GROUP BY u.id, u.email, u.username
     ORDER BY workload ASC
