@@ -156,4 +156,6 @@ public class MiningLeaseResponse {
     private String expPermitNo;
 
     private Long fileUploadIdKmz;
+
+    private String redirectUrl;
 }
