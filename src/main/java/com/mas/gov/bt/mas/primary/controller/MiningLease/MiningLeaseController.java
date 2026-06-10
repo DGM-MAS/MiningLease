@@ -1,6 +1,7 @@
 package com.mas.gov.bt.mas.primary.controller.MiningLease;
 
 import com.mas.gov.bt.mas.primary.config.UserContext;
+import com.mas.gov.bt.mas.primary.dto.payment.PaymentCallbackDTO;
 import com.mas.gov.bt.mas.primary.dto.request.*;
 import com.mas.gov.bt.mas.primary.dto.response.ApplicationListResponse;
 import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
@@ -286,6 +287,17 @@ public class MiningLeaseController {
                 Sort.Direction.fromString(sortDirection), sortBy);
 
         return ResponseEntity.ok(miningLeaseService.getAllApplicationAdmin(pageable, search));
+    }
+
+    /**
+     * Called by the masters payment service once application fee payment is confirmed as PAID.
+     * No JWT required — internal service call from mas-backend-masters.
+     */
+    @PostMapping("/payment-callback")
+    @Operation(summary = "Payment callback", description = "Internal callback from payment service — sets application to SUBMITTED after successful payment")
+    public ResponseEntity<SuccessResponse<Void>> paymentCallback(@RequestBody PaymentCallbackDTO dto) {
+        miningLeaseService.onPaymentConfirmed(dto.getApplicationNo());
+        return SuccessResponse.buildSuccessResponse("Payment confirmed and application submitted successfully.");
     }
 
 }
