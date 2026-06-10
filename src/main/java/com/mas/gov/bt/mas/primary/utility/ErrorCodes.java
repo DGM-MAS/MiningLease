@@ -92,6 +92,39 @@ public class ErrorCodes {
     public static final String INVALID_RESPONSE = "MISC003";
     public static final String INVALID_REQUEST = "MISC004";
 
+    // OTP / Session Errors
+    public static final String OTP_INVALID = "OTP001";
+    public static final String OTP_EXPIRED = "OTP002";
+    public static final String OTP_LIMIT_EXCEEDED = "OTP003";
+    public static final String REFRESH_TOKEN_INVALID = "AUTH008";
+    public static final String PASSWORD_POLICY_VIOLATION = "AUTH009";
+
+    // Payment Errors
+    public static final String PAYMENT_FAILED = "PAY001";
+    public static final String PAYMENT_ALREADY_PROCESSED = "PAY002";
+    public static final String PAYMENT_ADVICE_FAILED = "PAY003";
+    public static final String PAYMENT_CANCELLED = "PAY004";
+    public static final String INSUFFICIENT_BALANCE = "PAY005";
+    public static final String PAYMENT_VERIFICATION_FAILED = "PAY006";
+
+    // Workflow Errors
+    public static final String APPLICATION_ALREADY_SUBMITTED = "WF001";
+    public static final String INVALID_APPLICATION_STATUS = "WF002";
+    public static final String RESUBMIT_NOT_ALLOWED = "WF003";
+    public static final String TASK_ALREADY_COMPLETED = "WF004";
+    public static final String NO_ASSIGNEE_AVAILABLE = "WF005";
+    public static final String DEADLINE_EXPIRED = "WF006";
+
+    // Idempotency Errors
+    public static final String IDEMPOTENCY_IN_PROGRESS = "IDEM001";
+    public static final String IDEMPOTENCY_PAYLOAD_MISMATCH = "IDEM002";
+
+    // Notification Errors
+    public static final String EMAIL_SEND_FAILED = "NOTIF001";
+    public static final String SMS_SEND_FAILED = "NOTIF002";
+
+    // Concurrency Errors
+    public static final String CONCURRENT_MODIFICATION = "CONC001";
     private static final Map<String, String> errorDescriptions = new HashMap<>();
 
     static {
@@ -212,6 +245,39 @@ public class ErrorCodes {
         errorDescriptions.put(UNSUPPORTED_OPERATION, "Unsupported operation. The operation is not supported.");
         errorDescriptions.put(INVALID_RESPONSE, "Invalid response. The response received is invalid or malformed.");
         errorDescriptions.put(INVALID_REQUEST, "Invalid request. The request is invalid or malformed.");
+        // OTP / Session Errors
+        errorDescriptions.put(OTP_INVALID, "Invalid OTP. The code entered is incorrect.");
+        errorDescriptions.put(OTP_EXPIRED, "OTP expired. The code is no longer valid, please request a new one.");
+        errorDescriptions.put(OTP_LIMIT_EXCEEDED, "Too many OTP attempts. Please request a new code.");
+        errorDescriptions.put(REFRESH_TOKEN_INVALID, "Session refresh failed. Please log in again.");
+        errorDescriptions.put(PASSWORD_POLICY_VIOLATION, "Password does not meet the security requirements.");
+
+        // Payment Errors
+        errorDescriptions.put(PAYMENT_FAILED, "Payment failed. The payment could not be processed.");
+        errorDescriptions.put(PAYMENT_ALREADY_PROCESSED, "Payment already processed. This payment has already been recorded.");
+        errorDescriptions.put(PAYMENT_ADVICE_FAILED, "Payment advice failed. The payment advice could not be created.");
+        errorDescriptions.put(PAYMENT_CANCELLED, "Payment cancelled. The payment was cancelled.");
+        errorDescriptions.put(INSUFFICIENT_BALANCE, "Insufficient balance. The available balance is not enough for this operation.");
+        errorDescriptions.put(PAYMENT_VERIFICATION_FAILED, "Payment verification failed. The payment could not be verified.");
+
+        // Workflow Errors
+        errorDescriptions.put(APPLICATION_ALREADY_SUBMITTED, "Application already submitted. This application has already been submitted.");
+        errorDescriptions.put(INVALID_APPLICATION_STATUS, "Invalid application status. This action is not allowed in the application's current status.");
+        errorDescriptions.put(RESUBMIT_NOT_ALLOWED, "Resubmission not allowed. Only applications returned for revision can be resubmitted.");
+        errorDescriptions.put(TASK_ALREADY_COMPLETED, "Task already completed. This task has already been actioned.");
+        errorDescriptions.put(NO_ASSIGNEE_AVAILABLE, "No assignee available. No eligible officer is available for assignment.");
+        errorDescriptions.put(DEADLINE_EXPIRED, "Deadline expired. The allowed time for this action has passed.");
+
+        // Idempotency Errors
+        errorDescriptions.put(IDEMPOTENCY_IN_PROGRESS, "A request with this Idempotency-Key is already being processed. Please retry shortly.");
+        errorDescriptions.put(IDEMPOTENCY_PAYLOAD_MISMATCH, "Idempotency-Key was reused with a different request payload.");
+
+        // Notification Errors
+        errorDescriptions.put(EMAIL_SEND_FAILED, "Email could not be sent. The notification email failed to send.");
+        errorDescriptions.put(SMS_SEND_FAILED, "SMS could not be sent. The notification SMS failed to send.");
+
+        // Concurrency Errors
+        errorDescriptions.put(CONCURRENT_MODIFICATION, "Record was modified by another user. Please reload and try again.");
     }
 
     public static String getErrorDescription(String errorCode) {

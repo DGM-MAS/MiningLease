@@ -18,6 +18,7 @@ public class ApiErrorResponse {
         this.errorCode = errorCode;
         this.message = message;
         this.details = details;
+        this.timestamp = LocalDateTime.now();
     }
 
     /**
