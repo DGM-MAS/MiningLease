@@ -43,8 +43,8 @@ spring:
   datasource:
 #    url: jdbc:postgresql://localhost:5432/postgres
     url: jdbc:postgresql://172.30.3.10:30432/mas_db?tcpKeepAlive=true&socketTimeout=300
-    username: postgres
-    password: 4GbRIVm8KuYXzEJB
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:4GbRIVm8KuYXzEJB}
 #    password: root
     driver-class-name: org.postgresql.Driver
     type: com.zaxxer.hikari.HikariDataSource
@@ -77,7 +77,7 @@ spring:
     host: mail.systems.gov.bt
     port: 587
     username: mas@systems.gov.bt
-    password: 5xk5ZtSAyRcB
+    password: ${MAIL_PASSWORD:5xk5ZtSAyRcB}
     protocol: smtp
     default-encoding: UTF-8
     properties:
@@ -119,13 +119,16 @@ spring:
       use-key-prefix: true
       key-prefix: "mas::"
 
+internal:
+  api-key: ${INTERNAL_API_KEY:kjJ/7D4TrEUZ9YTx3wm+fRFqvcYEDEqqcTfvS8J7IQ8=}
+
 # BIRMS MOENR Service Configuration (Ministry of Energy and Natural Resources)
 birms:
   login:
     url: https://birmsstagging.drc.gov.bt/api-services/core-module/api/v1/auth/external-users/logMeIn
   moenr:
-    username: moenr
-    password: Admin@123
+    username: ${BIRMS_MOENR_USERNAME:moenr}
+    password: ${BIRMS_MOENR_PASSWORD:Admin@123}
     login:
       url: https://birmsstagging.drc.gov.bt/api-services/core-module/api/v1/auth/external-users/logMeIn
     payment-advice:
@@ -144,8 +147,8 @@ birms:
 data-hub:
   get-access-token:
     url: https://stg-sso.tech.gov.bt/oauth2/token?grant_type=client_credentials
-    client-id: wz_hmjRfUWx4ZGyUfL1KfQrAReka
-    client-secret: qIAoW01LGvU7XW5tHF_ZuuSNSGUa
+    client-id: ${DATAHUB_CLIENT_ID:wz_hmjRfUWx4ZGyUfL1KfQrAReka}
+    client-secret: ${DATAHUB_CLIENT_SECRET:qIAoW01LGvU7XW5tHF_ZuuSNSGUa}
   citizen-details:
     url: https://staging-datahub-apim.tech.gov.bt/dcrc_allcitizendetailsapi/1.0.0/allcitizendetails
   rbp-scs-details:
@@ -189,13 +192,13 @@ springdoc:
 
 # JWT Configuration (HS512 symmetric key) - must match auth server
 jwt:
-  secret: WFdz6u8hOXJD0ihDuRaZ+2dfkpWiDSlodyi78lBRJKpQwnMTwJCNiVCk2RW7mSzgeJdEHFsowE2CeutQvot9NQ==
+  secret: ${JWT_SECRET:ui+E7GSXc420QM93wD/FuYOZ3UzlDQ314bckuPN1zJQUCN69FpFLc7Ex6XwbY2PXmXM5JNNtYR9mDQoUS0w9KA==}
 
 # Eureka Client — defaults to local; override with -Dspring.profiles.active=prod for Kubernetes
 eureka:
   client:
     service-url:
-      defaultZone: http://admin:admin123@localhost:8081/eureka/
+      defaultZone: http://${EUREKA_USER:admin}:${EUREKA_PASSWORD:admin123}@localhost:8081/eureka/
     register-with-eureka: true
     fetch-registry: true
   instance:
@@ -224,5 +227,5 @@ springdoc:
 eureka:
   client:
     service-url:
-#      defaultZone: http://admin:admin123@172.30.3.10:30088/eureka/
-      defaultZone: http://admin:admin123@mas-eureka-server-service:8081/eureka/
+#      defaultZone: http://${EUREKA_USER:admin}:${EUREKA_PASSWORD:admin123}@172.30.3.10:30088/eureka/
+      defaultZone: http://${EUREKA_USER:admin}:${EUREKA_PASSWORD:admin123}@mas-eureka-server-service:8081/eureka/
