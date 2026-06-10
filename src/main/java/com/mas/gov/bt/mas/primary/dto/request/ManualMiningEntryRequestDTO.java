@@ -102,6 +102,12 @@ public class ManualMiningEntryRequestDTO {
     // -------------------------------------------------------
     // Surface Collection / Stock Lifting — Activity Details
     // -------------------------------------------------------
+    // STOCK LIFTING FIELDS ----------------
+    private String applicationFileId;
+    private String rcReportFileId;
+    private String iomFileId;
+    private String permitFileId;
+    // --------------------------------------
     // comma-separated: Surface collection, Dredging, Stock lifting, Migration works
     private String typeOfActivity;
     // comma-separated: Stones, Sand, Boulder, Minerals
@@ -133,8 +139,6 @@ public class ManualMiningEntryRequestDTO {
     private String undertakingFileId;
     private String bgFileId;
     private String mpcdReportFileId;
-    private String iomFileId;
-    private String rcReportFileId;
     private String miReportFileId;
     private String meReportFileId;
     private String scEcFileId;
