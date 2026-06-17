@@ -4,6 +4,10 @@ app:
   self:
     base-url: http://localhost:8085
 
+# Set to false to bypass payment and let applications flow through directly (dev/testing only)
+payment:
+  enabled: false
+
   notification:
     cleanup:
       enabled: true
@@ -30,6 +34,7 @@ spring:
       preferred-networks:
         - 10.10
         - 172
+        - 192.168
   jackson:
     time-zone: Asia/Thimphu
   data:
@@ -211,7 +216,7 @@ spring:
     activate:
       on-profile: prod
   datasource:
-    url: jdbc:postgresql://postgres:5432/mas_db  # ClusterIP DNS — no NodePort needed inside the cluster
+    url: jdbc:postgresql://172.30.3.10:30432/mas_db?tcpKeepAlive=true&socketTimeout=300
   jpa:
     hibernate:
       ddl-auto: validate
@@ -219,6 +224,11 @@ spring:
       hibernate:
         show_sql: false
         format_sql: false
+app:
+  masters:
+    base-url: http://172.30.3.10:30082
+  self:
+    base-url: http://172.30.3.10:30085
 springdoc:
   swagger-ui:
     enabled: false
@@ -226,6 +236,4 @@ springdoc:
     enabled: false
 eureka:
   client:
-    service-url:
-#      defaultZone: http://${EUREKA_USER:admin}:${EUREKA_PASSWORD:admin123}@172.30.3.10:30088/eureka/
-      defaultZone: http://${EUREKA_USER:admin}:${EUREKA_PASSWORD:admin123}@mas-eureka-server-service:8081/eureka/
+    enabled: false
