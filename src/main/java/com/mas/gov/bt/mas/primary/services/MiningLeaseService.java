@@ -71,6 +71,10 @@ public class MiningLeaseService {
 
     @Value("${app.self.base-url}")
     private String selfBaseUrl;
+
+    @Value("${payment.enabled:true}")
+    private boolean paymentEnabled;
+
     /**
      * Create a new application.
      * If applicationType is "Draft", save as draft. Otherwise, submit immediately.
@@ -222,6 +226,12 @@ public class MiningLeaseService {
                 miningLeaseApplicationRepository.save(application);
 
                 if (feeRequired) {
+                    if (!paymentEnabled) {
+                        onPaymentConfirmed(application.getApplicationNumber());
+                        log.info("Payment bypassed (payment.enabled=false) for application {}", application.getApplicationNumber());
+                        return mapper.toResponse(application);
+                    }
+
                     // Initiate payment — director task is created in onPaymentConfirmed()
                     PaymentInitiationResponse paymentResp = mastersPaymentClient.initiate(
                             buildPaymentRequest(application, paymentMaster.getServiceCode()));
