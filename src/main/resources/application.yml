@@ -1,8 +1,8 @@
 app:
   masters:
-    base-url: http://localhost:8082
+    base-url: http://172.30.3.10:30082
   self:
-    base-url: http://localhost:8085
+    base-url: http://172.30.3.10:30085
 
 # Set to false to bypass payment and let applications flow through directly (dev/testing only)
 payment:
@@ -202,12 +202,7 @@ jwt:
 # Eureka Client — defaults to local; override with -Dspring.profiles.active=prod for Kubernetes
 eureka:
   client:
-    service-url:
-      defaultZone: http://${EUREKA_USER:admin}:${EUREKA_PASSWORD:admin123}@localhost:8081/eureka/
-    register-with-eureka: true
-    fetch-registry: true
-  instance:
-    prefer-ip-address: true
+    enabled: false
 
 ---
 # ── Production profile ── activate with SPRING_PROFILES_ACTIVE=prod in Kubernetes
