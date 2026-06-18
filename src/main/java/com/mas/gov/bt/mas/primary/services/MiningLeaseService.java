@@ -1,6 +1,10 @@
 package com.mas.gov.bt.mas.primary.services;
 
+import com.mas.gov.bt.mas.primary.client.MastersPaymentClient;
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
+import com.mas.gov.bt.mas.primary.dto.payment.PaymentCallbackDTO;
+import com.mas.gov.bt.mas.primary.dto.payment.PaymentInitiationRequest;
+import com.mas.gov.bt.mas.primary.dto.payment.PaymentInitiationResponse;
 import com.mas.gov.bt.mas.primary.dto.request.*;
 import com.mas.gov.bt.mas.primary.dto.response.ApplicationListResponse;
 import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
@@ -17,6 +21,7 @@ import com.mas.gov.bt.mas.primary.utility.SuccessResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -61,6 +66,15 @@ public class MiningLeaseService {
     private final NotificationClient notificationClient;
 
     private final ApplicationRevisionHistoryRepository revisionHistoryRepository;
+
+    private final MastersPaymentClient mastersPaymentClient;
+
+    @Value("${app.self.base-url}")
+    private String selfBaseUrl;
+
+    @Value("${payment.enabled:true}")
+    private boolean paymentEnabled;
+
     /**
      * Create a new application.
      * If applicationType is "Draft", save as draft. Otherwise, submit immediately.
@@ -186,7 +200,6 @@ public class MiningLeaseService {
                         paymentMaster != null &&
                                 Boolean.TRUE.equals(paymentMaster.getIsApplicationFeeEnabled());
 
-                Long directorId;
                 if (feeRequired) {
                     application.setCurrentStatus("PAYMENT PENDING");
                     application.setApplicationFeesAmount(paymentMaster.getApplicationFee());
@@ -207,63 +220,143 @@ public class MiningLeaseService {
                 master.setSubmittedAt(now);
                 applicationMasterRepository.save(master);
 
-                // Resubmission of application to director after application submission from client
-                List<TaskManagement> getAssignedDirector =
-                        taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode
-                                (application.getApplicationNumber(),"GR SUBMITTED", "DIRECTOR", SERVICE_CODE);
-                TaskManagement taskManagement = getAssignedDirector.getFirst();
-                directorId = taskManagement.getAssignedToUserId();
-
-                createTask(master,application,"DIRECTOR",userId,directorId);
-
                 // =====================================================
-                // 7. NOTIFICATIONS
+                // 9. FINAL SAVE
                 // =====================================================
+                miningLeaseApplicationRepository.save(application);
 
-                if (application.getApplicantEmail() != null) {
-                    if (feeRequired) {
+                if (feeRequired) {
+                    if (!paymentEnabled) {
+                        onPaymentConfirmed(application.getApplicationNumber());
+                        log.info("Payment bypassed (payment.enabled=false) for application {}", application.getApplicationNumber());
+                        return mapper.toResponse(application);
+                    }
+
+                    // Initiate payment — director task is created in onPaymentConfirmed()
+                    PaymentInitiationResponse paymentResp = mastersPaymentClient.initiate(
+                            buildPaymentRequest(application, paymentMaster.getServiceCode()));
+
+                    if (application.getApplicantEmail() != null) {
                         notificationClient.sendApplicationFeeRequiredNotification(
                                 application.getApplicantEmail(),
                                 application.getApplicantName(),
                                 application.getApplicationNumber());
-                    } else {
-                        notificationClient.sendApplicationSubmittedNotification(
-                                application.getApplicantEmail(),
-                                application.getApplicantName(),
-                                application.getApplicationNumber());
                     }
+                    if (application.getApplicantUserId() != null) {
+                        notificationClient.sendUserNotification(
+                                "Application pending for payment",
+                                "Your application will be processed after payment.",
+                                application.getApplicantUserId(),
+                                "78");
+                    }
+
+                    MiningLeaseResponse response = mapper.toResponse(application);
+                    response.setRedirectUrl(paymentResp.getRedirectUrl());
+                    log.info("Payment initiated for application {}", application.getApplicationNumber());
+                    return response;
                 }
 
+                // =====================================================
+                // No fee: assign director task immediately
+                // =====================================================
+                List<TaskManagement> getAssignedDirector =
+                        taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+                                application.getApplicationNumber(), "GR SUBMITTED", "DIRECTOR", SERVICE_CODE);
+                TaskManagement grTask = getAssignedDirector.getFirst();
+                Long directorId = grTask.getAssignedToUserId();
+                createTask(master, application, "DIRECTOR", userId, directorId);
+
+                if (application.getApplicantEmail() != null) {
+                    notificationClient.sendApplicationSubmittedNotification(
+                            application.getApplicantEmail(),
+                            application.getApplicantName(),
+                            application.getApplicationNumber());
+                }
                 if (application.getApplicantUserId() != null) {
-                    String title = feeRequired
-                            ? "Application pending for payment"
-                            : "Application submitted successfully";
-
-                    String message = feeRequired
-                            ? "Your application will be processed after payment."
-                            : "Your quarry lease application has been submitted.";
-
                     notificationClient.sendUserNotification(
-                            title,
-                            message,
+                            "Application submitted successfully",
+                            "Your mining lease application has been submitted.",
                             application.getApplicantUserId(),
-                            "78"
-                    );
+                            "78");
                 }
 
-                // =====================================================
-                // 9. FINAL SAVE (ONLY ONCE)
-                // =====================================================
-                miningLeaseApplicationRepository.save(application);
-
-                log.info("Application submitted successfully: {}",
-                        application.getApplicationNumber());
-
+                log.info("Application submitted successfully: {}", application.getApplicationNumber());
                 return mapper.toResponse(application);
             }else {
                 throw new BusinessException("The number of mining lease count has exceeded");
             }
 
+    }
+
+    /**
+     * Called by the payment callback once application fee payment is confirmed as PAID.
+     * Transitions status PAYMENT PENDING → SUBMITTED, creates director task, and notifies.
+     */
+    @Transactional
+    public void onPaymentConfirmed(String applicationNo) {
+        MiningLeaseApplication application = miningLeaseApplicationRepository.findByApplicationNumber(applicationNo)
+                .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Application not found: " + applicationNo));
+
+        application.setCurrentStatus("SUBMITTED");
+        ApplicationMaster master = application.getApplicationMaster();
+        master.setCurrentStatus("SUBMITTED");
+        applicationMasterRepository.save(master);
+        miningLeaseApplicationRepository.save(application);
+
+        List<TaskManagement> grTasks = taskManagementRepository
+                .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+                        applicationNo, "GR SUBMITTED", "DIRECTOR", SERVICE_CODE);
+        if (!grTasks.isEmpty()) {
+            Long directorId = grTasks.getFirst().getAssignedToUserId();
+            createTask(master, application, "DIRECTOR", application.getApplicantUserId(), directorId);
+        }
+
+        if (application.getApplicantEmail() != null) {
+            notificationClient.sendApplicationSubmittedNotification(
+                    application.getApplicantEmail(),
+                    application.getApplicantName(),
+                    applicationNo);
+        }
+        if (application.getApplicantUserId() != null) {
+            notificationClient.sendUserNotification(
+                    "Application submitted successfully",
+                    "Your payment has been confirmed and your mining lease application has been submitted.",
+                    application.getApplicantUserId(),
+                    "78");
+        }
+        log.info("Payment confirmed — application {} transitioned to SUBMITTED", applicationNo);
+    }
+
+    private PaymentInitiationRequest buildPaymentRequest(MiningLeaseApplication application, String serviceCode) {
+        PaymentInitiationRequest.PaymentItemRequest item = new PaymentInitiationRequest.PaymentItemRequest();
+        item.setFeeType("APPLICATION_FEE");
+        item.setServiceCode(serviceCode);
+        item.setDescription("Mining Lease Application Fee");
+        item.setQuantity(1);
+
+        String documentNo = resolveDocumentNo(application);
+
+        PaymentInitiationRequest req = new PaymentInitiationRequest();
+        req.setApplicationId(application.getApplicationNumber());
+        req.setApplicationType("MINING_LEASE");
+        req.setTaxPayerName(application.getApplicantName());
+        req.setTaxPayerDocumentNo(documentNo);
+        req.setTaxPayerNo(documentNo);
+        req.setPlatform("MAS");
+        req.setOnPaidStatus("SUBMITTED");
+        req.setCallbackUrl(selfBaseUrl + "/api/mining-lease/payment-callback");
+        req.setPaymentItems(List.of(item));
+        return req;
+    }
+
+    private String resolveDocumentNo(MiningLeaseApplication application) {
+        String type = application.getApplicantType();
+        if (type == null) return application.getApplicantCid();
+        return switch (type.toUpperCase()) {
+            case "REGISTERED_COMPANY" -> application.getCompanyRegistrationNo();
+            case "BUSINESS_LICENSE"   -> application.getLicenseNo();
+            default                   -> application.getApplicantCid();
+        };
     }
 
     @Transactional
