@@ -79,6 +79,14 @@ public class StockLiftingApplication {
     @Column(name = "permit_file_id")
     private String permitFileId;
 
+    // Newly added as per the client requirement
+    @Column(name = "validity_date")
+    private LocalDateTime validityDate;
+
+    @Column(name = "quantity")
+    private String quantity;
+    // New columns added
+
     // ── Audit ────────────────────────────────────────────────────────────────────
     @Column(updatable = false)
     private Long createdBy;
