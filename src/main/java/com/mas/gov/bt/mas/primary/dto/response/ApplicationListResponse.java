@@ -140,4 +140,6 @@ public class ApplicationListResponse {
     private String expPermitNo;
 
     private Long fileUploadIdKmz;
+
+    private Long regionId;
 }

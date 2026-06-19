@@ -142,11 +142,13 @@ public class MiningLeaseService {
                 // =====================================================
                 mapper.updateEntityFromRequest(request, application);
 
+
                 if (request.getDzongkhag() != null && !request.getDzongkhag().isEmpty()) {
                     DzongkhagLookup dzongkhag = dzongkhagLookupRepository
                             .findById(request.getDzongkhag())
                             .orElseThrow(() -> new RuntimeException("Invalid Dzongkhag ID"));
 
+                    application.setRegionId(dzongkhag.getRegion().getId());
                     application.setDzongkhag(dzongkhag);
                 }
 
