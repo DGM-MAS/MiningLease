@@ -1,9 +1,6 @@
 package com.mas.gov.bt.mas.primary.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
@@ -24,4 +21,8 @@ public class DzongkhagLookup {
 
     @Column(name = "dzongkhag_code", nullable = false, length = 10)
     private String dzongkhagCode;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "region_id")
+    private RegionMaster region;
 }
