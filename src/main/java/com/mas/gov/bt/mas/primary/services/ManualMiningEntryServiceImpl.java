@@ -307,6 +307,10 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         sl.setCompanyName(req.getCompanyName());
         sl.setCompanyType(req.getCompanyType());
 
+        // New Columns added
+        sl.setValidityDate(req.getValidityDate());
+        sl.setQuantity(req.getQuantity());
+
         sl.setStockLiftingPermitNo(generatePermitNumber());
         sl.setApplicationFileId(req.getApplicationFileId());
         sl.setPermitFileId(req.getPermitFileId());

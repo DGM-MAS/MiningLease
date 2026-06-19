@@ -1,10 +1,12 @@
 package com.mas.gov.bt.mas.primary.dto.request;
 
+import jakarta.persistence.Column;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Getter
@@ -107,6 +109,13 @@ public class ManualMiningEntryRequestDTO {
     private String rcReportFileId;
     private String iomFileId;
     private String permitFileId;
+
+    // STOCK LIFTING
+    // Newly added as per the client requirement
+    private LocalDateTime validityDate;
+
+    private String quantity;
+    // New columns added
     // --------------------------------------
     // comma-separated: Surface collection, Dredging, Stock lifting, Migration works
     private String typeOfActivity;
