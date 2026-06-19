@@ -326,4 +326,8 @@ public class MiningLeaseApplication {
 
     @Column(name = "manual_entry_on")
     private LocalDateTime manualEntryOn;
+
+    // Region_id Saved for reporting purpose
+    @Column(name = "region_id")
+    private Long regionId;
 }
