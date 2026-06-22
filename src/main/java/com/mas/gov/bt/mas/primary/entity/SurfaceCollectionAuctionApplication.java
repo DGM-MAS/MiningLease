@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -102,6 +103,8 @@ public class SurfaceCollectionAuctionApplication {
     @Column(name = "md_remarks", columnDefinition = "TEXT")
     private String mdRemarks;
 
+    @Column(name = "approved_date")
+    private LocalDate approvedDate;
     /**
      * Audit Fields
      */

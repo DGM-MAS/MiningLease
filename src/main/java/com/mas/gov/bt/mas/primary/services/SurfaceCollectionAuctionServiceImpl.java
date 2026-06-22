@@ -51,6 +51,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
             SurfaceCollectionAuctionRequestDTO dto,
             Long userId
     ) {
+
         try {
             SurfaceCollectionAuctionApplication entity =
                 SurfaceCollectionAuctionApplication.builder()

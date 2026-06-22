@@ -7,13 +7,13 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "t_surface_collection_permit")
+@Table(name = "t_surface_collection_auction_permit")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class SurfaceCollectionPermit {
+public class SurfaceCollectionAuctionPermit {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
