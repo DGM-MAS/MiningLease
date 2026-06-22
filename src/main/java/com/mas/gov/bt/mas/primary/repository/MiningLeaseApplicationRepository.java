@@ -44,7 +44,7 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     LEFT JOIN mas_db.role_permissions t
         ON t.role_id = ur.role_id
     WHERE ur.role_id = 21
-      AND t.permission_id = 37
+      AND t.permission_id = 78
       AND u.account_status = 'ACTIVE'
     GROUP BY u.id, u.email, u.username
     ORDER BY workload ASC
@@ -130,7 +130,14 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('GR SUBMITTED', 'NOTE SHEET UPLOADED', 'MLA SUBMITTED')
+    AND q.currentStatus IN (
+    'SUBMITTED',
+    'GR SUBMITTED',
+    'NOTE SHEET UPLOADED',
+    'MLA SUBMITTED',
+    'ASSIGNED',
+    'FORWARDED TO DIRECTOR',
+    'DIRECTOR APPROVED FMFS')
 """)
     Page<MiningLeaseApplication> findAssignedToUserDirector(Long userId, Pageable pageable);
 
@@ -140,7 +147,14 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('GR SUBMITTED', 'NOTE SHEET UPLOADED', 'MLA SUBMITTED')
+    AND q.currentStatus IN (
+    'SUBMITTED',
+    'GR SUBMITTED',
+    'NOTE SHEET UPLOADED',
+    'MLA SUBMITTED',
+    'ASSIGNED',
+    'FORWARDED TO DIRECTOR',
+    'DIRECTOR APPROVED FMFS')
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseApplication> findAssignedToUserAndSearchDirector(Long userId, String search, Pageable pageable);
@@ -198,7 +212,16 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('PENDING', 'MPCD ASSIGNED', 'ASSIGNED', 'APPROVED', 'ACCEPTED PFS', 'MINING_CHIEF_REVIEW', 'PA/FC SUBMITTED', 'RESUBMITTED PFS MPCD')
+    AND t.taskStatus IN (
+    'PENDING',
+    'MPCD ASSIGNED',
+    'ASSIGNED',
+    'APPROVED',
+    'ACCEPTED PFS',
+    'MINING_CHIEF_REVIEW',
+    'PA/FC SUBMITTED',
+    'RESUBMITTED PFS MPCD'
+    )
 """)
     Page<MiningLeaseApplication> findAssignedToUserMPCD(
             Long userId,
@@ -239,7 +262,7 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     LEFT JOIN mas_db.role_permissions t
         ON t.role_id = ur.role_id
     WHERE ur.role_id = 30
-      AND t.permission_id = 37
+      AND t.permission_id = 78
       AND u.account_status = 'ACTIVE'
     GROUP BY u.id, u.email, u.username
     ORDER BY workload ASC
@@ -254,7 +277,12 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('FMFS SUBMITTED', 'ACCEPTED DIRECTOR', 'BG SUBMITTED')
+    AND q.currentStatus IN (
+    'FMFS SUBMITTED',
+    'ACCEPTED DIRECTOR',
+    'BG SUBMITTED',
+    'FORWARDED TO DIRECTOR'
+    )
 """)
     Page<MiningLeaseApplication> findAssignedToUserMineEngineer(Long userId, Pageable pageable);
 
@@ -264,7 +292,7 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ("FMFS SUBMITTED", 'ACCEPTED DIRECTOR', 'BG SUBMITTED')
+    AND q.currentStatus IN ("FMFS SUBMITTED", 'ACCEPTED DIRECTOR', 'BG SUBMITTED', 'FORWARDED TO DIRECTOR')
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseApplication> findAssignedToUserIdAndSearchMineEngineer(Long userId, String search, Pageable pageable);
