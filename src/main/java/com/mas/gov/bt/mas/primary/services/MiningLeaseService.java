@@ -93,9 +93,9 @@ public class MiningLeaseService {
         // 0. Checking if the user has not more than two mining lease
         // ============================================================
             String houseHoldNumber = miningLeaseApplicationRepository.findUserHouseHoldNumber(userId);
-            Integer miningLeaseCount = miningLeaseApplicationRepository.findLeaseCountForMining(houseHoldNumber);
+//            Integer miningLeaseCount = miningLeaseApplicationRepository.findLeaseCountForMining(houseHoldNumber);
 
-            if(miningLeaseCount <=1){
+//            if(miningLeaseCount <=1){
                 // =====================================================
                 // 1. FETCH EXISTING APPLICATION OR CREATE NEW
                 // =====================================================
@@ -284,9 +284,9 @@ public class MiningLeaseService {
 
                 log.info("Application submitted successfully: {}", application.getApplicationNumber());
                 return mapper.toResponse(application);
-            }else {
-                throw new BusinessException("The number of mining lease count has exceeded");
-            }
+//            }else {
+//                throw new BusinessException("The number of mining lease count has exceeded");
+//            }
 
     }
 
@@ -648,6 +648,7 @@ public class MiningLeaseService {
                 "APPROVED GR",
                 "NOTE SHEET UPLOADED",
                 "GR SUBMITTED",
+                "BG SUBMITTED",
                 "FMFS SUBMITTED",
                 "MLA SUBMITTED",
                 "APPROVED BY DIRECTOR",
@@ -2275,25 +2276,25 @@ public class MiningLeaseService {
                 miningLeaseApplicationRepository.save(quarryLeaseApplication1);
 
 
-                List<String> status = new ArrayList<>();
-                status.add("SUBMITTED");
-                status.add("PAYMENT PENDING");
-                List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusInAndAssignedToRole(quarryLeaseApplication1.getApplicationNumber(),status,"DIRECTOR");
-                Long directorId = null;
-                if (taskManagement != null) {
-                    TaskManagement taskManagement1 = taskManagement.getFirst();
-                    directorId = taskManagement1.getAssignedToUserId();
-                }
+//                List<String> status = new ArrayList<>();
+//                status.add("SUBMITTED");
+//                status.add("PAYMENT PENDING");
+//                List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusInAndAssignedToRole(quarryLeaseApplication1.getApplicationNumber(),status,"DIRECTOR");
+//                Long directorId = null;
+//                if (taskManagement != null) {
+//                    TaskManagement taskManagement1 = taskManagement.getFirst();
+//                    directorId = taskManagement1.getAssignedToUserId();
+//                }
 
-                createTask(applicationMaster,quarryLeaseApplication1,"DIRECTOR", userId, directorId);
-
-                UserWorkloadProjection assignedDirectorDetails = miningLeaseApplicationRepository.findUserDetails(directorId);
-                if(assignedDirectorDetails.getUserId() != null) {
-                    String title = "Mining lease application has been assigned for MLA review.";
-                    String message = "Mining lease application has been  assigned for MLA review.";
-                    String serviceId = "78";
-                    notificationClient.sendUserNotification(title, message, assignedDirectorDetails.getUserId(), serviceId);
-                }
+//                createTask(applicationMaster,quarryLeaseApplication1,"DIRECTOR", userId, directorId);
+//
+//                UserWorkloadProjection assignedDirectorDetails = miningLeaseApplicationRepository.findUserDetails(directorId);
+//                if(assignedDirectorDetails.getUserId() != null) {
+//                    String title = "Mining lease application has been assigned for MLA review.";
+//                    String message = "Mining lease application has been  assigned for MLA review.";
+//                    String serviceId = "78";
+//                    notificationClient.sendUserNotification(title, message, assignedDirectorDetails.getUserId(), serviceId);
+//                }
 
             }else {
                 throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);

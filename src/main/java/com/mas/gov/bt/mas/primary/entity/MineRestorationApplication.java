@@ -124,6 +124,11 @@ public class MineRestorationApplication {
     @Column(name = "updated_on")
     private LocalDateTime updatedOn;
 
+
+    // Region_id Saved for reporting purpose
+    @Column(name = "region_id")
+    private Long regionId;
+
     @Column(name = "is_active")
     private Boolean isActive = true;
 
