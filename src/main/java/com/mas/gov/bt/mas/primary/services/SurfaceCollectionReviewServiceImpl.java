@@ -15,6 +15,7 @@ import com.mas.gov.bt.mas.primary.repository.*;
 import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -22,9 +23,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +37,8 @@ public class SurfaceCollectionReviewServiceImpl
     private final SurfaceCollectionBankGuaranteeRepository bgRepository;
     private final SurfaceCollectionPermitReviewRepository reviewRepository;
     private final SurfaceCollectionPermitAuctionRepository permitRepository;
+    @Autowired
+    private SurfaceCollectionPermitRepository repository;
     private final SurfaceCollectionAuctionRepository auctionRepository;
     private final ApplicationMasterRepository applicationMasterRepository;
     private final TaskManagementRepository taskManagementRepository;
@@ -189,6 +193,7 @@ public class SurfaceCollectionReviewServiceImpl
 
         SurfaceCollectionAuctionApplication entity = getAuction(reviewId);
 
+        entity.setApprovedDate(LocalDate.now());
         entity.setPermitGenerated(true);
         entity.setAuctionStatus("APPROVED");
 
@@ -204,15 +209,26 @@ public class SurfaceCollectionReviewServiceImpl
 
         bgRepository.save(surfaceCollectionBankGuarantee);
 
-        SurfaceCollectionPermit surfaceCollectionPermit = new SurfaceCollectionPermit();
-        surfaceCollectionPermit.setIssuedBy(mdUserId);
-        surfaceCollectionPermit.setIssuedOn(LocalDateTime.now());
-        surfaceCollectionPermit.setAuctionApplication(entity);
-        surfaceCollectionPermit.setValidFrom(LocalDate.now());
-        surfaceCollectionPermit.setPermitNo(generatePermitNo());
-        surfaceCollectionPermit.setValidTo(LocalDate.now().plusDays(DEFAULT_TAT_DAYS));
-        surfaceCollectionPermit.setPermitStatus("APPROVED");
-        permitRepository.save(surfaceCollectionPermit);
+        SurfaceCollectionAuctionPermit surfaceCollectionAuctionPermit = new SurfaceCollectionAuctionPermit();
+        surfaceCollectionAuctionPermit.setIssuedBy(mdUserId);
+        surfaceCollectionAuctionPermit.setIssuedOn(LocalDateTime.now());
+        surfaceCollectionAuctionPermit.setAuctionApplication(entity);
+        surfaceCollectionAuctionPermit.setValidFrom(LocalDate.now());
+        surfaceCollectionAuctionPermit.setPermitNo(generatePermitNo());
+        surfaceCollectionAuctionPermit.setValidTo(LocalDate.now().plusDays(DEFAULT_TAT_DAYS));
+        surfaceCollectionAuctionPermit.setPermitStatus("APPROVED");
+        permitRepository.save(surfaceCollectionAuctionPermit);
+
+
+        // Surface Collection Permit is stored here
+        SurfaceCollectionPermitEntity surfaceCollectionPermitEntity = new SurfaceCollectionPermitEntity();
+        surfaceCollectionPermitEntity.setApprovedOn(LocalDate.now());
+        surfaceCollectionPermitEntity.setOrigin("AUCTION");
+        surfaceCollectionPermitEntity.setPermitNo(surfaceCollectionAuctionPermit.getPermitNo());;
+        surfaceCollectionPermitEntity.setApplicationNo(entity.getApplicationNo());
+
+        repository.save(surfaceCollectionPermitEntity);
+
 
         return mapToResponse(entity);
     }
@@ -303,7 +319,15 @@ public class SurfaceCollectionReviewServiceImpl
     }
 
     private String generatePermitNo() {
-        return "SCP-" + UUID.randomUUID().toString().substring(0, 8);
+        String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        return "SCP-" + date + String.format("%05d", monthlySequence());
+    }
+
+    private long monthlySequence() {
+        YearMonth currentMonth = YearMonth.now();
+        LocalDateTime monthStart = currentMonth.atDay(1).atStartOfDay();
+        LocalDateTime monthEnd = currentMonth.atEndOfMonth().atTime(23, 59, 59);
+        return repository.countByMonth(monthStart, monthEnd) + 1;
     }
 
     private ReviewResponseDTO map(SurfaceCollectionPermitReview review) {
@@ -314,7 +338,7 @@ public class SurfaceCollectionReviewServiceImpl
                 .build();
     }
 
-    private PermitResponseDTO mapPermit(SurfaceCollectionPermit permit) {
+    private PermitResponseDTO mapPermit(SurfaceCollectionAuctionPermit permit) {
         return PermitResponseDTO.builder()
                 .permitId(permit.getId())
                 .permitNo(permit.getPermitNo())

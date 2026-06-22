@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -195,6 +196,16 @@ public class SurfaceCollectionPermitEntity {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
+    // Region_id Saved for reporting purpose
+    @Column(name = "region_id")
+    private Long regionId;
+
+    @Column(name = "approved_On")
+    private LocalDate approvedOn;
+
+    @Column(name = "origin")
+    private String origin;
+
     @Column(name = "is_manual_entry")
     private String isManualEntry;
 
@@ -203,6 +214,7 @@ public class SurfaceCollectionPermitEntity {
 
     @Column(name = "manual_entry_on")
     private LocalDateTime manualEntryOn;
+
 
     @PrePersist
     public void onCreate() {
