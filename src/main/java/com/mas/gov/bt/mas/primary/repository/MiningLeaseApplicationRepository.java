@@ -281,7 +281,11 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     'FMFS SUBMITTED',
     'ACCEPTED DIRECTOR',
     'BG SUBMITTED',
-    'FORWARDED TO DIRECTOR'
+    'FORWARDED TO DIRECTOR',
+    'DIRECTOR APPROVED FMFS',
+    'LLC UPLOADED',
+    'NOTE SHEET UPLOADED',
+    'RESUBMITTED FMFS'
     )
 """)
     Page<MiningLeaseApplication> findAssignedToUserMineEngineer(Long userId, Pageable pageable);
@@ -292,7 +296,7 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND q.currentStatus IN ("FMFS SUBMITTED", 'ACCEPTED DIRECTOR', 'BG SUBMITTED', 'FORWARDED TO DIRECTOR')
+    AND q.currentStatus IN ('FMFS SUBMITTED', 'ACCEPTED DIRECTOR', 'BG SUBMITTED', 'FORWARDED TO DIRECTOR', 'DIRECTOR APPROVED FMFS', 'LLC UPLOADED', 'NOTE SHEET UPLOADED', 'RESUBMITTED FMFS')
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseApplication> findAssignedToUserIdAndSearchMineEngineer(Long userId, String search, Pageable pageable);
