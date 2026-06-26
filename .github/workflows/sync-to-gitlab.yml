@@ -30,9 +30,9 @@ jobs:
       # Step 4: Fetch GitLab branches (optional but safer)
       - name: Fetch GitLab
         run: |
-          git fetch gitlab
+          git fetch gitlab || true
 
       # Step 5: Push to GitLab QA branch
       - name: Push to GitLab QA
         run: |
-          git push gitlab HEAD:QA --force-with-lease
+          git push gitlab HEAD:QA --force
