@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Date;
 
 /**
  * Response DTO for Quarry Lease Application details.
@@ -34,6 +35,11 @@ public class MiningLeaseResponse {
     private String companyName;
     private String DepositAssessmentReportId;
 
+    //Newly added Name of Mine
+    private String nameOfMine;
+    private String ecFileId;
+    private String ecNumber;
+    private Date ecExpiryDate;
     // Mining Details
     private String typeOfMines;
     private String typeOfMineralsProducts;
