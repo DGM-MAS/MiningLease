@@ -709,9 +709,8 @@ public class MiningLeaseService {
         Page<MiningLeaseApplication> applications;
 
         if (search == null || search.isBlank()) {
-            applications = miningLeaseApplicationRepository.findByApplicantUserIdAndStatusIn(
+            applications = miningLeaseApplicationRepository.findArchivedAssignedToUserMPCD(
                     userId,
-                    archivedStatuses,
                     pageable);
         }
         else {
@@ -1025,7 +1024,19 @@ public class MiningLeaseService {
             if (miningLeaseApplication1.isPresent()) {
                 miningLeaseApplication = miningLeaseApplication1.get();
                 ApplicationMaster applicationMaster = miningLeaseApplication.getApplicationMaster();
+
                 miningLeaseApplication.setFmfsDocId(request.getFmfsDocId());
+
+                // New Requirement from client side
+                if(request.getEcFileId() != null && request.getEcNumber() != null && request.getEcExpiryDate() != null) {
+                    miningLeaseApplication.setEcFileId(request.getEcFileId());
+                    miningLeaseApplication.setEcNumber(request.getEcNumber());
+                    miningLeaseApplication.setEcExpiryDate(request.getEcExpiryDate());
+                    miningLeaseApplication.setECStatus("ACTIVE");
+                }else{
+                    log.info("EC file is not present");
+                }
+
                 miningLeaseApplication.setCurrentStatus("FMFS SUBMITTED");
                 applicationMaster.setCurrentStatus("FMFS SUBMITTED");
                 applicationMasterRepository.save(applicationMaster);
@@ -2041,6 +2052,8 @@ public class MiningLeaseService {
                     app.setApprovedLeasePeriod(request.getApprovedLeasePeriod());
                     app.setApprovedMineral(request.getApprovedMineral());
                     app.setMeReviewedAt(LocalDateTime.now());
+                    // Newly added after review
+                    app.setNameOfMine(request.getNameOfMine());
 
                     if (master != null) {
                         master.setCurrentStatus("MINING_CHIEF_REVIEW");

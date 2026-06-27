@@ -26,6 +26,9 @@ public class MiningLeaseApplication {
     @Column(name = "permit_number")
     private String expPermitNo;
 
+    @Column(name = "name_of_mine")
+    private String nameOfMine;
+
     @Column(name = "application_number", unique = true, nullable = false, length = 30)
     private String applicationNumber;
 
@@ -176,7 +179,7 @@ public class MiningLeaseApplication {
     private String eCStatus;
 
     @Column(name = "ec_expiry_date", length = 30)
-    private Date eCExpiryDate;
+    private Date ecExpiryDate;
 
     @Column(name = "approved_area", length = 100)
     private String approvedArea;
@@ -330,4 +333,17 @@ public class MiningLeaseApplication {
     // Region_id Saved for reporting purpose
     @Column(name = "region_id")
     private Long regionId;
+
+    // Added after Review
+    // New Requirement For EC
+    // SUBMITTED BY Promoter
+
+    @Column(name = "ec_file_id")
+    private String ecFileId;
+
+    @Column(name = "ec_number")
+    private String ecNumber;
+
+
+
 }
