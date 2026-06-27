@@ -1,0 +1,38 @@
+name: Sync to GitLab
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  sync-to-gitlab:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Step 2: Configure Git (important for push)
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+
+      # Step 3: Add GitLab remote, I was trying in env
+      - name: Add GitLab remote
+        run: |
+          git remote add gitlab https://oauth2:${{ secrets.MAS }}@code.neyduetewa.gov.bt/govtech/fy25_26/mas-mines-administration-system/mininglease.git
+          git remote -v
+
+      # Step 4: Fetch GitLab branches (optional but safer)
+      - name: Fetch GitLab
+        run: |
+          git fetch gitlab
+
+      # Step 5: Push to GitLab QA branch
+      - name: Push to GitLab QA
+        run: |
+          git push gitlab HEAD:QA --force-with-lease

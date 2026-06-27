@@ -14,4 +14,5 @@ public class ReviewMiningLeaseApplicationME {
     private String approvedErb;
     private String approvedLeasePeriod;
     private String approvedMineral;
+    private String nameOfMine;
 }

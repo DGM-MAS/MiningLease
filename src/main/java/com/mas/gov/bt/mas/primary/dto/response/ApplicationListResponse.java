@@ -34,6 +34,12 @@ public class ApplicationListResponse {
     private String businessLicenseNo;
     private String companyName;
 
+    //Newly added Name of Mine
+    private String nameOfMine;
+    private String ecFileId;
+    private String ecNumber;
+    private Date ecExpiryDate;
+
     // Mining Details
     private String typeOfMines;
     private String typeOfMineralsProducts;
