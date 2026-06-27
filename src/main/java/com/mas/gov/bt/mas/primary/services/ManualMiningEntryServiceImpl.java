@@ -108,7 +108,7 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         ml.setFmfsStatus(req.getFmfsStatus());
         ml.setFmfsId(req.getFmfsId());
         ml.setECStatus(req.getEcStatus());
-        ml.setECExpiryDate(toDate(req.getEcExpiryDate()));
+        ml.setEcExpiryDate(toDate(req.getEcExpiryDate()));
         ml.setMlaStatus(req.getMlaStatus());
         ml.setGeologicalReportStatus(req.getGeologicalReportStatus());
         ml.setPfsDocId(req.getPfsDocId());
@@ -430,7 +430,7 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
                 .fmfsStatus(ml.getFmfsStatus())
                 .fmfsId(ml.getFmfsId())
                 .ecStatus(ml.getECStatus())
-                .ecExpiryDate(toLocalDate(ml.getECExpiryDate()))
+                .ecExpiryDate(toLocalDate(ml.getEcExpiryDate()))
                 .mlaStatus(ml.getMlaStatus())
                 .geologicalReportStatus(ml.getGeologicalReportStatus())
                 .pfsDocId(ml.getPfsDocId())

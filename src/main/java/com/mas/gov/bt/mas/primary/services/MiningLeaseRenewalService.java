@@ -355,7 +355,7 @@ public class MiningLeaseRenewalService {
 
                         MiningLeaseApplication application = miningLeaseApplication.get();
                         String ecStatus = application.getECStatus();
-                        Date ecExpiryDate = application.getECExpiryDate();
+                        Date ecExpiryDate = application.getEcExpiryDate();
 
                         if (ecStatus != null && (ecStatus.equalsIgnoreCase("VALID") || ecStatus.equalsIgnoreCase("Active")) && ecExpiryDate != null) {
 
