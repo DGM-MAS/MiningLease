@@ -13,6 +13,8 @@ public class ImmediateSuspensionApplicationResponse {
 
     private Long id;
 
+    private String nameOfMine;
+
     private String applicationNumber;
 
     private Long promoterUserId;
