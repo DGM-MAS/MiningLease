@@ -41,4 +41,7 @@ public class SurfaceCollectionBidWinner {
     @OneToOne
     @JoinColumn(name = "auction_id")
     private SurfaceCollectionAuctionApplication auctionApplication;
+
+    @Column(name = "bid_amount")
+    private String bidAmount;
 }
