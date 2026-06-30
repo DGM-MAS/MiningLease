@@ -15,4 +15,5 @@ public class BidWinnerResponseDTO {
     private String emailAddress;
     private String agencyName;
     private String cidNumber;
+    private String bidAmount;
 }
