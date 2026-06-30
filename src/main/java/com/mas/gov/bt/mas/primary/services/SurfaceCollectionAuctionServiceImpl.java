@@ -270,6 +270,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                         .promoterId(dto.getPromoterId())
                         .agencyName(dto.getAgencyName())
                         .cidNumber(dto.getCidNumber())
+                        .bidAmount(dto.getBidAmount())
                         .auctionApplication(entity)
                         .build();
 
@@ -398,6 +399,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                 .emailAddress(bidWinner.getEmailAddress())
                 .contactNumber(bidWinner.getContactNumber())
                 .cidNumber(bidWinner.getCidNumber())
+                .bidAmount(bidWinner.getBidAmount())
                 .build();
     }
 

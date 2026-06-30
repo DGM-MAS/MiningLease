@@ -21,6 +21,9 @@ public class SurfaceCollectionPermitEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "name_of_surface_collection")
+    private String nameOfSurfaceCollection;
+
     private String applicationNo;
     private String permitNo;
     private String ecNo;

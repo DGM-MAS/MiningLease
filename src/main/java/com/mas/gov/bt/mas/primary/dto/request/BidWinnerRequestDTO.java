@@ -14,4 +14,5 @@ public class BidWinnerRequestDTO {
     private String agencyName;
     private String cidNumber;
     private Long promoterId;
+    private String bidAmount;
 }
