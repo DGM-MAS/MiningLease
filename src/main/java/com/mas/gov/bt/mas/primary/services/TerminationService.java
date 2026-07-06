@@ -276,7 +276,7 @@ public class TerminationService {
                         miningLeaseApplicationEntity = miningLeaseApplication.get();
                     }
                     assert miningLeaseApplicationEntity != null;
-                    miningLeaseApplicationEntity.setCurrentStatus("TERMINATION APPROVED");
+                    miningLeaseApplicationEntity.setCurrentStatus("TERMINATED");
                     miningLeaseApplicationRepository.save(miningLeaseApplicationEntity);
                 }
                 case "Rectification" -> {
