@@ -632,6 +632,7 @@ public class SampleTransportClearanceServiceImpl
         master.setServiceCode(SERVICE_CODE);
         master.setApplicantUserId(userId);
         master.setCurrentStatus(sampleTransportClearanceEntity.getStatus());
+        master.setSubmittedOn(LocalDateTime.now());
         return applicationMasterRepository.save(master);
     }
 
