@@ -1,5 +1,6 @@
 package com.mas.gov.bt.mas.primary.config;
 
+import com.mas.gov.bt.mas.primary.utility.CustomRuntimeException;
 import com.mas.gov.bt.mas.primary.utility.ApiErrorResponse;
 import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
 import jakarta.servlet.http.HttpServletRequest;
@@ -98,6 +99,14 @@ public class GlobalExceptionHandler {
         log.warn("BusinessException [{}] at {}: {}", ex.getErrorCode(), request.getRequestURI(), ex.getDetails());
         return build(HttpStatus.BAD_REQUEST, ex.getErrorCode(),
                 ex.getDetails() != null ? ex.getDetails() : "Request could not be processed.");
+    }
+
+    @ExceptionHandler(CustomRuntimeException.class)
+    public ResponseEntity<ApiErrorResponse> handleCustomRuntimeException(
+            CustomRuntimeException ex, HttpServletRequest request) {
+        log.warn("CustomRuntimeException at {}: {}", request.getRequestURI(), ex.getMessage());
+        return build(HttpStatus.BAD_REQUEST, ErrorCodes.BAD_REQUEST,
+                ex.getMessage() != null ? ex.getMessage() : "The request could not be completed.");
     }
 
     @ExceptionHandler(RuntimeException.class)

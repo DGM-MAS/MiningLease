@@ -1,5 +1,7 @@
 package com.mas.gov.bt.mas.primary.services;
 
+import com.mas.gov.bt.mas.primary.utility.CustomRuntimeException;
+
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
 import com.mas.gov.bt.mas.primary.dto.request.*;
 import com.mas.gov.bt.mas.primary.dto.response.TemporaryClosureNotificationResponse;
@@ -101,7 +103,7 @@ public class TemporaryClosureService {
             String serviceId = "108";
             notificationClient.sendUserNotification(title, message, assignedRC.getUserId(), serviceId);
         }else {
-            throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+            throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
 
         return TemporaryClosureMapper.toResponse(temporaryClosureEntity);
@@ -445,7 +447,7 @@ public class TemporaryClosureService {
         List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(),"SUBMITTED","RC", SERVICE_CODE);
 
         if (task == null) {
-            throw new RuntimeException("No tasks found");
+            throw new CustomRuntimeException("No tasks found");
         }
 
         for (TaskManagement taskManagement : task) {
@@ -472,7 +474,7 @@ public class TemporaryClosureService {
             String serviceId = "108";
             notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId);
         }else {
-            throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+            throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
 
         log.info("RC task {} reassigned to user {}", firstTask.getId(), request.getNewAssigneeUserId());
@@ -484,7 +486,7 @@ public class TemporaryClosureService {
         TemporaryClosureEntity application = temporaryClosureRepository.findByApplicationId(applicationNo);
 
         if(application == null) {
-            throw new RuntimeException(ErrorCodes.RECORD_NOT_FOUND);
+            throw new CustomRuntimeException(ErrorCodes.RECORD_NOT_FOUND);
         }
 
         return TemporaryClosureMapper.toResponse(application);
@@ -507,7 +509,7 @@ public class TemporaryClosureService {
         List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(),"MI ASSIGNED","MI", SERVICE_CODE);
 
         if (task == null) {
-            throw new RuntimeException("No tasks found");
+            throw new CustomRuntimeException("No tasks found");
         }
 
         for (TaskManagement taskManagement : task) {
@@ -534,7 +536,7 @@ public class TemporaryClosureService {
             String serviceId = "108";
             notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId);
         }else {
-            throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+            throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
 
         log.info("MI task {} reassigned to user {}", firstTask.getId(), request.getNewAssigneeUserId());

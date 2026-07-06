@@ -64,6 +64,23 @@ public class MiningEngineerController {
         );
     }
 
+    // ** Team-wide queue: every pending application regardless of assignee ** //
+    @GetMapping("/team-queue")
+    public ResponseEntity<SuccessResponse<List<MiningLeaseResponse>>> teamQueue(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection) {
+
+        Pageable pageable = PageRequest1Based.of(page, size,
+                Sort.Direction.fromString(sortDirection), sortBy);
+
+        return ResponseEntity.ok(
+                miningLeaseService.getMineEngineerTeamQueue(pageable, search)
+        );
+    }
+
     // Used by user to submit LLC
     @PostMapping("/applicationLLC")
     @Operation(summary = "Submit LLC file ", description = "Submit LLC file for quarry lease application")
