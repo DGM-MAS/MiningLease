@@ -636,13 +636,17 @@ public class MiningLeaseService {
     @Transactional(readOnly = true)
     public Page<ApplicationListResponse> getMyApplications(Long userId, Pageable pageable, String search) {
         List<String> ApplicationStatus = List.of(
+                "SUBMITTED",
+                "DRAFT",
+                "ASSIGNED",
+                "MPCD ASSIGNED",
+                "GEOLOGIST_REVIEW",
+
+
                 "GR SUBMITTED",
                 "LLC UPLOADED",
-                "SUBMITTED",
-                "ASSIGNED",
-                "DRAFT",
+
                 "PAYMENT PENDING",
-                "GEOLOGIST_REVIEW",
                 "ACCEPTED PFS",
                 "ADDITIONAL DATA NEEDED",
                 "MA SUBMITTED",
@@ -658,7 +662,6 @@ public class MiningLeaseService {
                 "RESUBMIT GR",
                 "RESUBMITTED GR",
                 "RESUBMIT FMFS",
-                "MPCD ASSIGNED",
                 "RESUBMITTED FMFS",
                 "RESUBMIT APPLICATION",
                 "RESUBMIT PFS GEOLOGIST",
