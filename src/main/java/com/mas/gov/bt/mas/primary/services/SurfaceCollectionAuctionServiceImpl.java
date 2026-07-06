@@ -165,6 +165,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
         master.setServiceCode(SERVICE_CODE);
         master.setApplicantUserId(userId);
         master.setCurrentStatus("GR SUBMITTED");
+        master.setSubmittedOn(LocalDateTime.now());
         return applicationMasterRepository.save(master);
     }
 
