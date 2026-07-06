@@ -1,5 +1,7 @@
 package com.mas.gov.bt.mas.primary.services;
 
+import com.mas.gov.bt.mas.primary.utility.CustomRuntimeException;
+
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
 import com.mas.gov.bt.mas.primary.dto.request.ReassignTaskRequest;
 import com.mas.gov.bt.mas.primary.dto.request.ReviewTerminationApplicationCMSHead;
@@ -12,6 +14,7 @@ import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.mapper.TerminationMapper;
 import com.mas.gov.bt.mas.primary.repository.ApplicationMasterRepository;
 import com.mas.gov.bt.mas.primary.repository.MiningLeaseApplicationRepository;
+import com.mas.gov.bt.mas.primary.repository.QuarryLeaseApplicationRepository;
 import com.mas.gov.bt.mas.primary.repository.TaskManagementRepository;
 import com.mas.gov.bt.mas.primary.repository.TerminationApplicationRepository;
 import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
@@ -48,6 +51,8 @@ public class TerminationService {
 
     private final MiningLeaseApplicationRepository miningLeaseApplicationRepository;
 
+    private final QuarryLeaseApplicationRepository quarryLeaseApplicationRepository;
+
     @Transactional
     public List<TerminationApplicationResponse> submitTerminationApplication(
             @Valid TerminationApplicationRequest request, Long userId) {
@@ -61,20 +66,7 @@ public class TerminationService {
 
         for (String appNo : request.getApplicationNumber()) {
 
-            Optional<MiningLeaseApplication> miningLeaseApplication =
-                    miningLeaseApplicationRepository.findByApplicationNumber(appNo);
-
-            if (miningLeaseApplication.isEmpty()) {
-                throw new RuntimeException("Invalid application number: " + appNo);
-            }
-
-            MiningLeaseApplication miningLeaseApplication1 = miningLeaseApplication.get();
-            if(miningLeaseApplication1.getCurrentStatus().equalsIgnoreCase("MINING LEASE APPROVED")){
-                miningLeaseApplication1.setCurrentStatus("Under-Review-Termination");
-                miningLeaseApplicationRepository.save(miningLeaseApplication1);
-            }else {
-                throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
-            }
+            LeaseApplicationRef leaseRef = resolveAndMarkUnderReview(appNo);
 
             TerminationApplicationEntity entity = new TerminationApplicationEntity();
 
@@ -92,11 +84,11 @@ public class TerminationService {
                entity.setTerminationEndDate(request.getTerminationEndDate());
             }
             entity.setTerminationEndDate(request.getTerminationEndDate());
-            entity.setApplicantName(miningLeaseApplication1.getApplicantName());
-            entity.setApplicantEmail(miningLeaseApplication1.getApplicantEmail());
+            entity.setApplicantName(leaseRef.applicantName());
+            entity.setApplicantEmail(leaseRef.applicantEmail());
 
             // Application master
-            ApplicationMaster master = miningLeaseApplication1.getApplicationMaster();
+            ApplicationMaster master = leaseRef.applicationMaster();
             master.setSubmittedAt(LocalDateTime.now());
             master.setCurrentStatus("SUBMITTED");
             master.setApplicantUserId(userId);
@@ -135,6 +127,69 @@ public class TerminationService {
         }
 
         return responseList;
+    }
+
+    /** Common fields the rest of submitTerminationApplication needs, regardless of lease type. */
+    private record LeaseApplicationRef(String applicantName, String applicantEmail, ApplicationMaster applicationMaster) {}
+
+    /**
+     * Looks up the application across every lease type that can be terminated (Mining Lease,
+     * Quarry Lease), validates it's currently in the approved state, and flips it to
+     * Under-Review-Termination. Surface Collection and Stock Lifting are not supported here yet —
+     * they don't share this status/ApplicationMaster shape with Mining/Quarry Lease.
+     */
+    @Transactional
+    private LeaseApplicationRef resolveAndMarkUnderReview(String appNo) {
+        Optional<MiningLeaseApplication> miningLeaseApplication =
+                miningLeaseApplicationRepository.findByApplicationNumber(appNo);
+
+        if (miningLeaseApplication.isPresent()) {
+            MiningLeaseApplication application = miningLeaseApplication.get();
+            if (!"MINING LEASE APPROVED".equalsIgnoreCase(application.getCurrentStatus())) {
+                throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
+            }
+            application.setCurrentStatus("Under-Review-Termination");
+            miningLeaseApplicationRepository.save(application);
+            return new LeaseApplicationRef(
+                    application.getApplicantName(), application.getApplicantEmail(), application.getApplicationMaster());
+        }
+
+        Optional<QuarryLeaseApplication> quarryLeaseApplication =
+                quarryLeaseApplicationRepository.findByApplicationNumber(appNo);
+
+        if (quarryLeaseApplication.isPresent()) {
+            QuarryLeaseApplication application = quarryLeaseApplication.get();
+            if (!"QUARRY LEASE APPROVED".equalsIgnoreCase(application.getCurrentStatus())) {
+                throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
+            }
+            application.setCurrentStatus("Under-Review-Termination");
+            quarryLeaseApplicationRepository.save(application);
+            return new LeaseApplicationRef(
+                    application.getApplicantName(), application.getApplicantEmail(), application.getApplicationMaster());
+        }
+
+        throw new CustomRuntimeException("Invalid application number: " + appNo);
+    }
+
+    /**
+     * Updates the underlying lease application's status once a termination is decided, trying
+     * Mining Lease first and falling back to Quarry Lease, mirroring resolveAndMarkUnderReview.
+     */
+    private void updateLeaseApplicationStatus(String appNo, String miningStatus, String quarryStatus) {
+        Optional<MiningLeaseApplication> miningLeaseApplication =
+                miningLeaseApplicationRepository.findByApplicationNumber(appNo);
+
+        if (miningLeaseApplication.isPresent()) {
+            MiningLeaseApplication application = miningLeaseApplication.get();
+            application.setCurrentStatus(miningStatus);
+            miningLeaseApplicationRepository.save(application);
+            return;
+        }
+
+        QuarryLeaseApplication application = quarryLeaseApplicationRepository.findByApplicationNumber(appNo)
+                .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
+        application.setCurrentStatus(quarryStatus);
+        quarryLeaseApplicationRepository.save(application);
     }
 
     @Transactional(readOnly = true)
@@ -229,7 +284,7 @@ public class TerminationService {
             String serviceId = "112";
             notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId);
         }else {
-            throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+            throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
 
 
@@ -270,14 +325,7 @@ public class TerminationService {
                     assert master != null;
                     createTask( master, app, "DIRECTOR CMS APPROVED", userId, app.getCreatedBy());
 
-                    Optional<MiningLeaseApplication> miningLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(app.getApplicationNumber());
-                    MiningLeaseApplication miningLeaseApplicationEntity = null;
-                    if (miningLeaseApplication.isPresent()) {
-                        miningLeaseApplicationEntity = miningLeaseApplication.get();
-                    }
-                    assert miningLeaseApplicationEntity != null;
-                    miningLeaseApplicationEntity.setCurrentStatus("TERMINATION APPROVED");
-                    miningLeaseApplicationRepository.save(miningLeaseApplicationEntity);
+                    updateLeaseApplicationStatus(app.getApplicationNumber(), "TERMINATION APPROVED", "TERMINATION APPROVED");
                 }
                 case "Rectification" -> {
                     LocalDateTime now = LocalDateTime.now();
@@ -329,15 +377,8 @@ public class TerminationService {
                     }
                     assert master != null;
                     createTask( master, app, "TERMINATION CANCELED", userId, app.getCreatedBy());
-                    Optional<MiningLeaseApplication> miningLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(app.getApplicationNumber());
 
-                    MiningLeaseApplication miningLeaseApplicationEntity = null;
-                    if (miningLeaseApplication.isPresent()) {
-                        miningLeaseApplicationEntity = miningLeaseApplication.get();
-                    }
-                    assert miningLeaseApplicationEntity != null;
-                    miningLeaseApplicationEntity.setCurrentStatus("MINING LEASE APPROVED");
-                    miningLeaseApplicationRepository.save(miningLeaseApplicationEntity);
+                    updateLeaseApplicationStatus(app.getApplicationNumber(), "MINING LEASE APPROVED", "QUARRY LEASE APPROVED");
                 }
                 default -> throw new IllegalArgumentException("Application status not recognized");
             }

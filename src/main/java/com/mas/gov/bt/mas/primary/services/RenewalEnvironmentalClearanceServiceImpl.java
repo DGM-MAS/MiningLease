@@ -1,5 +1,7 @@
 package com.mas.gov.bt.mas.primary.services;
 
+import com.mas.gov.bt.mas.primary.utility.CustomRuntimeException;
+
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
 import com.mas.gov.bt.mas.primary.dto.request.*;
 import com.mas.gov.bt.mas.primary.dto.response.EnvironmentClearanceRenewalResponseDTO;
@@ -358,13 +360,13 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
     ) {
 
         if (entity.getAssignedMPCDId() == null) {
-            throw new RuntimeException(
+            throw new CustomRuntimeException(
                     "Application is not assigned"
             );
         }
 
         if (!entity.getAssignedMPCDId().equals(userId)) {
-            throw new RuntimeException(
+            throw new CustomRuntimeException(
                     "You are not assigned to this application"
             );
         }
@@ -463,7 +465,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             String serviceId = "78";
             notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId);
         }else {
-            throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+            throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
 
         log.info("MPCD task {} reassigned to user {}", firstTask.getId(), request.getNewAssigneeUserId());
@@ -523,7 +525,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         boolean isAssignedMD   = userId.equals(entity.getAssignedMDId());
 
         if (!isCreator && !isAssignedMPCD && !isAssignedRC && !isAssignedMI && !isAssignedMD) {
-            throw new RuntimeException("You are not authorized to access this application");
+            throw new CustomRuntimeException("You are not authorized to access this application");
         }
 
         return environmentClearanceRenewalMapper
@@ -859,7 +861,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                                 new RuntimeException("Application not found"));
 
         if (!entity.getAssignedRCId().equals(userId)) {
-            throw new RuntimeException("You are not assigned");
+            throw new CustomRuntimeException("You are not assigned");
         }
 
         entity.setRcSiteReportFileId(
@@ -898,7 +900,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                                 new RuntimeException("Application not found"));
 
         if (!entity.getAssignedRCId().equals(userId)) {
-            throw new RuntimeException("You are not assigned as RC");
+            throw new CustomRuntimeException("You are not assigned as RC");
         }
 
         entity.setAssignedMIId(request.getMiUserId());
@@ -982,7 +984,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                                 ));
 
         if (!entity.getAssignedMIId().equals(userId)) {
-            throw new RuntimeException(
+            throw new CustomRuntimeException(
                     "You are not assigned as MI"
             );
         }
@@ -1062,7 +1064,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                         .orElseThrow(() -> new RuntimeException("Application not found"));
 
         if (!userId.equals(entity.getAssignedMDId())) {
-            throw new RuntimeException("You are not assigned as MD");
+            throw new CustomRuntimeException("You are not assigned as MD");
         }
 
         entity.setEcCertificateFileId(request.getEcCertificateFileId());
@@ -1103,7 +1105,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
     ) {
 
         if (!entity.getCreatedBy().equals(userId)) {
-            throw new RuntimeException(
+            throw new CustomRuntimeException(
                     "You are not authorized to access this application"
             );
         }
@@ -1114,7 +1116,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
     ) {
 
         if (!"DRAFT".equals(entity.getStatus())) {
-            throw new RuntimeException(
+            throw new CustomRuntimeException(
                     "Only draft application can be modified"
             );
         }
@@ -1126,7 +1128,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
 
         if (!"RESUBMISSION_REQUIRED".equals(
                 entity.getStatus())) {
-            throw new RuntimeException(
+            throw new CustomRuntimeException(
                     "Application is not in resubmission state"
             );
         }

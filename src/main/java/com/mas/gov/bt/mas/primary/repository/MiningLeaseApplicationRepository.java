@@ -60,7 +60,7 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
 """)
     Page<MiningLeaseApplication> findApplicationsAssignedToUser(Long currentUserId, Pageable pageable);
 
-    @Query("SELECT a FROM MiningLeaseApplication a WHERE a.currentStatus IN :applicationStatus ")
+    @Query("SELECT a FROM MiningLeaseApplication a WHERE a.applicantUserId = :userId AND a.currentStatus IN :applicationStatus ")
     Page<MiningLeaseApplication> findByApplicantUserIdAndStatusIn(Long userId, List<String> applicationStatus, Pageable pageable);
 
     @Query("SELECT a FROM MiningLeaseApplication a WHERE a.applicantUserId = :userId ")
@@ -320,6 +320,46 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseApplication> findAssignedToUserIdAndSearchMineEngineer(Long userId, String search, Pageable pageable);
+
+    // Team-wide queue — every pending application regardless of who it auto-assigned to
+    @Query("""
+    SELECT q
+    FROM MiningLeaseApplication q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE t.taskStatus IN (
+    'FMFS SUBMITTED',
+    'ACCEPTED DIRECTOR',
+    'BG SUBMITTED',
+    'FORWARDED TO DIRECTOR',
+    'DIRECTOR APPROVED FMFS',
+    'LLC UPLOADED',
+    'NOTE SHEET UPLOADED',
+    'RESUBMITTED FMFS',
+    'MINING_CHIEF_REVIEW'
+    )
+""")
+    Page<MiningLeaseApplication> findTeamQueueMineEngineer(Pageable pageable);
+
+    @Query("""
+    SELECT q
+    FROM MiningLeaseApplication q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE t.taskStatus IN (
+    'FMFS SUBMITTED',
+    'ACCEPTED DIRECTOR',
+    'BG SUBMITTED',
+    'FORWARDED TO DIRECTOR',
+    'DIRECTOR APPROVED FMFS',
+    'LLC UPLOADED',
+    'NOTE SHEET UPLOADED',
+    'RESUBMITTED FMFS',
+    'MINING_CHIEF_REVIEW'
+    )
+    AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
+""")
+    Page<MiningLeaseApplication> findTeamQueueWithSearchMineEngineer(String search, Pageable pageable);
 
     // All renewal applications (admin view)
     @Query("""
