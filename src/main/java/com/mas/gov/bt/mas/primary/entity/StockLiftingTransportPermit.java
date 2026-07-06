@@ -129,7 +129,9 @@ public class StockLiftingTransportPermit {
     @Column(name = "applicant_type", length = 50)
     private String applicantType;
 
-    @Column(name = "applicant_cid", length = 11)
+    // Not always a citizen ID — license/company registrants have no CID and
+    // are identified here by license/company registration number instead.
+    @Column(name = "applicant_cid", length = 50)
     private String applicantCid;
 
     @Column(name = "applicant_name", length = 255)
