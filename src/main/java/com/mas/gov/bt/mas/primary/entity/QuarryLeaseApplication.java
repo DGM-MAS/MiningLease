@@ -323,4 +323,7 @@ public class QuarryLeaseApplication {
 
     @Column(name = "manual_entry_on")
     private LocalDateTime manualEntryOn;
+
+    @Column(name = "name_of_quarry")
+    private String nameOfQuarry;
 }
