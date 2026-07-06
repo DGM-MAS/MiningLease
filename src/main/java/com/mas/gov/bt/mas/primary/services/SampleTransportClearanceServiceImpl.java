@@ -1,5 +1,7 @@
 package com.mas.gov.bt.mas.primary.services;
 
+import com.mas.gov.bt.mas.primary.utility.CustomRuntimeException;
+
 
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
 import com.mas.gov.bt.mas.primary.dto.request.*;
@@ -60,7 +62,7 @@ public class SampleTransportClearanceServiceImpl
             assignedChief = assignChief();
 
             if (assignedChief.getUserId() == null) {
-                throw new RuntimeException("No available chief for assignment");
+                throw new CustomRuntimeException("No available chief for assignment");
             }
 
             entity.setAssignedGSDChiefId(assignedChief.getUserId());
@@ -362,7 +364,7 @@ public class SampleTransportClearanceServiceImpl
             String serviceId = "78";
             notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId);
         }else {
-            throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+            throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
 
         log.info("Task reassigned by chief to user {}", request.getNewAssigneeUserId());

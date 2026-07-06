@@ -1,5 +1,7 @@
 package com.mas.gov.bt.mas.primary.services;
 
+import com.mas.gov.bt.mas.primary.utility.CustomRuntimeException;
+
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
 import com.mas.gov.bt.mas.primary.dto.request.*;
 import com.mas.gov.bt.mas.primary.dto.response.ImmediateSuspensionApplicationResponse;
@@ -517,7 +519,7 @@ public class ImmediateSuspensionService {
                                 miningLeaseApplicationRepository.findByApplicationNumber(app.getApplicationNumber());
 
                         if (miningLeaseApplication.isEmpty()) {
-                            throw new RuntimeException("Invalid application number: " + app.getApplicationNumber());
+                            throw new CustomRuntimeException("Invalid application number: " + app.getApplicationNumber());
                         }
 
                         MiningLeaseApplication miningLeaseApplication1 = miningLeaseApplication.get();
@@ -529,7 +531,7 @@ public class ImmediateSuspensionService {
                                 quarryLeaseApplicationRepository.findByApplicationNumber(app.getApplicationNumber());
 
                         if (application.isEmpty()) {
-                            throw new RuntimeException("Invalid application number: " + app.getApplicationNumber());
+                            throw new CustomRuntimeException("Invalid application number: " + app.getApplicationNumber());
                         }
 
                         QuarryLeaseApplication quarryLeaseApplication = application.get();
