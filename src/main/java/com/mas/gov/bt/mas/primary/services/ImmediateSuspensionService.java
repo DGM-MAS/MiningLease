@@ -94,7 +94,8 @@ public class ImmediateSuspensionService {
                         miningLeaseApplication.getApplicantName(),
                         miningLeaseApplication.getApplicantCid(),
                         miningLeaseApplication.getApplicantEmail(),
-                        miningLeaseApplication.getApplicationNumber());
+                        miningLeaseApplication.getApplicationNumber(),
+                        miningLeaseApplication.getNameOfMine());
 
         ApplicationMaster master = updateApplicationMaster(miningLeaseApplication.getApplicationMaster(), userId);
 
@@ -134,7 +135,8 @@ public class ImmediateSuspensionService {
                         quarryLeaseApplication.getApplicantName(),
                         quarryLeaseApplication.getApplicantCid(),
                         quarryLeaseApplication.getApplicantEmail(),
-                        quarryLeaseApplication.getApplicationNumber());
+                        quarryLeaseApplication.getApplicationNumber(),
+                        quarryLeaseApplication.getNameOfQuarry());
 
         ApplicationMaster master = updateApplicationMaster(quarryLeaseApplication.getApplicationMaster(), userId);
 
@@ -174,7 +176,8 @@ public class ImmediateSuspensionService {
                         surfaceCollectionPermitEntity.getApplicantName(),
                         surfaceCollectionPermitEntity.getApplicantCid(),
                         surfaceCollectionPermitEntity.getEmail(),
-                        surfaceCollectionPermitEntity.getApplicationNo());
+                        surfaceCollectionPermitEntity.getApplicationNo(),
+                        surfaceCollectionPermitEntity.getNameOfSurfaceCollection());
 
         Optional<ApplicationMaster> applicationMaster = applicationMasterRepository.findByApplicationNumberAndServiceCode(request.getApplicationNumber(), "SURFACE_COLLECTION_PERMIT");
 
@@ -210,11 +213,13 @@ public class ImmediateSuspensionService {
             String applicantName,
             String cid,
             String email,
-            String applicationNumber) {
+            String applicationNumber,
+            String nameOfMine) {
 
         ImmediateSuspensionApplication suspension = new ImmediateSuspensionApplication();
 
         suspension.setApplicationNumber(applicationNumber);
+        suspension.setNameOfMine(nameOfMine);
         suspension.setApplicationFrom(request.getApplicationFrom());
         suspension.setPromoterUserId(promoterId);
         suspension.setApplicantName(applicantName);
