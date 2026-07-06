@@ -1,5 +1,7 @@
 package com.mas.gov.bt.mas.primary.services;
 
+import com.mas.gov.bt.mas.primary.utility.CustomRuntimeException;
+
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
 import com.mas.gov.bt.mas.primary.dto.request.*;
 import com.mas.gov.bt.mas.primary.dto.response.ApplicationListResponse;
@@ -398,10 +400,10 @@ public class MiningLeaseRenewalService {
                                 assert master != null;
                                 createTask( master, app, "DIRECTOR APPROVED FMFS", userId, mineEngineerId);
                             } else {
-                                throw new RuntimeException("EC has expired.");
+                                throw new CustomRuntimeException("EC has expired.");
                             }
                         } else {
-                            throw new RuntimeException("EC Status is not valid.");
+                            throw new CustomRuntimeException("EC Status is not valid.");
                         }
                     }
                 }
@@ -603,7 +605,7 @@ public class MiningLeaseRenewalService {
                             String serviceId = "78";
                             notificationClient.sendUserNotification(title, message, assignedMiningChief.getUserId(), serviceId);
                         }else {
-                            throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+                            throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
                         }
                     }
                 }
@@ -842,7 +844,7 @@ public class MiningLeaseRenewalService {
                         String serviceId = "78";
                         notificationClient.sendUserNotification(title, message, miningLeaseRenewalApplication.getCreatedBy(), serviceId);
                     }else {
-                        throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+                        throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
                     }
                 }
                 case "ACCEPTED FMFS" -> {
@@ -1731,7 +1733,7 @@ public class MiningLeaseRenewalService {
         List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleInAndServiceCode(request.getApplicationNumber(),"ASSIGNED",assignedRoles, SERVICE_CODE );
 
         if (task.isEmpty()) {
-            throw new RuntimeException("No tasks found");
+            throw new CustomRuntimeException("No tasks found");
         }
 
         for (TaskManagement taskManagement : task) {
@@ -1759,7 +1761,7 @@ public class MiningLeaseRenewalService {
             String serviceId = "85";
             notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId);
         }else {
-            throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+            throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
 
 
@@ -1773,7 +1775,7 @@ public class MiningLeaseRenewalService {
         List<TaskManagement> tasks = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(),"ASSIGNED","MINE ENGINEER", SERVICE_CODE);
 
         if (tasks.isEmpty()) {
-            throw new RuntimeException("No tasks found");
+            throw new CustomRuntimeException("No tasks found");
         }
 
         for (TaskManagement taskManagement : tasks) {
@@ -1801,7 +1803,7 @@ public class MiningLeaseRenewalService {
             String serviceId = "85";
             notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId);
         }else {
-            throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+            throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
 
         log.info("Mining engineer task {} reassigned to user {}", request.getApplicationNumber(), request.getNewAssigneeUserId());
@@ -1816,7 +1818,7 @@ public class MiningLeaseRenewalService {
         List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(),"MINING_CHIEF_REVIEW","MINING_CHIEF_REVIEW", SERVICE_CODE);
 
         if (task.isEmpty()) {
-            throw new RuntimeException("No tasks found");
+            throw new CustomRuntimeException("No tasks found");
         }
 
         for (TaskManagement taskManagement : task) {
@@ -1845,7 +1847,7 @@ public class MiningLeaseRenewalService {
             String serviceId = "85";
             notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId);
         }else {
-            throw new RuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+            throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
 
         log.info("Task {} reassigned to user {}", firstTask.getId(), request.getNewAssigneeUserId());

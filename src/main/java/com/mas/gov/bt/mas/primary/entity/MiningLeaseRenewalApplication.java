@@ -34,7 +34,9 @@ public class MiningLeaseRenewalApplication {
     @Column(name = "applicant_email", length = 255)
     private String applicantEmail;
 
-    @Column(name = "applicant_cid", length = 11)
+    // Not always a citizen ID — license/company registrants have no CID and
+    // are identified here by license/company registration number instead.
+    @Column(name = "applicant_cid", length = 50)
     private String applicantCid;
 
     @Column(name = "applicant_type", length = 50)

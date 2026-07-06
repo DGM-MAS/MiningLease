@@ -164,4 +164,7 @@ public class MiningLeaseResponse {
     private Long fileUploadIdKmz;
 
     private String redirectUrl;
+
+    private Long assignedEngineerUserId;
+    private String assignedEngineerName;
 }

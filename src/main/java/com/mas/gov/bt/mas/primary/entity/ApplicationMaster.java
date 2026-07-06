@@ -39,7 +39,12 @@ public class ApplicationMaster {
     private Long serviceApplicationId;
 
     // Applicant Info
-    @Column(name = "applicant_user_id")
+    // Canonical column is applicant_id — mas-backend-masters, Quarrying-Lease, and the
+    // citizen tracking dashboard all read/write it. This entity used to point at a
+    // separate applicant_user_id column that nothing else read, so every application
+    // submitted through this service was invisible to citizen tracking. Java field name
+    // kept as applicantUserId to avoid touching the many call sites across this service.
+    @Column(name = "applicant_id")
     private Long applicantUserId;
 
     // Status & Workflow
@@ -62,10 +67,28 @@ public class ApplicationMaster {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    // mas-backend-masters' citizen tracking dashboard splits In Process vs Archived on
+    // completed_on IS NULL, not completed_at. This service only ever set completedAt, so
+    // approved/completed applications here stayed stuck as "in process" forever on the
+    // dashboard. Kept as a separate field (not a column retarget like applicant_id) since
+    // submittedOn/completedOn need to coexist with submittedAt/completedAt going forward.
+    @Column(name = "completed_on")
+    private LocalDateTime completedOn;
+
     private String remarks;
 
     private String rejectionRemarks;
 
     @Column(name = "expiry_date")
     private LocalDateTime expiryDate;
+
+    /** Keeps the _at/_on timestamp pairs in sync regardless of which one this service's code sets. */
+    @PrePersist
+    @PreUpdate
+    private void syncTimestampColumnPairs() {
+        if (submittedOn == null && submittedAt != null) submittedOn = submittedAt;
+        if (submittedAt == null && submittedOn != null) submittedAt = submittedOn;
+        if (completedOn == null && completedAt != null) completedOn = completedAt;
+        if (completedAt == null && completedOn != null) completedAt = completedOn;
+    }
 }
