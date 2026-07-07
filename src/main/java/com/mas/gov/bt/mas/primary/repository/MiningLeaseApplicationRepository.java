@@ -75,7 +75,7 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('MINING LEASE APPROVED','REJECTED')
+    AND t.taskStatus IN ('MINING LEASE APPROVED','REJECTED','TERMINATION APPROVED')
 """)
     Page<MiningLeaseApplication> findArchivedAssignedToUserMPCD(Long userId, Pageable pageable);
 
@@ -85,7 +85,7 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('MINING LEASE APPROVED', 'REJECTED')
+    AND t.taskStatus IN ('MINING LEASE APPROVED', 'REJECTED', 'TERMINATION APPROVED')
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseApplication> findArchivedAssignedToUserAndSearchMPCD(Long userId, String search, Pageable pageable);
@@ -131,11 +131,15 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
     AND q.currentStatus IN (
-    'SUBMITTED',
     'GR SUBMITTED',
-    'NOTE SHEET UPLOADED',
-    'MLA SUBMITTED',
+    'SUBMITTED',
     'ASSIGNED',
+    "ACCEPTED PFS MPCD",
+    "ACCEPTED PFS",
+    "APPROVED",
+    'NOTE SHEET UPLOADED',
+    'MPCD ASSIGNED',
+    'MLA SUBMITTED',
     'FORWARDED TO DIRECTOR',
     'DIRECTOR APPROVED FMFS')
 """)
@@ -149,10 +153,11 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     WHERE t.assignedToUserId = :userId
     AND q.currentStatus IN (
     'SUBMITTED',
+    'ASSIGNED',
     'GR SUBMITTED',
+    'MPCD ASSIGNED',
     'NOTE SHEET UPLOADED',
     'MLA SUBMITTED',
-    'ASSIGNED',
     'FORWARDED TO DIRECTOR',
     'DIRECTOR APPROVED FMFS')
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
@@ -191,7 +196,48 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('ASSIGNED','GEOLOGIST_REVIEW', 'RESUBMIT PFS GEOLOGIST', 'ACCEPTED PFS', 'FMFS SUBMITTED', 'GR SUBMITTED', 'ACCEPTED PFS MPCD', 'RESUBMITTED PFS GEOLOGIST')
+    AND q.currentStatus IN (
+    'ASSIGNED',
+    'GEOLOGIST_REVIEW',
+    "ACCEPTED PFS MPCD",
+    "ACCEPTED PFS",
+    "APPROVED",
+    "RESUBMIT APPLICATION",
+    'APPROVED BY DIRECTOR',
+    'NOTE SHEET UPLOADED',
+    'MA SUBMITTED',
+    'MLA SUBMITTED',
+    'ACCEPTED PFS',
+    'APPROVED PA/FC',
+    'RESUBMIT PA/FC',
+    'RESUBMITTED PFS',
+    'RESUBMIT PFS GEOLOGIST',
+    'FMFS SUBMITTED',
+    'RESUBMIT FMFS',
+    'RESUBMITTED FMFS',
+    'GR SUBMITTED',
+    'RESUBMITTED PFS GEOLOGIST',
+    "MA SUBMITTED",
+    "PA/FC SUBMITTED",
+    "APPROVED GR",
+    "NOTE SHEET UPLOADED",
+    "GR SUBMITTED",
+    "BG SUBMITTED",
+    "FMFS SUBMITTED",
+    "MLA SUBMITTED",
+    "APPROVED BY DIRECTOR",
+    "RESUBMITTED PFS",
+    "RESUBMIT GR",
+    "RESUBMITTED GR",
+    "RESUBMIT FMFS",
+    "MPCD ASSIGNED",
+    "RESUBMITTED FMFS",
+    "RESUBMIT APPLICATION",
+    "RESUBMIT PFS GEOLOGIST",
+    "RESUBMIT PFS MPCD",
+    "RESUBMIT PA/FC",
+    "APPROVED PA/FC"
+    )
 """)
     Page<MiningLeaseApplication> findAssignedToUserGeologist(Long userId, Pageable pageable);
 
@@ -201,7 +247,48 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('ASSIGNED','GEOLOGIST_REVIEW', 'ACCEPTED PFS', 'RESUBMIT PFS GEOLOGIST', 'FMFS SUBMITTED', 'GR SUBMITTED', 'RESUBMITTED PFS GEOLOGIST')
+    AND q.currentStatus IN (
+    'ASSIGNED',
+    'GEOLOGIST_REVIEW',
+    "ACCEPTED PFS MPCD",
+    "ACCEPTED PFS",
+    "APPROVED",
+    "RESUBMIT APPLICATION",
+    'APPROVED BY DIRECTOR',
+    'NOTE SHEET UPLOADED',
+    'MA SUBMITTED',
+    'MLA SUBMITTED',
+    'ACCEPTED PFS',
+    'APPROVED PA/FC',
+    'RESUBMIT PA/FC',
+    'RESUBMITTED PFS',
+    'RESUBMIT PFS GEOLOGIST',
+    'FMFS SUBMITTED',
+    'RESUBMIT FMFS',
+    'RESUBMITTED FMFS',
+    'GR SUBMITTED',
+    'RESUBMITTED PFS GEOLOGIST',
+    "MA SUBMITTED",
+    "PA/FC SUBMITTED",
+    "APPROVED GR",
+    "NOTE SHEET UPLOADED",
+    "GR SUBMITTED",
+    "BG SUBMITTED",
+    "FMFS SUBMITTED",
+    "MLA SUBMITTED",
+    "APPROVED BY DIRECTOR",
+    "RESUBMITTED PFS",
+    "RESUBMIT GR",
+    "RESUBMITTED GR",
+    "RESUBMIT FMFS",
+    "MPCD ASSIGNED",
+    "RESUBMITTED FMFS",
+    "RESUBMIT APPLICATION",
+    "RESUBMIT PFS GEOLOGIST",
+    "RESUBMIT PFS MPCD",
+    "RESUBMIT PA/FC",
+    "APPROVED PA/FC"
+    )
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseApplication> findAssignedToUserAndSearchGeologist(Long userId, String search, Pageable pageable);
@@ -212,15 +299,39 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN (
-    'PENDING',
-    'MPCD ASSIGNED',
+    AND q.currentStatus IN (
     'ASSIGNED',
+    'MPCD ASSIGNED',
+    'GEOLOGIST_REVIEW',
+    'RESUBMIT APPLICATION',
+    'PENDING',
+    'MA SUBMITTED',
     'APPROVED',
     'ACCEPTED PFS',
+    'APPROVED PA/FC',
     'MINING_CHIEF_REVIEW',
     'PA/FC SUBMITTED',
-    'RESUBMITTED PFS MPCD'
+    'RESUBMITTED PFS MPCD',
+    "MA SUBMITTED",
+    "PA/FC SUBMITTED",
+    "APPROVED GR",
+    "NOTE SHEET UPLOADED",
+    "GR SUBMITTED",
+    "BG SUBMITTED",
+    "FMFS SUBMITTED",
+    "MLA SUBMITTED",
+    "APPROVED BY DIRECTOR",
+    "RESUBMITTED PFS",
+    "RESUBMIT GR",
+    "RESUBMITTED GR",
+    "RESUBMIT FMFS",
+    "MPCD ASSIGNED",
+    "RESUBMITTED FMFS",
+    "RESUBMIT APPLICATION",
+    "RESUBMIT PFS GEOLOGIST",
+    "RESUBMIT PFS MPCD",
+    "RESUBMIT PA/FC",
+    "APPROVED PA/FC"
     )
 """)
     Page<MiningLeaseApplication> findAssignedToUserMPCD(
@@ -234,14 +345,18 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN (
+    AND q.currentStatus IN (
     'PENDING',
     'MPCD ASSIGNED',
+    'GEOLOGIST_REVIEW',
+    'MA SUBMITTED',
     'ASSIGNED',
     'APPROVED',
     'ACCEPTED PFS',
+    'APPROVED PA/FC',
     'MINING_CHIEF_REVIEW',
     'PA/FC SUBMITTED',
+    'RESUBMIT APPLICATION',
     'RESUBMITTED PFS MPCD'
     )
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
@@ -286,7 +401,7 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN (
+    AND q.currentStatus IN (
     'FMFS SUBMITTED',
     'ACCEPTED DIRECTOR',
     'BG SUBMITTED',
@@ -306,7 +421,7 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN (
+    AND q.currentStatus IN (
     'FMFS SUBMITTED',
     'MINING_CHIEF_REVIEW',
     'ACCEPTED DIRECTOR',

@@ -3,6 +3,8 @@ package com.mas.gov.bt.mas.primary.dto.request;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDate;
+
 @Getter
 @Setter
 public class ReviewMiningLeaseApplicationME {
@@ -15,4 +17,6 @@ public class ReviewMiningLeaseApplicationME {
     private String approvedLeasePeriod;
     private String approvedMineral;
     private String nameOfMine;
+    private LocalDate leaseStartDate;
+    private LocalDate leaseEndDate;
 }
