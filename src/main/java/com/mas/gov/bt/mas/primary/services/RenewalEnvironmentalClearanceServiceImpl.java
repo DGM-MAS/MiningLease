@@ -139,6 +139,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         master.setServiceCode(SERVICE_CODE);
         master.setApplicantUserId(userId);
         master.setCurrentStatus(status);
+        master.setSubmittedOn(LocalDateTime.now());
         return applicationMasterRepository.save(master);
     }
 
@@ -765,6 +766,9 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
 
         entity.getApplicationMaster()
                 .setCurrentStatus("REJECTED");
+        // Terminal state — mark completion so the citizen tracking dashboard archives it
+        entity.getApplicationMaster()
+                .setCompletedOn(LocalDateTime.now());
 
         EnvironmentClearanceRenewal saved =
                 renewalEnvironmentalClearanceRepository
@@ -1082,6 +1086,9 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             entity.setStatus("FORWARDED_TO_DECC");
         } else {
             entity.setStatus("EC_RENEWED");
+            // Terminal state — mark completion so the citizen tracking dashboard archives it
+            entity.getApplicationMaster()
+                    .setCompletedOn(LocalDateTime.now());
         }
 
         entity.getApplicationMaster()

@@ -407,6 +407,7 @@ public class MiningLeaseService {
             master.setServiceCode(SERVICE_CODE);
             master.setApplicantUserId(userId);
             master.setCurrentStatus("GR SUBMITTED");
+            master.setSubmittedOn(LocalDateTime.now());
 
             ApplicationMaster savedMaster = applicationMasterRepository.save(master);
             log.debug("Application Master created with ID: {}", savedMaster.getId());
