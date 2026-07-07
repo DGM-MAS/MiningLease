@@ -102,6 +102,13 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         }else {
             UserWorkloadProjection assignedMPCD = assignMPCD();
 
+            log.info(
+                    "Assigned MPCD: id={}, username={}, email={}",
+                    assignedMPCD.getUserId(),
+                    assignedMPCD.getUsername(),
+                    assignedMPCD.getEmail()
+            );
+
             if(assignedMPCD != null) {
                 createTask(master, entity, "MPCD", userId, assignedMPCD.getUserId());
                 entity.setAssignedMPCDId(assignedMPCD.getUserId());
