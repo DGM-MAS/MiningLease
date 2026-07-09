@@ -9,6 +9,8 @@ import lombok.*;
 @Builder
 public class SampleTransportClearanceDTO {
 
+    private String siteName;
+    private String siteApplicationNo;
     private String applicantName;
     private String contactNo;
     private String emailAddress;
