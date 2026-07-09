@@ -263,6 +263,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
 
         SurfaceCollectionAuctionApplication entity = getAuction(auctionId);
 
+
         SurfaceCollectionBidWinner winner =
                 SurfaceCollectionBidWinner.builder()
                         .bidWinnerName(dto.getBidWinnerName())
@@ -279,6 +280,8 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
         entity.setAuctionCompleted(true);
         entity.setAuctionStatus("AUCTION_COMPLETED");
 
+        // MPCD will set Site name while adding bid winner
+        entity.setSiteName(dto.getSiteName());
         auctionRepository.save(entity);
 
         UserWorkloadProjection assignedUser = auctionRepository.findUserDetailsByEmail(dto.getEmailAddress());
@@ -522,6 +525,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
 
         return SurfaceCollectionAuctionListResponseDTO.builder()
                 .id(entity.getId())
+                .siteName(entity.getSiteName())
                 .applicationNo(entity.getApplicationNo())
                 .location(entity.getLocation())
                 .area(entity.getArea())

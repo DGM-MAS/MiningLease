@@ -1,5 +1,6 @@
 package com.mas.gov.bt.mas.primary.dto.response;
 
+import jakarta.persistence.Column;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -14,6 +15,8 @@ import java.util.List;
 public class SurfaceCollectionAuctionResponseDTO {
 
     private Long id;
+
+    private String siteName;
     private String applicationNo;
     private String location;
     private BigDecimal area;
