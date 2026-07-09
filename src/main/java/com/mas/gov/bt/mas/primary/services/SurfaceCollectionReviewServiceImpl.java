@@ -223,6 +223,7 @@ public class SurfaceCollectionReviewServiceImpl
         // Surface Collection Permit is stored here
         SurfaceCollectionPermitEntity surfaceCollectionPermitEntity = new SurfaceCollectionPermitEntity();
         surfaceCollectionPermitEntity.setApprovedOn(LocalDate.now());
+        surfaceCollectionPermitEntity.setNameOfSurfaceCollection(entity.getSiteName());
         surfaceCollectionPermitEntity.setOrigin("AUCTION");
         surfaceCollectionPermitEntity.setPermitNo(surfaceCollectionAuctionPermit.getPermitNo());;
         surfaceCollectionPermitEntity.setApplicationNo(entity.getApplicationNo());

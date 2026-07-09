@@ -2092,7 +2092,6 @@ public class MiningLeaseService {
 
                     fmfsDetails.setLeaseEndDate(request.getLeaseEndDate());
                     fmfsDetails.setLeaseStartDate(request.getLeaseStartDate());
-                    fmfsDetails.setLeasePeriodYears(Integer.valueOf(request.getApprovedLeasePeriod()));
 
                     fmfsDetails.setLicenseNo(app.getLicenseNo());
                     fmfsDetails.setNearestVillage(app.getNearestVillage().getVillageName());
