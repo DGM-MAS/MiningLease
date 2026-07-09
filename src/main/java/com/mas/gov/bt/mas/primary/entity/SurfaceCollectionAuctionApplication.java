@@ -21,6 +21,9 @@ public class SurfaceCollectionAuctionApplication {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "site_name")
+    private String siteName;
+
     /**
      * Auction Application Details
      */

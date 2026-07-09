@@ -1,5 +1,6 @@
 package com.mas.gov.bt.mas.primary.dto.response;
 
+import jakarta.persistence.Column;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -12,6 +13,10 @@ import java.time.LocalDateTime;
 public class SampleTransportClearanceResponseDTO {
 
     private Long id;
+    private String siteName;
+
+    private String siteApplicationNo;
+
     private String applicationNo;
     private String applicantName;
     private String contactNo;

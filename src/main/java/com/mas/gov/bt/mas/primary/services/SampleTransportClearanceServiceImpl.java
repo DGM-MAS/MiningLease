@@ -49,6 +49,11 @@ public class SampleTransportClearanceServiceImpl
             SampleTransportClearanceEntity entity =
                     sampleTransportClearanceMapper.toEntity(request);
 
+
+            // Site Details
+            entity.setSiteApplicationNo(request.getSiteApplicationNo());
+            entity.setSiteName(request.getSiteName());
+
             entity.setApplicationNo(generateApplicationNumber());
             entity.setCreatedOn(LocalDateTime.now());
             entity.setCreatedBy(userId);
