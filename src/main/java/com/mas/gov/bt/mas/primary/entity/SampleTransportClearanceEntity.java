@@ -18,6 +18,12 @@ public class SampleTransportClearanceEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "site_name")
+    private String siteName;
+
+    @Column(name = "site_application_no")
+    private String siteApplicationNo;
+
     @Column(name = "application_no", unique = true, nullable = false, length = 100)
     private String applicationNo;
 
