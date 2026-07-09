@@ -71,6 +71,8 @@ public class MiningLeaseService {
 
     private final MastersPaymentClient mastersPaymentClient;
 
+    private final SiteProvisioningService siteProvisioningService;
+
     private final FMFSDetailsRepository fmfsDetailsRepository;
 
     @Value("${app.self.base-url}")
@@ -2402,6 +2404,8 @@ public class MiningLeaseService {
                 quarryLeaseApplication1.setCurrentStatus("MINING LEASE APPROVED");
                 applicationMasterRepository.save(applicationMaster);
                 miningLeaseApplicationRepository.save(quarryLeaseApplication1);
+
+                siteProvisioningService.provisionSiteForApprovedLease(quarryLeaseApplication1);
 
                 if(quarryLeaseApplication1.getApplicantUserId() != null) {
                     String title = "Work order has been uploaded by mine engineer.";
