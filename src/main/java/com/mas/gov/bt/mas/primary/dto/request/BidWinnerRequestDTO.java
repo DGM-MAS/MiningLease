@@ -8,6 +8,7 @@ import lombok.*;
 @AllArgsConstructor
 public class BidWinnerRequestDTO {
 
+    private String siteName;
     private String bidWinnerName;
     private String contactNumber;
     private String emailAddress;
