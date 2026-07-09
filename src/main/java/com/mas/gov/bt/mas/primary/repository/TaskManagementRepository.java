@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface TaskManagementRepository extends JpaRepository<TaskManagement, Long> {
@@ -50,4 +51,7 @@ public interface TaskManagementRepository extends JpaRepository<TaskManagement, 
     TaskManagement findByAssignedToRoleAndTaskStatusAndServiceCode(String cmsHead, String submitted, String serviceCode);
 
     TaskManagement findByApplicationNumberAndAssignedToRoleAndTaskStatusAndServiceCode(String applicationNumber, String cmsHead, String submitted, String serviceCode);
+
+    /** Most-recent task for an application, regardless of status — used by WorkflowTrackingService. */
+    Optional<TaskManagement> findTopByApplicationNumberAndServiceCodeOrderByAssignedAtDesc(String applicationNumber, String serviceCode);
 }
