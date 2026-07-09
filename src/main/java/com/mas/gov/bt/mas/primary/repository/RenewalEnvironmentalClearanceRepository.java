@@ -53,7 +53,7 @@ public interface RenewalEnvironmentalClearanceRepository extends JpaRepository<E
     SELECT
         u.id AS userId,
         u.email AS email,
-        u.username AS userName,
+        u.username AS username,
         COUNT(ecr.id) AS workload
     FROM mas_db.users u
     JOIN mas_db.user_roles ur
