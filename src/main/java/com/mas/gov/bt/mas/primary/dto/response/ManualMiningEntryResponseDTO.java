@@ -128,6 +128,8 @@ public class ManualMiningEntryResponseDTO {
     private String meReportFileId;
     private String scEcFileId;
 
+    private Long regionId;
+
     // General
     private String details;
     private Long promoterId;

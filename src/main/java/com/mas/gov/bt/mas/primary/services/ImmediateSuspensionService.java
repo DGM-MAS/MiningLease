@@ -95,7 +95,8 @@ public class ImmediateSuspensionService {
                         miningLeaseApplication.getApplicantCid(),
                         miningLeaseApplication.getApplicantEmail(),
                         miningLeaseApplication.getApplicationNumber(),
-                        miningLeaseApplication.getNameOfMine());
+                        miningLeaseApplication.getNameOfMine(),
+                        miningLeaseApplication.getRegionId());
 
         ApplicationMaster master = updateApplicationMaster(miningLeaseApplication.getApplicationMaster(), userId);
 
@@ -136,7 +137,8 @@ public class ImmediateSuspensionService {
                         quarryLeaseApplication.getApplicantCid(),
                         quarryLeaseApplication.getApplicantEmail(),
                         quarryLeaseApplication.getApplicationNumber(),
-                        quarryLeaseApplication.getNameOfQuarry());
+                        quarryLeaseApplication.getNameOfQuarry(),
+                        quarryLeaseApplication.getRegionId());
 
         ApplicationMaster master = updateApplicationMaster(quarryLeaseApplication.getApplicationMaster(), userId);
 
@@ -177,7 +179,8 @@ public class ImmediateSuspensionService {
                         surfaceCollectionPermitEntity.getApplicantCid(),
                         surfaceCollectionPermitEntity.getEmail(),
                         surfaceCollectionPermitEntity.getApplicationNo(),
-                        surfaceCollectionPermitEntity.getNameOfSurfaceCollection());
+                        surfaceCollectionPermitEntity.getNameOfSurfaceCollection(),
+                        surfaceCollectionPermitEntity.getRegionId());
 
         Optional<ApplicationMaster> applicationMaster = applicationMasterRepository.findByApplicationNumberAndServiceCode(request.getApplicationNumber(), "SURFACE_COLLECTION_PERMIT");
 
@@ -214,7 +217,8 @@ public class ImmediateSuspensionService {
             String cid,
             String email,
             String applicationNumber,
-            String nameOfMine) {
+            String nameOfMine,
+            Long regionId) {
 
         ImmediateSuspensionApplication suspension = new ImmediateSuspensionApplication();
 
@@ -229,6 +233,7 @@ public class ImmediateSuspensionService {
         suspension.setCreatedBy(userId);
         suspension.setCreatedAt(LocalDateTime.now());
         suspension.setCurrentStatus("SUBMITTED");
+        suspension.setRegionId(regionId);
 
         ImmediateSuspensionReasonMaster reason =
                 immediateSuspensionReasonRepository
