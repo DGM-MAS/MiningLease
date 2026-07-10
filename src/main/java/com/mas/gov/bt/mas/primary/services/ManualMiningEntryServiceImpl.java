@@ -45,7 +45,6 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
     private final GewogLookupRepository gewogLookupRepository;
     private final VillageLookupRepository villageLookupRepository;
 
-    private final DzongkhagLookupRepository dzongkhagLookupRepository;
     @Autowired
     private StockLiftingRepository stockLiftingRepository;
 
