@@ -137,4 +137,17 @@ public class SurfaceCollectionAuctionApplication {
     @OneToOne(mappedBy = "auctionApplication",
             cascade = CascadeType.ALL)
     private SurfaceCollectionBidWinner bidWinner;
+
+    // Dzongkhag, gewog and village details have been saved
+    @Column(name = "dzongkhag_id")
+    private DzongkhagLookup dzongkhagId;
+
+    @Column(name = "gewog_id")
+    private GewogLookup gewogId;
+
+    @Column(name = "village_id")
+    private VillageLookup villageId;
+
+    @Column(name = "region_id")
+    private RegionMaster regionId;
 }
