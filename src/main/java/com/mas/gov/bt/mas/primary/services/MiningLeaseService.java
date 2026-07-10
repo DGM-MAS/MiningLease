@@ -75,6 +75,8 @@ public class MiningLeaseService {
 
     private final FMFSDetailsRepository fmfsDetailsRepository;
 
+    private final WorkflowTrackingService workflowTrackingService;
+
     @Value("${app.self.base-url}")
     private String selfBaseUrl;
 
@@ -975,7 +977,16 @@ public class MiningLeaseService {
                     String title = "PA/FC submitted. ";
                     String message = "PA/FC has been submitted by applicant. Please login an process the application."+ "Application No. : "+ miningLeaseApplication.getApplicationNumber();
                     String serviceId = "78";
-                    notificationClient.sendUserNotification(title, message, userId, serviceId);
+                    notificationClient.sendUserNotification(title, message, assignedMPCDFocalId, serviceId);
+                }
+
+                if(miningLeaseApplication.getApplicantEmail() != null) {
+                    notificationClient.sendStatusUpdateNotification(
+                            miningLeaseApplication.getApplicantEmail(),
+                            miningLeaseApplication.getApplicantCid(),
+                            miningLeaseApplication.getApplicationNumber(),
+                            "PA/FC SUBMITTED",
+                            "PA/FC has been submitted successfully.");
                 }
 
             }else {
@@ -1016,7 +1027,16 @@ public class MiningLeaseService {
                     String title = "PA/FC resubmitted. ";
                     String message = "PA/FC has been resubmitted by applicant. Please login to process the application."+ "Application No. : "+ miningLeaseApplication.getApplicationNumber();
                     String serviceId = "78";
-                    notificationClient.sendUserNotification(title, message, userId, serviceId);
+                    notificationClient.sendUserNotification(title, message, assignedMPCDFocalId, serviceId);
+                }
+
+                if(miningLeaseApplication.getApplicantEmail() != null) {
+                    notificationClient.sendStatusUpdateNotification(
+                            miningLeaseApplication.getApplicantEmail(),
+                            miningLeaseApplication.getApplicantCid(),
+                            miningLeaseApplication.getApplicationNumber(),
+                            "PA/FC RESUBMITTED",
+                            "PA/FC has been resubmitted successfully.");
                 }
 
             }else {
@@ -1369,7 +1389,8 @@ public class MiningLeaseService {
         if(reviewQuarryLeaseApplicationGeologist.getStatus() != null) {
             switch (reviewQuarryLeaseApplicationGeologist.getStatus()) {
                 case "ACCEPTED" -> {
-                    if (Objects.equals(miningLeaseApplication.getCurrentStatus(), "ACCEPTED PFS MPCD")) {
+                    boolean fullyApprovedPfs = Objects.equals(miningLeaseApplication.getCurrentStatus(), "ACCEPTED PFS MPCD");
+                    if (fullyApprovedPfs) {
                         miningLeaseApplication.setCurrentStatus("APPROVED");
                     }else {
                         miningLeaseApplication.setCurrentStatus("ACCEPTED PFS");
@@ -1381,6 +1402,23 @@ public class MiningLeaseService {
                     if (applicationMaster != null) {
                         applicationMaster.setCurrentStatus(miningLeaseApplication.getCurrentStatus());
                         applicationMasterRepository.save(applicationMaster);
+                    }
+
+                    // Only forward to the Mining Engineer once PFS is fully approved by both
+                    // Geologist and MPCD (see the symmetric check in the MPCD review branch) —
+                    // otherwise this is still waiting on the other reviewer.
+                    if (fullyApprovedPfs && applicationMaster != null) {
+                        UserWorkloadProjection assignedMineEngineer = miningLeaseApplicationRepository.findLeastBusyMineEngineer(20L);
+                        if (assignedMineEngineer != null) {
+                            createTask(applicationMaster, miningLeaseApplication, "MINE ENGINEER", userId, assignedMineEngineer.getUserId());
+
+                            if (assignedMineEngineer.getUserId() != null) {
+                                String meTitle = "Mining lease application has been assigned for review.";
+                                String meMessage = "A mining lease application has been forwarded to you for review.";
+                                String meServiceId = "78";
+                                notificationClient.sendUserNotification(meTitle, meMessage, assignedMineEngineer.getUserId(), meServiceId);
+                            }
+                        }
                     }
 
                     if (miningLeaseApplication.getApplicantEmail() != null) {
@@ -2345,6 +2383,12 @@ public class MiningLeaseService {
                 applicationMasterRepository.save(applicationMaster);
                 miningLeaseApplicationRepository.save(quarryLeaseApplication1);
 
+                // Keep the open Mining Engineer task alive but record progress, since the same
+                // engineer still has the Note Sheet + Work Order steps left before this task closes.
+                workflowTrackingService.updateCurrentTask(
+                        quarryLeaseApplication1.getApplicationNumber(), SERVICE_CODE,
+                        "IN_PROGRESS", "LLC_UPLOADED", "LLC document uploaded by mine engineer.");
+
                 if(quarryLeaseApplication1.getApplicantUserId() != null) {
                     String title = "LLC has been uploaded by mine engineer.";
                     String message = "LLC for you application has been uploaded by mine engineer.";
@@ -2372,6 +2416,11 @@ public class MiningLeaseService {
                 quarryLeaseApplication1.setCurrentStatus("NOTE SHEET UPLOADED");
                 applicationMasterRepository.save(applicationMaster);
                 miningLeaseApplicationRepository.save(quarryLeaseApplication1);
+
+                // Same open Mining Engineer task, one step closer to the Work Order — not closed yet.
+                workflowTrackingService.updateCurrentTask(
+                        quarryLeaseApplication1.getApplicationNumber(), SERVICE_CODE,
+                        "IN_PROGRESS", "NOTE_SHEET_UPLOADED", "Note sheet uploaded by mine engineer.");
 
                 if(quarryLeaseApplication1.getApplicantUserId() != null) {
                     String title = "Note sheet has been uploaded by mine engineer.";
@@ -2407,6 +2456,12 @@ public class MiningLeaseService {
 
                 siteProvisioningService.provisionSiteForApprovedLease(quarryLeaseApplication1);
 
+                // Terminal approval — close out the open Mining Engineer task instead of leaving
+                // it dangling in the queue forever.
+                workflowTrackingService.completeCurrentTask(
+                        quarryLeaseApplication1.getApplicationNumber(), SERVICE_CODE,
+                        "APPROVED", "Work order uploaded; mining lease approved.");
+
                 if(quarryLeaseApplication1.getApplicantUserId() != null) {
                     String title = "Work order has been uploaded by mine engineer.";
                     String message = "Work order for your application has been uploaded by mine engineer. Your application for mining lease has been approved.";
@@ -2438,25 +2493,32 @@ public class MiningLeaseService {
                 miningLeaseApplicationRepository.save(quarryLeaseApplication1);
 
 
-//                List<String> status = new ArrayList<>();
-//                status.add("SUBMITTED");
-//                status.add("PAYMENT PENDING");
-//                List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusInAndAssignedToRole(quarryLeaseApplication1.getApplicationNumber(),status,"DIRECTOR");
-//                Long directorId = null;
-//                if (taskManagement != null) {
-//                    TaskManagement taskManagement1 = taskManagement.getFirst();
-//                    directorId = taskManagement1.getAssignedToUserId();
-//                }
+                List<String> status = new ArrayList<>();
+                status.add("SUBMITTED");
+                status.add("PAYMENT PENDING");
+                List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusInAndAssignedToRole(quarryLeaseApplication1.getApplicationNumber(),status,"DIRECTOR");
+                Long directorId = null;
+                if (taskManagement != null && !taskManagement.isEmpty()) {
+                    TaskManagement taskManagement1 = taskManagement.getFirst();
+                    directorId = taskManagement1.getAssignedToUserId();
+                }
 
-//                createTask(applicationMaster,quarryLeaseApplication1,"DIRECTOR", userId, directorId);
-//
-//                UserWorkloadProjection assignedDirectorDetails = miningLeaseApplicationRepository.findUserDetails(directorId);
-//                if(assignedDirectorDetails.getUserId() != null) {
-//                    String title = "Mining lease application has been assigned for MLA review.";
-//                    String message = "Mining lease application has been  assigned for MLA review.";
-//                    String serviceId = "78";
-//                    notificationClient.sendUserNotification(title, message, assignedDirectorDetails.getUserId(), serviceId);
-//                }
+                createTask(applicationMaster,quarryLeaseApplication1,"DIRECTOR", userId, directorId);
+
+                UserWorkloadProjection assignedDirectorDetails = miningLeaseApplicationRepository.findUserDetails(directorId);
+                if(assignedDirectorDetails != null && assignedDirectorDetails.getUserId() != null) {
+                    String title = "Mining lease application has been assigned for MLA review.";
+                    String message = "Mining lease application has been  assigned for MLA review.";
+                    String serviceId = "78";
+                    notificationClient.sendUserNotification(title, message, assignedDirectorDetails.getUserId(), serviceId);
+                }
+
+                if(quarryLeaseApplication1.getApplicantUserId() != null) {
+                    String title = "MLA submitted successfully.";
+                    String message = "Your MLA has been submitted and forwarded to the Director for review."+ "Application No. : "+ quarryLeaseApplication1.getApplicationNumber();
+                    String serviceId = "78";
+                    notificationClient.sendUserNotification(title, message, quarryLeaseApplication1.getApplicantUserId(), serviceId);
+                }
 
             }else {
                 throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
