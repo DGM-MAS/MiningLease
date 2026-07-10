@@ -4,7 +4,6 @@ import com.mas.gov.bt.mas.primary.utility.CustomRuntimeException;
 
 import com.mas.gov.bt.mas.primary.client.MastersPaymentClient;
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
-import com.mas.gov.bt.mas.primary.dto.payment.PaymentCallbackDTO;
 import com.mas.gov.bt.mas.primary.dto.payment.PaymentInitiationRequest;
 import com.mas.gov.bt.mas.primary.dto.payment.PaymentInitiationResponse;
 import com.mas.gov.bt.mas.primary.dto.request.*;
@@ -77,6 +76,8 @@ public class MiningLeaseService {
 
     private final WorkflowTrackingService workflowTrackingService;
 
+    private final UserRepository userRepository;
+
     @Value("${app.self.base-url}")
     private String selfBaseUrl;
 
@@ -100,7 +101,7 @@ public class MiningLeaseService {
         // ============================================================
         // 0. Checking if the user has not more than two mining lease
         // ============================================================
-            String houseHoldNumber = miningLeaseApplicationRepository.findUserHouseHoldNumber(userId);
+//            String houseHoldNumber = miningLeaseApplicationRepository.findUserHouseHoldNumber(userId);
 //            Integer miningLeaseCount = miningLeaseApplicationRepository.findLeaseCountForMining(houseHoldNumber);
 
 //            if(miningLeaseCount <=1){
@@ -156,7 +157,7 @@ public class MiningLeaseService {
                             .findById(request.getDzongkhag())
                             .orElseThrow(() -> new RuntimeException("Invalid Dzongkhag ID"));
 
-                    application.setRegionId(dzongkhag.getRegion().getId());
+//                    application.setRegionId(dzongkhag.getRegion().getId());
                     application.setDzongkhag(dzongkhag);
                 }
 
@@ -169,7 +170,7 @@ public class MiningLeaseService {
                 }
 
                 if (request.getNearestVillage() != null && !request.getNearestVillage().isEmpty()) {
-                    VillageLookup villageLookup = (VillageLookup) villageLookupRepository
+                    VillageLookup villageLookup = villageLookupRepository
                             .findByVillageSerialNo(Integer.parseInt(request.getNearestVillage()))
                             .orElseThrow(() -> new RuntimeException("Invalid village ID"));
 
@@ -459,6 +460,21 @@ public class MiningLeaseService {
         // Validate input
         validateApplicationRequest(request);
 
+//         ============================================================
+//         0. Checking if the user has not more than two mining lease
+//         ============================================================
+        String householdNumber = miningLeaseApplicationRepository.findUserHouseHoldNumber(userId);
+
+        Integer total = miningLeaseApplicationRepository
+                .countMiningLeasesByHousehold(householdNumber);
+
+        if (total >= 2) {
+            throw new BusinessException(
+                    ErrorCodes.DATA_INTEGRITY_VIOLATION,
+                    "Only two mining leases/applications are permitted per household."
+            );
+        }
+
         miningLeaseApplication.setExpPermitNo(request.getExpPermitNo());
         miningLeaseApplication.setFileUploadIdGr(request.getGRDocId());
         miningLeaseApplication.setFileUploadIdKmz(request.getKmzDocId());
@@ -717,18 +733,26 @@ public class MiningLeaseService {
      */
     @Transactional(readOnly = true)
     public Page<ApplicationListResponse> getArchivedApplications(Pageable pageable, String search, Long userId) {
-        List<String> archivedStatuses = List.of("MINING LEASE APPROVED", "REJECTED");
+
+        List<String> archivedStatuses = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATION APPROVED"
+        );
+
         Page<MiningLeaseApplication> applications;
 
         if (search == null || search.isBlank()) {
             applications = miningLeaseApplicationRepository.findArchivedAssignedToUserMPCD(
                     userId,
+                    archivedStatuses,
                     pageable);
         }
         else {
 
             applications = miningLeaseApplicationRepository.findArchivedAssignedToUserAndSearch(
                     userId,
+                    archivedStatuses,
                     search.trim(),
                     pageable
             );
@@ -757,16 +781,23 @@ public class MiningLeaseService {
 
         Page<MiningLeaseApplication> page;
 
+        List<String> archivedStatuses = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATION APPROVED"
+        );
+
         if (search == null || search.isBlank()) {
 
             page = miningLeaseApplicationRepository
-                    .findArchivedAssignedToUserMPCD(userId, pageable);
+                    .findArchivedAssignedToUserMPCD(userId, archivedStatuses, pageable);
 
         } else {
 
             page = miningLeaseApplicationRepository
                     .findArchivedAssignedToUserAndSearchMPCD(
                             userId,
+                            archivedStatuses,
                             search.trim(),
                             pageable
                     );
@@ -1073,7 +1104,7 @@ public class MiningLeaseService {
                 applicationMasterRepository.save(applicationMaster);
                 miningLeaseApplicationRepository.save(miningLeaseApplication);
 
-                UserWorkloadProjection assignedMineEngineer = miningLeaseApplicationRepository.findLeastBusyMineEngineer(20L);
+                UserWorkloadProjection assignedMineEngineer = miningLeaseApplicationRepository.findLeastBusyMineEngineer(20L, miningLeaseApplication.getRegionId());
 
                 createTask(applicationMaster,miningLeaseApplication,"MINE ENGINEER", userId, assignedMineEngineer.getUserId());
 
@@ -1288,15 +1319,16 @@ public class MiningLeaseService {
 
     @Transactional
     public MiningLeaseResponse assignApplicationDirector(@Valid AssignTaskDirector request, Long userId) {
-        MiningLeaseApplication miningLeaseApplication ;
+        MiningLeaseApplication miningLeaseApplication = findApplicationById(request.getApplicationId());
 
-        miningLeaseApplication = findApplicationById(request.getApplicationId());
         ApplicationMaster applicationMaster ;
+
         if(miningLeaseApplication != null) {
             applicationMaster = miningLeaseApplication.getApplicationMaster();
         }else {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
         }
+
         if (request.getMpcdFocalId() != null && request.getGeologistId() != null) {
             miningLeaseApplication.setCurrentStatus("MPCD ASSIGNED");
             applicationMaster.setCurrentStatus("MPCD ASSIGNED");
@@ -1380,6 +1412,15 @@ public class MiningLeaseService {
     public MiningLeaseResponse reviewApplicationGeologist(@Valid ReviewMiningLeaseApplicationGeologist reviewQuarryLeaseApplicationGeologist, Long userId) {
         log.info("Reviewing mining lease application by Geologist user: {}", userId);
 
+        Long geologistRegionId = 0L;
+                //
+        Optional<User> user = userRepository.findById(userId);
+
+        if(user.isPresent()) {
+            User user1 = user.get();
+            geologistRegionId = user1.getRegion().getId();
+        }
+
         MiningLeaseApplication miningLeaseApplication = findApplicationById(reviewQuarryLeaseApplicationGeologist.getId());
         ApplicationMaster applicationMaster = miningLeaseApplication.getApplicationMaster();
 
@@ -1408,7 +1449,7 @@ public class MiningLeaseService {
                     // Geologist and MPCD (see the symmetric check in the MPCD review branch) —
                     // otherwise this is still waiting on the other reviewer.
                     if (fullyApprovedPfs && applicationMaster != null) {
-                        UserWorkloadProjection assignedMineEngineer = miningLeaseApplicationRepository.findLeastBusyMineEngineer(20L);
+                        UserWorkloadProjection assignedMineEngineer = miningLeaseApplicationRepository.findLeastBusyMineEngineer(20L, geologistRegionId);
                         if (assignedMineEngineer != null) {
                             createTask(applicationMaster, miningLeaseApplication, "MINE ENGINEER", userId, assignedMineEngineer.getUserId());
 
@@ -1428,6 +1469,8 @@ public class MiningLeaseService {
                                 miningLeaseApplication.getApplicationNumber(),
                                 "Mining Engineer Review",
                                 "Your application has been forwarded to the Mining Engineer for review.");
+                    }else {
+                        throw new BusinessException(ErrorCodes.DATA_INTEGRITY_VIOLATION, "Applicant email ID is not present.");
                     }
 
                     String title = "Application status updated.";
@@ -1455,6 +1498,8 @@ public class MiningLeaseService {
                                 miningLeaseApplication.getApplicationNumber(),
                                 "GR APPROVED",
                                 "Geological Report has been accepted. Please upload mining lease application and PFS to proceed further.");
+                    }else {
+                        throw new BusinessException(ErrorCodes.DATA_INTEGRITY_VIOLATION, "Applicant email ID is not present.");
                     }
 
                     if(miningLeaseApplication.getApplicantUserId() != null) {
@@ -1463,7 +1508,7 @@ public class MiningLeaseService {
                         String serviceId = "78";
                         notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId);
                     }else {
-                        throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+                        throw new BusinessException(ErrorCodes.DATA_INTEGRITY_VIOLATION, "Applicant user ID is not present.");
                     }
                 }
                 case "ACCEPTED FMFS" -> {
