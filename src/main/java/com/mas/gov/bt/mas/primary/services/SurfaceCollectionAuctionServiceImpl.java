@@ -11,6 +11,7 @@ import com.mas.gov.bt.mas.primary.exception.BusinessException;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.repository.*;
 import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
+import com.mas.gov.bt.mas.primary.utility.LookupHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -41,6 +42,16 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
 
     private final NotificationClient notificationClient;
 
+    private final DzongkhagLookupRepository dzongkhagLookupRepository;
+
+    private final GewogLookupRepository gewogLookupRepository;
+
+    private final VillageLookupRepository villageLookupRepository;
+
+    private final RegionMasterRepository regionMasterRepository;
+
+    private final LookupHelper lookupHelper;
+
     private static final String SERVICE_CODE = "SURFACE_COLLECTION_AUCTION";
 
     private static final int DEFAULT_TAT_DAYS = 2;
@@ -51,6 +62,17 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
             SurfaceCollectionAuctionRequestDTO dto,
             Long userId
     ) {
+        DzongkhagLookup dzongkhagLookup =
+                lookupHelper.fetchLookup(dto.getDzongkhagId(), dzongkhagLookupRepository, "Dzongkhag");
+
+        GewogLookup gewogLookup =
+                lookupHelper.fetchLookup(dto.getGewogId(), gewogLookupRepository, "Gewog");
+
+        VillageLookup villageLookup =
+                lookupHelper.fetchLookup(dto.getVillageId(), villageLookupRepository, "Village");
+
+        RegionMaster regionMaster =
+                lookupHelper.fetchLookup(dzongkhagLookup.getRegion().getId(), regionMasterRepository, "RegionMaster");
 
         try {
             SurfaceCollectionAuctionApplication entity =
@@ -61,6 +83,10 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                         .material(dto.getMaterial())
                         .auctionStatus("SUBMITTED")
                         .createdBy(userId)
+                        .dzongkhagId(dzongkhagLookup)
+                        .gewogId(gewogLookup)
+                        .villageId(villageLookup)
+                        .regionId(regionMaster)
                         .createdOn(LocalDateTime.now())
                         .build();
 
@@ -80,7 +106,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
         // =====================================================
         // 2. ASSIGN MINING DIRECTOR
         // =====================================================
-        UserWorkloadProjection assignedMD = assignMD();
+        UserWorkloadProjection assignedMD = assignMD(regionMaster.getId());
 
         entity.setAssignedMdUserId(assignedMD.getUserId());
 
@@ -116,7 +142,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
             String title = "Surface Collection Auction application has been assigned.";
             String message = "An application for surface collection auction has been assigned for review. Application No. "+ entity.getApplicationNo();
             String serviceId = "71";
-            notificationClient.sendUserNotification(title, message, assignMD().getUserId(), serviceId);
+            notificationClient.sendUserNotification(title, message, assignedMD.getUserId(), serviceId);
         }else {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND,"Assigned MD user ID not Found");
         }
@@ -170,13 +196,13 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
     }
 
     @Transactional
-    public UserWorkloadProjection assignMD() {
+    public UserWorkloadProjection assignMD(Long id) {
 
         UserWorkloadProjection miningDirector =
-                auctionRepository.findMDSurfaceCollection();
+                auctionRepository.findMDSurfaceCollection(id);
 
         if (miningDirector == null || miningDirector.getUserId() == null) {
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Mining Engineer with required permission and role not found.");
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Mining Engineer with required permission, region and role not found.");
         }
         return miningDirector;
     }
@@ -380,6 +406,9 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                 .location(entity.getLocation())
                 .area(entity.getArea())
                 .material(entity.getMaterial())
+                .dzongkhagName(entity.getDzongkhagId().getDzongkhagName())
+                .gewogName(entity.getGewogId().getGewogName())
+                .villageName(entity.getVillageId().getVillageName())
                 .ecStatus(entity.getEcStatus())
                 .fcStatus(entity.getFcStatus())
                 .auctionStatus(entity.getAuctionStatus())
