@@ -39,6 +39,7 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
     private final ManualEntryValidator validator;
     private final ManualMiningEntryRepository entryRepository; // user lookup only
 
+    private final DzongkhagLookupRepository dzongkhagLookupRepository;
     @Autowired
     private StockLiftingRepository stockLiftingRepository;
 
@@ -72,6 +73,19 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
                                                         String prefix, String status, LocalDateTime now) {
         MiningLeaseApplication ml = new MiningLeaseApplication();
 
+        Long regionId = 0L;
+        if(req.getDzongkhag() != null){
+
+            Optional<DzongkhagLookup> dzongkhagLookup = Optional.of(new DzongkhagLookup());
+
+            dzongkhagLookup = dzongkhagLookupRepository.findById(req.getDzongkhag());
+
+            if(dzongkhagLookup.isPresent()){
+                DzongkhagLookup lookup = dzongkhagLookup.get();
+                regionId = lookup.getRegion().getId();
+            }
+
+        }
         ml.setApplicantType(req.getApplicantType());
         ml.setApplicantCid(req.getApplicantCid());
         ml.setApplicantName(req.getApplicantName());
@@ -142,6 +156,9 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         ml.setApprovedAt(now);
         ml.setIsActive(true);
 
+        ml.setRegionId(regionId);
+
+
         MiningLeaseApplication saved = mlRepo.save(ml);
         saveAttachments(req.getFileIds(), saved.getApplicationNumber());
         ApplicationMaster master = createApplicationMaster(saved.getApplicationNumber(), userId, status, now);
@@ -155,6 +172,20 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
     private ManualMiningEntryResponseDTO createQlEntry(ManualMiningEntryRequestDTO req, Long userId,
                                                         String prefix, String status, LocalDateTime now) {
         QuarryLeaseApplication ql = new QuarryLeaseApplication();
+
+        Long regionId = 0L;
+        if(req.getDzongkhag() != null){
+
+            Optional<DzongkhagLookup> dzongkhagLookup = Optional.of(new DzongkhagLookup());
+
+            dzongkhagLookup = dzongkhagLookupRepository.findById(req.getDzongkhag());
+
+            if(dzongkhagLookup.isPresent()){
+                DzongkhagLookup lookup = dzongkhagLookup.get();
+                regionId = lookup.getRegion().getId();
+            }
+
+        }
 
         ql.setApplicantType(req.getApplicantType());
         ql.setApplicantCid(req.getApplicantCid());
@@ -224,6 +255,8 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         ql.setApprovedAt(now);
         ql.setIsActive(true);
 
+        ql.setRegionId(regionId);
+
         QuarryLeaseApplication saved = qlRepo.save(ql);
         saveAttachments(req.getFileIds(), saved.getApplicationNumber());
         ApplicationMaster master = createApplicationMaster(saved.getApplicationNumber(), userId, status, now);
@@ -237,6 +270,20 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
     private ManualMiningEntryResponseDTO createScEntry(ManualMiningEntryRequestDTO req, Long userId,
                                                         String prefix, String status, LocalDateTime now) {
         SurfaceCollectionPermitEntity sc = new SurfaceCollectionPermitEntity();
+
+        Long regionId = 0L;
+        if(req.getDzongkhag() != null){
+
+            Optional<DzongkhagLookup> dzongkhagLookup = Optional.of(new DzongkhagLookup());
+
+            dzongkhagLookup = dzongkhagLookupRepository.findById(req.getDzongkhag());
+
+            if(dzongkhagLookup.isPresent()){
+                DzongkhagLookup lookup = dzongkhagLookup.get();
+                regionId = lookup.getRegion().getId();
+            }
+
+        }
 
         sc.setApplicantCid(req.getApplicantCid());
         sc.setApplicantName(req.getApplicantName());
@@ -279,6 +326,8 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         sc.setManualEntryBy(userId);
         sc.setManualEntryOn(now);
         sc.setIsActive(true);
+
+        sc.setRegionId(regionId);
 
         SurfaceCollectionPermitEntity saved = scRepo.save(sc);
         saveAttachments(req.getFileIds(), saved.getApplicationNo());
@@ -456,6 +505,7 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
                 .fileIds(fileIds != null ? fileIds : Collections.emptyList())
                 .createdBy(ml.getManualEntryBy())
                 .createdOn(ml.getManualEntryOn())
+                .regionId(ml.getRegionId())
                 .build();
     }
 
@@ -525,6 +575,7 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
                 .fileIds(fileIds != null ? fileIds : Collections.emptyList())
                 .createdBy(ql.getManualEntryBy())
                 .createdOn(ql.getManualEntryOn())
+                .regionId(ql.getRegionId())
                 .build();
     }
 
@@ -576,6 +627,7 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
                 .fileIds(fileIds != null ? fileIds : Collections.emptyList())
                 .createdBy(sc.getManualEntryBy())
                 .createdOn(sc.getManualEntryOn())
+                .regionId(sc.getRegionId())
                 .build();
     }
 

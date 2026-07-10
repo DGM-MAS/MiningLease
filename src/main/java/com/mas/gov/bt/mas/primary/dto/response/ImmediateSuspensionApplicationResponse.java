@@ -59,4 +59,6 @@ public class ImmediateSuspensionApplicationResponse {
 
     private LocalDateTime updatedAt;
 
+    private Long regionId;
+
 }

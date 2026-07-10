@@ -284,6 +284,10 @@ public class QuarryLeaseApplication {
     @Column(name = "fmfs_id")
     private String fmfsId;
 
+    // Region_id Saved for reporting purpose
+    @Column(name = "region_id")
+    private Long regionId;
+
     // ========== Flags ==========
     @Column(name = "is_active")
     private Boolean isActive = true;
