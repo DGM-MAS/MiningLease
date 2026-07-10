@@ -13,4 +13,8 @@ public class ImmediateSuspensionApplicationRequest {
     private String applicationFrom;
     private Long suspensionReasonId;
     private String rcMiRemark;
+
+    private String dzongkhagId;
+    private String gewogId;
+    private String villageId;
 }

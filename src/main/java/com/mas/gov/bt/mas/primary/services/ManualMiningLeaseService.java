@@ -8,7 +8,6 @@ import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
 import com.mas.gov.bt.mas.primary.entity.*;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
 import com.mas.gov.bt.mas.primary.exception.ResourceNotFoundException;
-import com.mas.gov.bt.mas.primary.exception.UnauthorizedOperationException;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.mapper.MiningLeaseMapper;
 import com.mas.gov.bt.mas.primary.mapper.QuarryLeaseMapper;
@@ -418,7 +417,7 @@ public class ManualMiningLeaseService {
 
             applications = miningLeaseApplicationRepository.findArchivedAssignedToUserAndSearch(
                     userId,
-                    search.trim(),
+                    archivedStatuses, search.trim(),
                     pageable
             );
         }

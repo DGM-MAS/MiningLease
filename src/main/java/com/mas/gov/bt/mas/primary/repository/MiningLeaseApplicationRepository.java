@@ -75,9 +75,9 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('MINING LEASE APPROVED','REJECTED','TERMINATION APPROVED')
+    AND t.taskStatus IN :archivedStatuses
 """)
-    Page<MiningLeaseApplication> findArchivedAssignedToUserMPCD(Long userId, Pageable pageable);
+    Page<MiningLeaseApplication> findArchivedAssignedToUserMPCD(Long userId, List<String> archivedStatuses, Pageable pageable);
 
     @Query("""
     SELECT q
@@ -85,10 +85,10 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('MINING LEASE APPROVED', 'REJECTED', 'TERMINATION APPROVED')
+    AND t.taskStatus IN :archivedStatuses
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
-    Page<MiningLeaseApplication> findArchivedAssignedToUserAndSearchMPCD(Long userId, String search, Pageable pageable);
+    Page<MiningLeaseApplication> findArchivedAssignedToUserAndSearchMPCD(Long userId, List<String> archivedStatuses, String search, Pageable pageable);
 
     @Query(value = """
     SELECT 
@@ -117,11 +117,12 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
         AND t.task_status IN ('PENDING', 'ASSIGNED')
     WHERE ur.role_id = :roleId
       AND u.account_status = 'ACTIVE'
+      AND u.region_id = :regionId
     GROUP BY u.id, u.email, u.username
     ORDER BY workload ASC
     LIMIT 1
     """, nativeQuery = true)
-    UserWorkloadProjection findLeastBusyMineEngineer(Long roleId);
+    UserWorkloadProjection findLeastBusyMineEngineer(Long roleId, Long regionId);
 
 
     @Query("""
@@ -486,11 +487,11 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     @Query("""
     SELECT a
     FROM MiningLeaseApplication a
-    WHERE a.currentStatus IN ('MINING LEASE APPROVED', 'REJECTED')
+    WHERE a.currentStatus IN :archivedStatuses
     AND a.applicantUserId = :userId
     AND LOWER(a.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
-    Page<MiningLeaseApplication> findArchivedAssignedToUserAndSearch(Long userId, String search, Pageable pageable);
+    Page<MiningLeaseApplication> findArchivedAssignedToUserAndSearch(Long userId, List<String> archivedStatuses, String search, Pageable pageable);
 
     @Query("""
     SELECT q FROM MiningLeaseApplication q
@@ -528,4 +529,57 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     List<MiningLeaseApplication> findByIsManualEntry(String isManualEntry);
 
     List<MiningLeaseApplication> findByIsManualEntryAndManualEntryBy(String isManualEntry, Long manualEntryBy);
+
+    @Query(value = """
+SELECT
+(
+    SELECT COUNT(*)
+    FROM household_permit_threshold h
+    JOIN t_citizens c
+      ON c.cid = h.applicant_cid
+    WHERE c.household_number = :householdNumber
+      AND h.service_type = 'MINING_LEASE'
+      AND h.status = 'ACTIVE'
+)
++
+(
+    SELECT COUNT(*)
+    FROM t_mining_lease_application mla
+    JOIN t_citizens c
+      ON c.cid = mla.applicant_cid
+    WHERE c.household_number = :householdNumber
+      AND mla.current_status IN (
+     "SUBMITTED",
+     "DRAFT",
+     "ASSIGNED",
+     "MPCD ASSIGNED",
+     "GEOLOGIST_REVIEW",
+     "GR SUBMITTED",
+     "LLC UPLOADED",
+     "PAYMENT PENDING",
+     "ACCEPTED PFS",
+     "ADDITIONAL DATA NEEDED",
+     "MA SUBMITTED",
+     "PA/FC SUBMITTED",
+     "APPROVED GR",
+     "NOTE SHEET UPLOADED",
+     "GR SUBMITTED",
+     "BG SUBMITTED",
+     "FMFS SUBMITTED",
+     "MLA SUBMITTED",
+     "APPROVED BY DIRECTOR",
+     "RESUBMITTED PFS",
+     "RESUBMIT GR",
+     "RESUBMITTED GR",
+     "RESUBMIT FMFS",
+     "RESUBMITTED FMFS",
+     "RESUBMIT APPLICATION",
+     "RESUBMIT PFS GEOLOGIST",
+     "RESUBMIT PFS MPCD",
+     "RESUBMIT PA/FC",
+     "APPROVED PA/FC"
+      )
+)
+""", nativeQuery = true)
+    Integer countMiningLeasesByHousehold(String householdNumber);
 }
