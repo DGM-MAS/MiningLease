@@ -80,10 +80,11 @@ public class MineRestorationService {
             restoration.setApplicantName(lease.getApplicantName());
             restoration.setApplicantEmail(lease.getApplicantEmail());
             restoration.setApplicantContact(lease.getApplicantContact());
-            restoration.setNameOfMine(lease.getPlaceOfMiningActivity());
+            restoration.setNameOfMine(lease.getNameOfMine());
             restoration.setLeaseAreaAcres(lease.getTotalLand());
             restoration.setLeaseEndDate(lease.getLeaseEndDate());
             restoration.setCreatedBy(userId);
+
         }
 
         restoration.setMrpDocId(request.getMrpDocId());

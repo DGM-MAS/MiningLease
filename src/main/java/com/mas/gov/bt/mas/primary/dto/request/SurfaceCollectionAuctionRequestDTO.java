@@ -15,5 +15,9 @@ public class SurfaceCollectionAuctionRequestDTO {
     private BigDecimal area;
     private String material;
 
+    private String dzongkhagId;
+    private String gewogId;
+    private String villageId;
+
     private List<SurfaceCollectionAttachmentRequestDTO> attachments;
 }

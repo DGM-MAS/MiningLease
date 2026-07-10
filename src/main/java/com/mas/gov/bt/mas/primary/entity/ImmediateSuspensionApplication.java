@@ -102,4 +102,7 @@ public class ImmediateSuspensionApplication {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "region_id")
+    private Long regionId;
 }
