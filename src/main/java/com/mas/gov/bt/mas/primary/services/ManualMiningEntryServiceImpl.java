@@ -17,6 +17,8 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.*;
 import java.time.format.DateTimeFormatter;
@@ -36,8 +38,12 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
     private final ManualMiningAttachmentRepository attachmentRepository;
     private final ApplicationMasterRepository applicationMasterRepository;
     private final NotificationClient notificationClient;
+    private final ApplicantAccountProvisioningService applicantAccountProvisioningService;
     private final ManualEntryValidator validator;
     private final ManualMiningEntryRepository entryRepository; // user lookup only
+    private final DzongkhagLookupRepository dzongkhagLookupRepository;
+    private final GewogLookupRepository gewogLookupRepository;
+    private final VillageLookupRepository villageLookupRepository;
 
     private final DzongkhagLookupRepository dzongkhagLookupRepository;
     @Autowired
@@ -60,13 +66,39 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         String finalStatus = resolveFinalStatus(type);
         LocalDateTime now = LocalDateTime.now();
 
-        return switch (type) {
+        ManualMiningEntryResponseDTO response = switch (type) {
             case "MINING_LEASE" -> createMlEntry(request, userId, prefix, finalStatus, now);
             case "QUARRY_LEASE" -> createQlEntry(request, userId, prefix, finalStatus, now);
             case "SURFACE_COLLECTION" -> createScEntry(request, userId, prefix, finalStatus, now);
             case "STOCK_LIFTING" -> createSLEntry(request, userId, prefix, finalStatus, now);
             default -> throw new BusinessException(ErrorCodes.INVALID_REQUEST, "Unknown activityType: " + type);
         };
+
+        registerApplicantAccountAfterCommit(request);
+
+        return response;
+    }
+
+    // Runs only once the submission has actually committed, in its own transaction,
+    // so a failure provisioning the applicant's account/email can never roll back
+    // (or be rolled back by) the manual-entry submission itself.
+    private void registerApplicantAccountAfterCommit(ManualMiningEntryRequestDTO req) {
+        Runnable provision = () -> applicantAccountProvisioningService.provisionForApplicant(
+                req.getApplicantType(), req.getApplicantCid(), req.getApplicantName(),
+                req.getApplicantContact(), req.getApplicantEmail(),
+                req.getLicenseNo(), req.getBusinessLicenseNo(),
+                req.getCompanyRegistrationNo(), req.getCompanyName(), req.getCompanyType());
+
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            provision.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                provision.run();
+            }
+        });
     }
 
     private ManualMiningEntryResponseDTO createMlEntry(ManualMiningEntryRequestDTO req, Long userId,
@@ -98,8 +130,18 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         ml.setCompanyRegistrationNo(req.getCompanyRegistrationNo());
         ml.setCompanyName(req.getCompanyName());
         ml.setCompanyType(req.getCompanyType());
-        ml.setPlaceOfMiningActivity(buildLocationText(req.getDzongkhag(), req.getGewog(),
-                req.getNearestVillage(), req.getPlaceOfActivity()));
+        ml.setApplicationType("Submitted");
+        ml.setNameOfMine(req.getNameOfMine());
+        ml.setEcFileId(req.getEcFileId());
+        ml.setEcNumber(req.getEcNumber());
+        ml.setPlaceOfMiningActivity(req.getPlaceOfActivity());
+        DzongkhagLookup mlDzongkhag = resolveDzongkhag(req.getDzongkhag());
+        if (mlDzongkhag != null) {
+            ml.setDzongkhag(mlDzongkhag);
+            ml.setRegionId(mlDzongkhag.getRegion() != null ? mlDzongkhag.getRegion().getId() : null);
+        }
+        ml.setGewog(resolveGewog(req.getGewog()));
+        ml.setNearestVillage(resolveVillage(req.getNearestVillage()));
         ml.setDungkhag(req.getDungkhag());
         ml.setTypeOfMines(req.getTypeOfMines());
         ml.setTypeOfMineralsProducts(req.getTypeOfMinerals());
@@ -199,8 +241,16 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         ql.setCompanyRegistrationNo(req.getCompanyRegistrationNo());
         ql.setCompanyName(req.getCompanyName());
         ql.setCompanyType(req.getCompanyType());
-        ql.setPlaceOfMiningActivity(buildLocationText(req.getDzongkhag(), req.getGewog(),
-                req.getNearestVillage(), req.getPlaceOfActivity()));
+        ql.setApplicationType("Submitted");
+        ql.setNameOfQuarry(req.getNameOfQuarry());
+        ql.setMlaSignedDocId(req.getMlaSignedDocId());
+        ql.setPlaceOfMiningActivity(req.getPlaceOfActivity());
+        DzongkhagLookup qlDzongkhag = resolveDzongkhag(req.getDzongkhag());
+        if (qlDzongkhag != null) {
+            ql.setDzongkhag(qlDzongkhag);
+        }
+        ql.setGewog(resolveGewog(req.getGewog()));
+        ql.setNearestVillage(resolveVillage(req.getNearestVillage()));
         ql.setDungkhag(req.getDungkhag());
         ql.setTypeOfMines(req.getTypeOfMines());
         ql.setTypeOfMineralsProducts(req.getTypeOfMinerals());
@@ -456,6 +506,9 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
                 .companyRegistrationNo(ml.getCompanyRegistrationNo())
                 .companyName(ml.getCompanyName())
                 .companyType(ml.getCompanyType())
+                .nameOfMine(ml.getNameOfMine())
+                .ecFileId(ml.getEcFileId())
+                .ecNumber(ml.getEcNumber())
                 .placeOfActivity(ml.getPlaceOfMiningActivity())
                 .dungkhag(ml.getDungkhag())
                 .typeOfMines(ml.getTypeOfMines())
@@ -528,6 +581,8 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
                 .companyRegistrationNo(ql.getCompanyRegistrationNo())
                 .companyName(ql.getCompanyName())
                 .companyType(ql.getCompanyType())
+                .nameOfQuarry(ql.getNameOfQuarry())
+                .mlaSignedDocId(ql.getMlaSignedDocId())
                 .placeOfActivity(ql.getPlaceOfMiningActivity())
                 .dungkhag(ql.getDungkhag())
                 .typeOfMines(ql.getTypeOfMines())
@@ -759,13 +814,22 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
                         Collectors.mapping(ManualMiningAttachmentEntity::getFileId, Collectors.toList())));
     }
 
-    private String buildLocationText(String dzongkhag, String gewog, String village, String place) {
-        List<String> parts = new ArrayList<>();
-        if (dzongkhag != null && !dzongkhag.isBlank()) parts.add(dzongkhag);
-        if (gewog != null && !gewog.isBlank()) parts.add(gewog);
-        if (village != null && !village.isBlank()) parts.add(village);
-        if (place != null && !place.isBlank()) parts.add(place);
-        return String.join(", ", parts);
+    private DzongkhagLookup resolveDzongkhag(String dzongkhagId) {
+        if (dzongkhagId == null || dzongkhagId.isBlank()) return null;
+        return dzongkhagLookupRepository.findById(dzongkhagId)
+                .orElseThrow(() -> new BusinessException(ErrorCodes.INVALID_REQUEST, "Invalid Dzongkhag ID: " + dzongkhagId));
+    }
+
+    private GewogLookup resolveGewog(String gewogId) {
+        if (gewogId == null || gewogId.isBlank()) return null;
+        return (GewogLookup) gewogLookupRepository.findByGewogId(gewogId)
+                .orElseThrow(() -> new BusinessException(ErrorCodes.INVALID_REQUEST, "Invalid Gewog ID: " + gewogId));
+    }
+
+    private VillageLookup resolveVillage(String villageSerialNo) {
+        if (villageSerialNo == null || villageSerialNo.isBlank()) return null;
+        return villageLookupRepository.findByVillageSerialNo(Integer.parseInt(villageSerialNo))
+                .orElseThrow(() -> new BusinessException(ErrorCodes.INVALID_REQUEST, "Invalid Village ID: " + villageSerialNo));
     }
 
     private Date toDate(LocalDate localDate) {
