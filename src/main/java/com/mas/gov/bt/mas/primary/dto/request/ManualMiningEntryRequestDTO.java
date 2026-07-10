@@ -46,6 +46,15 @@ public class ManualMiningEntryRequestDTO {
     private String dungkhag;
 
     // -------------------------------------------------------
+    // Mining Lease / Quarry Lease — Identity
+    // -------------------------------------------------------
+    private String nameOfMine;       // ML only
+    private String nameOfQuarry;     // QL only
+    private String ecFileId;         // ML only — newer EC requirement
+    private String ecNumber;         // ML only — newer EC requirement
+    private String mlaSignedDocId;   // QL only
+
+    // -------------------------------------------------------
     // Mining Lease / Quarry Lease — Mine Details
     // -------------------------------------------------------
     private String typeOfMines;

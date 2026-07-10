@@ -41,6 +41,13 @@ public class ManualMiningEntryResponseDTO {
     private String placeOfActivity;
     private String dungkhag;
 
+    // Mining / Quarry — Identity
+    private String nameOfMine;
+    private String nameOfQuarry;
+    private String ecFileId;
+    private String ecNumber;
+    private String mlaSignedDocId;
+
     // Mining / Quarry — Details
     private String typeOfMines;
     private String typeOfMinerals;

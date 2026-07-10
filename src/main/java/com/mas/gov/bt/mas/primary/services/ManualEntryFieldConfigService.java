@@ -140,10 +140,13 @@ public class ManualEntryFieldConfigService {
     }
 
     private SectionConfig mineDetailsSection(String leaseType) {
-        return SectionConfig.builder()
-                .sectionKey("MINE_DETAILS")
-                .label(leaseType + " Details")
-                .fields(List.of(
+        boolean isMiningLease = "Mining Lease".equals(leaseType);
+        List<FieldMetadata> fields = new java.util.ArrayList<>(List.of(
+                isMiningLease
+                        ? field("nameOfMine",   "Name of Mine",   "TEXT", true, null)
+                        : field("nameOfQuarry", "Name of Quarry", "TEXT", true, null)
+        ));
+        fields.addAll(List.of(
                         field("typeOfMines",                     "Type of Mines",                   "TEXT",     true,  null),
                         field("typeOfMinerals",                  "Type of Minerals / Products",     "TEXT",     true,  null),
                         field("requiredInvestment",              "Required Investment",             "TEXT",     false, null),
@@ -154,7 +157,12 @@ public class ManualEntryFieldConfigService {
                         field("srf",                             "SRF Area",                        "TEXT",     false, null),
                         field("landPrivate",                     "Private Land Area",               "TEXT",     false, null),
                         field("totalLand",                       "Total Land Area",                 "TEXT",     false, null)
-                ))
+                ));
+
+        return SectionConfig.builder()
+                .sectionKey("MINE_DETAILS")
+                .label(leaseType + " Details")
+                .fields(fields)
                 .build();
     }
 
@@ -206,6 +214,8 @@ public class ManualEntryFieldConfigService {
                         field("signedPFSId",               "Signed PFS",                 "FILE_ID", false, null),
                         field("bankGuarantorDocId",        "Bank Guarantor Document",    "FILE_ID", false, null),
                         field("workOrderDocId",            "Work Order Document",        "FILE_ID", false, null),
+                        field("ecFileId",                  "EC Document",                "FILE_ID", false, null),
+                        field("ecNumber",                  "EC Number",                  "TEXT",    false, null),
                         field("fileIds",                   "Additional Attachments",     "FILE_ID", false, "Multiple files allowed")
                 ))
                 .build();
@@ -231,6 +241,7 @@ public class ManualEntryFieldConfigService {
                         field("fileUploadIdPublicClearance","Public Clearance File",     "FILE_ID", false, null),
                         field("bankGuarantorDocId",        "Bank Guarantor Document",    "FILE_ID", false, null),
                         field("workOrderDocId",            "Work Order Document",        "FILE_ID", false, null),
+                        field("mlaSignedDocId",            "MLA Signed Document",        "FILE_ID", false, null),
                         field("fileIds",                   "Additional Attachments",     "FILE_ID", false, "Multiple files allowed")
                 ))
                 .build();

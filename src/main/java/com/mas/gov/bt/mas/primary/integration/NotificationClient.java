@@ -99,6 +99,53 @@ public class NotificationClient {
     }
 
     /**
+     * Send the auto-generated login credentials to an applicant whose citizen
+     * account was just provisioned from a manual-entry submission.
+     */
+    @Async
+    public void sendApplicantAccountCredentialsEmail(String to, String fullName, String registrationType, String tempPassword) {
+        if (!emailEnabled) {
+            log.info("Email disabled. Would have sent applicant account credentials to: {}", to);
+            return;
+        }
+
+        String typeDisplay = switch (registrationType) {
+            case "REGISTERED_COMPANY" -> "Registered Company";
+            case "BUSINESS_LICENSE" -> "Business License Holder";
+            default -> "Individual";
+        };
+
+        String subject = "Welcome to MAS - Your Account Has Been Created";
+        String htmlContent = String.format("""
+                <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto;">
+                    <div style="background-color: #28a745; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0;">
+                        <h1 style="margin:0;">Welcome to MAS!</h1>
+                    </div>
+                    <div style="background-color: #f9f9f9; padding: 30px; border: 1px solid #ddd; border-radius: 0 0 5px 5px;">
+                        <p>Dear %s,</p>
+                        <p>Your %s account has been automatically created in the Mines Administration System (MAS)
+                        following your recent manual-entry application submission.</p>
+                        <div style="background-color: #fff; padding: 15px; border-left: 4px solid #28a745; margin: 20px 0;">
+                            <h3 style="margin-top:0;">Your Login Credentials</h3>
+                            <p><strong>Email:</strong><br><span style="font-family: monospace; color:#28a745;">%s</span></p>
+                            <p><strong>Temporary Password:</strong><br><span style="font-family: monospace; color:#28a745;">%s</span></p>
+                        </div>
+                        <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0;">
+                            <strong>Important Security Notice:</strong>
+                            <ul>
+                                <li>This is a <strong>temporary password</strong> that you must change upon first login</li>
+                                <li>Please do not share this password with anyone</li>
+                            </ul>
+                        </div>
+                        <p>You can log in to the system to track the status of your application.</p>
+                    </div>
+                </div>
+                """, fullName, typeDisplay, to, tempPassword);
+
+        sendHtmlEmail(to, subject, htmlContent);
+    }
+
+    /**
      * Send application submitted notification to applicant.
      */
     @Async
