@@ -300,4 +300,15 @@ public class MiningLeaseController {
         return SuccessResponse.buildSuccessResponse("Payment confirmed and application submitted successfully.");
     }
 
+    /**
+     * Called by the masters payment service once the BG upfront payment is confirmed as
+     * PAID. No JWT required — internal service call from mas-backend-masters.
+     */
+    @PostMapping("/bg-payment-callback")
+    @Operation(summary = "BG upfront payment callback", description = "Internal callback from payment service — confirms BG upfront payment and sets application to BG SUBMITTED")
+    public ResponseEntity<SuccessResponse<Void>> bgPaymentCallback(@RequestBody PaymentCallbackDTO dto) {
+        miningLeaseService.onBgPaymentConfirmed(dto.getApplicationNo());
+        return SuccessResponse.buildSuccessResponse("BG upfront payment confirmed.");
+    }
+
 }

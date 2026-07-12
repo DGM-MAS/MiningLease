@@ -1,6 +1,7 @@
 package com.mas.gov.bt.mas.primary.services;
 
 import com.mas.gov.bt.mas.primary.entity.MiningLeaseApplication;
+import com.mas.gov.bt.mas.primary.entity.MiningLeaseRenewalApplication;
 import com.mas.gov.bt.mas.primary.entity.SiteMaster;
 import com.mas.gov.bt.mas.primary.repository.SiteMasterRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -45,5 +46,25 @@ public class SiteProvisioningService {
         site.setCreatedBy("system-lease-approval");
         siteMasterRepository.save(site);
         log.info("Provisioned site '{}' for approved mining lease {}", site.getSiteName(), app.getApplicationNumber());
+    }
+
+    /**
+     * Refreshes the existing site_master row's location fields when a renewal is approved.
+     * Renewal applications share the original lease's applicationNumber (not its id), so the
+     * row is matched by leaseApplicationNumber. Renewals don't carry a mine-name field, so
+     * site_name is intentionally left untouched here — only location can drift at renewal.
+     */
+    public void refreshSiteLocationForRenewal(MiningLeaseRenewalApplication app) {
+        siteMasterRepository.findByLeaseTypeAndLeaseApplicationNumber(LEASE_TYPE, app.getApplicationNumber())
+                .ifPresent(site -> {
+                    site.setDzongkhagId(app.getDzongkhag() != null ? app.getDzongkhag().getId() : site.getDzongkhagId());
+                    site.setGewogNameId(app.getGewog() != null ? String.valueOf(app.getGewog().getGewogSerialNo()) : site.getGewogNameId());
+                    site.setDungkhagName(app.getDungkhag() != null ? app.getDungkhag() : site.getDungkhagName());
+                    site.setNearestVillageId(app.getNearestVillage() != null
+                            ? String.valueOf(app.getNearestVillage().getVillageSerialNo()) : site.getNearestVillageId());
+                    site.setPlace(app.getPlaceOfMiningActivity() != null ? app.getPlaceOfMiningActivity() : site.getPlace());
+                    siteMasterRepository.save(site);
+                    log.info("Refreshed site_master location for renewed mining lease {}", app.getApplicationNumber());
+                });
     }
 }
