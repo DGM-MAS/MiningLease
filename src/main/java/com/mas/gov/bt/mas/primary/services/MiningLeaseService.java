@@ -28,6 +28,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Year;
@@ -180,7 +181,7 @@ public class MiningLeaseService {
                 application.setUpdatedBy(userId);
 
                 PaymentMaster paymentMaster =
-                        paymentMasterRepository.findByServiceName(SERVICE_CODE);
+                        paymentMasterRepository.resolveApplicable(SERVICE_CODE, "APPLICATION_FEE", "SUBMITTED").orElse(null);
 
                 // =====================================================
                 // 5. DRAFT FLOW
@@ -209,11 +210,11 @@ public class MiningLeaseService {
 
                 boolean feeRequired =
                         paymentMaster != null &&
-                                Boolean.TRUE.equals(paymentMaster.getIsApplicationFeeEnabled());
+                                Boolean.TRUE.equals(paymentMaster.getIsEnabled());
 
                 if (feeRequired) {
                     application.setCurrentStatus("PAYMENT PENDING");
-                    application.setApplicationFeesAmount(paymentMaster.getApplicationFee());
+                    application.setApplicationFeesAmount(paymentMaster.getAmount());
                     application.setApplicationFeesRequired(true);
                 } else {
                     application.setCurrentStatus("SUBMITTED");
@@ -1141,6 +1142,29 @@ public class MiningLeaseService {
                 ApplicationMaster applicationMaster = miningLeaseApplication.getApplicationMaster();
                 miningLeaseApplication.setBankGuarantorDocId(request.getBankGuarantorDocId());
                 miningLeaseApplication.setUpfrontPaymentAmount(request.getUpfrontPaymentAmount());
+
+                PaymentMaster bgFeeRow = paymentMasterRepository
+                        .resolveApplicable(SERVICE_CODE, "BG_UPFRONT_FEE", "BG SUBMITTED").orElse(null);
+                boolean bgFeeEnabled = bgFeeRow != null && Boolean.TRUE.equals(bgFeeRow.getIsEnabled());
+
+                if (bgFeeEnabled && paymentEnabled) {
+                    if (request.getUpfrontPaymentAmount() == null) {
+                        throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Upfront payment amount is required");
+                    }
+                    miningLeaseApplication.setCurrentStatus("BG PAYMENT PENDING");
+                    applicationMaster.setCurrentStatus("BG PAYMENT PENDING");
+                    applicationMasterRepository.save(applicationMaster);
+                    miningLeaseApplicationRepository.save(miningLeaseApplication);
+
+                    PaymentInitiationResponse paymentResp = mastersPaymentClient.initiate(
+                            buildBgPaymentRequest(miningLeaseApplication, bgFeeRow.getServiceCode(), request.getUpfrontPaymentAmount()));
+
+                    MiningLeaseResponse response = mapper.toResponse(miningLeaseApplication);
+                    response.setRedirectUrl(paymentResp.getRedirectUrl());
+                    log.info("BG upfront payment initiated for application {}", request.getApplicationNo());
+                    return response;
+                }
+
                 miningLeaseApplication.setCurrentStatus("BG SUBMITTED");
                 applicationMaster.setCurrentStatus("BG SUBMITTED");
                 applicationMasterRepository.save(applicationMaster);
@@ -1148,6 +1172,45 @@ public class MiningLeaseService {
             }
         }
         return mapper.toResponse(miningLeaseApplication);
+    }
+
+    /**
+     * Called by the payment callback once the BG upfront payment is confirmed as PAID.
+     * Transitions status BG PAYMENT PENDING → BG SUBMITTED (today's existing next step).
+     */
+    @Transactional
+    public void onBgPaymentConfirmed(String applicationNo) {
+        MiningLeaseApplication application = miningLeaseApplicationRepository.findByApplicationNumber(applicationNo)
+                .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Application not found: " + applicationNo));
+        application.setCurrentStatus("BG SUBMITTED");
+        ApplicationMaster master = application.getApplicationMaster();
+        master.setCurrentStatus("BG SUBMITTED");
+        applicationMasterRepository.save(master);
+        miningLeaseApplicationRepository.save(application);
+        log.info("BG upfront payment confirmed — application {} transitioned to BG SUBMITTED", applicationNo);
+    }
+
+    private PaymentInitiationRequest buildBgPaymentRequest(MiningLeaseApplication application, String serviceCode, BigDecimal upfrontAmount) {
+        PaymentInitiationRequest.PaymentItemRequest item = new PaymentInitiationRequest.PaymentItemRequest();
+        item.setFeeType("BG_UPFRONT_FEE");
+        item.setServiceCode(serviceCode);
+        item.setDescription("Mining Lease Bank Guarantee Upfront Payment");
+        item.setQuantity(1);
+        item.setAmount(upfrontAmount); // caller-supplied — this amount is inherently case-specific, never centrally configured
+
+        String documentNo = resolveDocumentNo(application);
+
+        PaymentInitiationRequest req = new PaymentInitiationRequest();
+        req.setApplicationId(application.getApplicationNumber());
+        req.setApplicationType("MINING_LEASE");
+        req.setTaxPayerName(application.getApplicantName());
+        req.setTaxPayerDocumentNo(documentNo);
+        req.setTaxPayerNo(documentNo);
+        req.setPlatform("MAS");
+        req.setOnPaidStatus("BG SUBMITTED");
+        req.setCallbackUrl(selfBaseUrl + "/api/mining-lease/bg-payment-callback");
+        req.setPaymentItems(List.of(item));
+        return req;
     }
 
     @Transactional

@@ -2,7 +2,10 @@ package com.mas.gov.bt.mas.primary.services;
 
 import com.mas.gov.bt.mas.primary.utility.CustomRuntimeException;
 
+import com.mas.gov.bt.mas.primary.client.MastersPaymentClient;
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
+import com.mas.gov.bt.mas.primary.dto.payment.PaymentInitiationRequest;
+import com.mas.gov.bt.mas.primary.dto.payment.PaymentInitiationResponse;
 import com.mas.gov.bt.mas.primary.dto.request.*;
 import com.mas.gov.bt.mas.primary.dto.response.ApplicationListResponse;
 import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseRenewalApplicationResponse;
@@ -18,11 +21,13 @@ import com.mas.gov.bt.mas.primary.utility.SuccessResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -57,6 +62,23 @@ public class MiningLeaseRenewalService {
 
     private final MiningLeaseRenewalApplicationRepository  miningLeaseRenewalApplicationRepository;
 
+    private final SiteProvisioningService siteProvisioningService;
+
+    private final PaymentMasterRepository paymentMasterRepository;
+
+    private final MastersPaymentClient mastersPaymentClient;
+
+    /** payment_master.service_code for Mining Lease fee rows — deliberately the same value
+     *  MiningLeaseService.SERVICE_CODE uses, NOT this class's own SERVICE_CODE constant
+     *  above (which is a different, task-routing-only string, "MINING LEASE RENEWAL"). */
+    private static final String PAYMENT_SERVICE_CODE = "MINING_LEASE";
+
+    @Value("${app.self.base-url}")
+    private String selfBaseUrl;
+
+    @Value("${payment.enabled:true}")
+    private boolean paymentEnabled;
+
     public Page<ApplicationListResponse> getApplicationByApplicantId(Long userId, Pageable pageable, String search) {
         List<String> statusIns = new ArrayList<>();
         statusIns.add("MINING LEASE APPROVED");
@@ -71,7 +93,7 @@ public class MiningLeaseRenewalService {
 
             applications = miningLeaseApplicationRepository.findArchivedAssignedToUserAndSearch(
                             userId,
-                    archivedStatuses, search.trim(),
+                    statusIns, search.trim(),
                             pageable
                     );
         }
@@ -417,7 +439,14 @@ public class MiningLeaseRenewalService {
 
                     Boolean erbRequired = app.getErbRegularizationRequired();
 
-                    if (Boolean.TRUE.equals(erbRequired)) {
+                    // Only actually route through a payment step if the ERB fee is enabled —
+                    // otherwise this behaves exactly like "not required at all" (falls into the
+                    // else branch below: straight to APPROVED BY DIRECTOR, no citizen action).
+                    PaymentMaster erbFeeRow = paymentMasterRepository
+                            .resolveApplicable(PAYMENT_SERVICE_CODE, "ERB_REGULARIZATION_FEE", "PAYMENT PENDING").orElse(null);
+                    boolean erbFeeEnabled = erbFeeRow != null && Boolean.TRUE.equals(erbFeeRow.getIsEnabled());
+
+                    if (Boolean.TRUE.equals(erbRequired) && erbFeeEnabled && paymentEnabled) {
                         app.setCurrentStatus("PAYMENT PENDING");
                         if (master != null) {
                             master.setCurrentStatus("PAYMENT PENDING");
@@ -495,6 +524,116 @@ public class MiningLeaseRenewalService {
             miningLeaseRenewalApplicationRepository.save(app);
         }
         return mapper.toRenewalResponse(app);
+    }
+
+    /**
+     * Citizen/applicant pays the ERB regularization fee through BIRMS, once a Director has
+     * marked erbRegularizationRequired=true and the application is in PAYMENT PENDING.
+     * Mirrors SurfaceCollectionRenewalService.payEcFee's pattern: the reviewer's approval
+     * step only flips status and notifies — payment initiation itself is a separate,
+     * citizen-triggered action, not something fired automatically inside the review flow.
+     */
+    @Transactional
+    public MiningLeaseResponse payErbFee(String applicationNo, Long userId) {
+        MiningLeaseRenewalApplication app = miningLeaseRenewalApplicationRepository.findByApplicationNumber(applicationNo)
+                .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Application not found: " + applicationNo));
+
+        if (!userId.equals(app.getCreatedBy())) {
+            throw new BusinessException(ErrorCodes.ACCESS_DENIED, "You are not authorized to pay for this application.");
+        }
+        if (!"PAYMENT PENDING".equalsIgnoreCase(app.getCurrentStatus())) {
+            throw new BusinessException(ErrorCodes.INVALID_STATE,
+                    "ERB regularization fee can only be paid while the application is in PAYMENT PENDING.");
+        }
+
+        PaymentMaster erbFeeRow = paymentMasterRepository
+                .resolveApplicable(PAYMENT_SERVICE_CODE, "ERB_REGULARIZATION_FEE", "PAYMENT PENDING").orElse(null);
+        boolean erbFeeEnabled = erbFeeRow != null && Boolean.TRUE.equals(erbFeeRow.getIsEnabled());
+
+        if (!erbFeeEnabled || !paymentEnabled) {
+            onErbPaymentConfirmed(applicationNo);
+            return mapper.toRenewalResponse(app);
+        }
+
+        if (app.getPayableAmount() == null) {
+            throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Payable amount is required for ERB regularization");
+        }
+
+        PaymentInitiationResponse paymentResp = mastersPaymentClient.initiate(
+                buildErbPaymentRequest(app, erbFeeRow.getServiceCode(), app.getPayableAmount()));
+
+        MiningLeaseResponse response = mapper.toRenewalResponse(app);
+        response.setRedirectUrl(paymentResp.getRedirectUrl());
+        log.info("ERB regularization payment initiated for application {}", applicationNo);
+        return response;
+    }
+
+    /**
+     * Called by the payment callback once the ERB regularization payment is confirmed as
+     * PAID. Converges to the same next step reviewApplicationDirector's non-ERB branch
+     * already takes: APPROVED BY DIRECTOR, notify the assigned ME to upload the work order.
+     */
+    @Transactional
+    public void onErbPaymentConfirmed(String applicationNo) {
+        MiningLeaseRenewalApplication app = miningLeaseRenewalApplicationRepository.findByApplicationNumber(applicationNo)
+                .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Application not found: " + applicationNo));
+
+        app.setCurrentStatus("APPROVED BY DIRECTOR");
+        ApplicationMaster master = app.getApplicationMaster();
+        if (master != null) {
+            master.setCurrentStatus("APPROVED BY DIRECTOR");
+            master.setApprovedAt(LocalDateTime.now());
+            applicationMasterRepository.save(master);
+        }
+        miningLeaseRenewalApplicationRepository.save(app);
+
+        List<TaskManagement> meTasks = taskManagementRepository
+                .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+                        app.getApplicationNumber(), "FMFS SUBMITTED", "MINE ENGINEER", SERVICE_CODE);
+        Long meId = (meTasks != null && !meTasks.isEmpty()) ? meTasks.getFirst().getAssignedToUserId() : null;
+
+        if (master != null) {
+            createTask(master, app, "MINE ENGINEER", app.getCreatedBy(), meId);
+        }
+
+        if (meId != null) {
+            UserWorkloadProjection me = miningLeaseRenewalApplicationRepository.findUserDetailsME(meId);
+            if (me != null && me.getUserId() != null) {
+                notificationClient.sendUserNotification(
+                        "ERB regularization payment confirmed.",
+                        "Please upload the work order for application " + app.getApplicationNumber() + ".",
+                        me.getUserId(), "85");
+            }
+        }
+
+        if (app.getApplicantEmail() != null) {
+            notificationClient.sendApprovalNotification(
+                    app.getApplicantEmail(),
+                    app.getApplicantName(),
+                    app.getApplicationNumber());
+        }
+        log.info("ERB regularization payment confirmed — application {} transitioned to APPROVED BY DIRECTOR", applicationNo);
+    }
+
+    private PaymentInitiationRequest buildErbPaymentRequest(MiningLeaseRenewalApplication app, String serviceCode, BigDecimal payableAmount) {
+        PaymentInitiationRequest.PaymentItemRequest item = new PaymentInitiationRequest.PaymentItemRequest();
+        item.setFeeType("ERB_REGULARIZATION_FEE");
+        item.setServiceCode(serviceCode);
+        item.setDescription("Mining Lease ERB Regularization Fee");
+        item.setQuantity(1);
+        item.setAmount(payableAmount); // caller-supplied — Director-entered, inherently case-specific
+
+        PaymentInitiationRequest req = new PaymentInitiationRequest();
+        req.setApplicationId(app.getApplicationNumber());
+        req.setApplicationType("MINING_LEASE_RENEWAL");
+        req.setTaxPayerName(app.getApplicantName());
+        req.setTaxPayerDocumentNo(app.getApplicantCid());
+        req.setTaxPayerNo(app.getApplicantCid());
+        req.setPlatform("MAS");
+        req.setOnPaidStatus("APPROVED BY DIRECTOR");
+        req.setCallbackUrl(selfBaseUrl + "/api/mining-lease/renewal/erb-payment-callback");
+        req.setPaymentItems(List.of(item));
+        return req;
     }
 
     @Transactional
@@ -1255,6 +1394,8 @@ public class MiningLeaseRenewalService {
                 miningLeaseRenewalApplication.setCurrentStatus("MINING RENEWAL APPROVED");
                 applicationMasterRepository.save(applicationMaster);
                 miningLeaseRenewalApplicationRepository.save(miningLeaseRenewalApplication);
+
+                siteProvisioningService.refreshSiteLocationForRenewal(miningLeaseRenewalApplication);
 
                 if(miningLeaseRenewalApplication.getCreatedBy() != null) {
                     String title = "Work order has been uploaded by mine engineer.";

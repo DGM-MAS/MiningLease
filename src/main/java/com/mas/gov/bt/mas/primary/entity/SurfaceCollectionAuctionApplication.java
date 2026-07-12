@@ -139,15 +139,19 @@ public class SurfaceCollectionAuctionApplication {
     private SurfaceCollectionBidWinner bidWinner;
 
     // Dzongkhag, gewog and village details have been saved
-    @Column(name = "dzongkhag_id")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "dzongkhag_id")
     private DzongkhagLookup dzongkhagId;
 
-    @Column(name = "gewog_id")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "gewog_id")
     private GewogLookup gewogId;
 
-    @Column(name = "village_id")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "village_id")
     private VillageLookup villageId;
 
-    @Column(name = "region_id")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "region_id")
     private RegionMaster regionId;
 }
