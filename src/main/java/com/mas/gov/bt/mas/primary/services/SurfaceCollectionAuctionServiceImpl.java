@@ -62,8 +62,12 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
             SurfaceCollectionAuctionRequestDTO dto,
             Long userId
     ) {
+        Long regionId;
+
         DzongkhagLookup dzongkhagLookup =
                 lookupHelper.fetchLookup(dto.getDzongkhagId(), dzongkhagLookupRepository, "Dzongkhag");
+
+        regionId = dzongkhagLookup.getRegion().getId();
 
         GewogLookup gewogLookup =
                 lookupHelper.fetchLookup(dto.getGewogId(), gewogLookupRepository, "Gewog");
@@ -106,7 +110,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
         // =====================================================
         // 2. ASSIGN MINING DIRECTOR
         // =====================================================
-        UserWorkloadProjection assignedMD = assignMD(regionMaster.getId());
+        UserWorkloadProjection assignedMD = assignMD(regionId);
 
         entity.setAssignedMdUserId(assignedMD.getUserId());
 
