@@ -26,11 +26,12 @@ public interface TemporaryClosureRepository extends JpaRepository<TemporaryClosu
     WHERE ur.role_id = 19
       AND t.permission_id = 108
       AND u.account_status = 'ACTIVE'
+      AND u.region_id = :regionId
     GROUP BY u.id, u.email, u.username
     ORDER BY workload ASC
     LIMIT 1
     """, nativeQuery = true)
-    UserWorkloadProjection findRCTemporaryClosure();
+    UserWorkloadProjection findRCTemporaryClosure(Long regionId);
 
     @Query("""
     SELECT a FROM TemporaryClosureEntity a
