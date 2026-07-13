@@ -1,6 +1,7 @@
 package com.mas.gov.bt.mas.primary.controller.RenewalMiningLease;
 
 import com.mas.gov.bt.mas.primary.config.UserContext;
+import com.mas.gov.bt.mas.primary.dto.payment.PaymentCallbackDTO;
 import com.mas.gov.bt.mas.primary.dto.request.*;
 import com.mas.gov.bt.mas.primary.dto.response.ApplicationListResponse;
 import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseRenewalApplicationResponse;
@@ -231,5 +232,26 @@ public class MiningLeaseRenewalController {
         miningLeaseRenewalService.reassignTaskMineChief(request, userId);
 
         return SuccessResponse.buildSuccessResponse("Task reassigned successfully");
+    }
+
+    // ========== ERB Regularization Payment ==========
+
+    @PostMapping("/{applicationNo}/pay-erb-fee")
+    @Operation(summary = "Pay ERB regularization fee", description = "Citizen pays the ERB regularization fee through BIRMS after a Director marks it required")
+    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> payErbFee(@PathVariable String applicationNo) {
+        Long userId = userContext.getCurrentUserId();
+        MiningLeaseResponse response = miningLeaseRenewalService.payErbFee(applicationNo, userId);
+        return ResponseEntity.ok(new SuccessResponse<>("ERB regularization payment initiated.", response));
+    }
+
+    /**
+     * Called by the masters payment service once the ERB regularization payment is
+     * confirmed as PAID. No JWT required — internal service call from mas-backend-masters.
+     */
+    @PostMapping("/erb-payment-callback")
+    @Operation(summary = "ERB regularization payment callback", description = "Internal callback from payment service — confirms ERB regularization payment and advances the application")
+    public ResponseEntity<SuccessResponse<Void>> erbPaymentCallback(@RequestBody PaymentCallbackDTO dto) {
+        miningLeaseRenewalService.onErbPaymentConfirmed(dto.getApplicationNo());
+        return SuccessResponse.buildSuccessResponse("ERB regularization payment confirmed.");
     }
 }
