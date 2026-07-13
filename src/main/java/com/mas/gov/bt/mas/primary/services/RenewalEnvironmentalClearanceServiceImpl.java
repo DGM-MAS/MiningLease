@@ -1,19 +1,15 @@
 package com.mas.gov.bt.mas.primary.services;
 
+import com.mas.gov.bt.mas.primary.entity.*;
+import com.mas.gov.bt.mas.primary.repository.*;
 import com.mas.gov.bt.mas.primary.utility.CustomRuntimeException;
 
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
 import com.mas.gov.bt.mas.primary.dto.request.*;
 import com.mas.gov.bt.mas.primary.dto.response.EnvironmentClearanceRenewalResponseDTO;
-import com.mas.gov.bt.mas.primary.entity.ApplicationMaster;
-import com.mas.gov.bt.mas.primary.entity.EnvironmentClearanceRenewal;
-import com.mas.gov.bt.mas.primary.entity.TaskManagement;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.mapper.EnvironmentClearanceRenewalMapper;
-import com.mas.gov.bt.mas.primary.repository.ApplicationMasterRepository;
-import com.mas.gov.bt.mas.primary.repository.RenewalEnvironmentalClearanceRepository;
-import com.mas.gov.bt.mas.primary.repository.TaskManagementRepository;
 import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
 import com.mas.gov.bt.mas.primary.utility.SuccessResponse;
 import jakarta.transaction.Transactional;
@@ -23,10 +19,13 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Year;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 @Service
 @Slf4j
@@ -44,6 +43,12 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
     private final ApplicationMasterRepository applicationMasterRepository;
 
     private final NotificationClient notificationClient;
+
+    private final MiningLeaseApplicationRepository miningLeaseApplicationRepository;
+
+    private final QuarryLeaseApplicationRepository queryLeaseApplicationRepository;
+
+    private final SurfaceCollectionPermitRepository surfaceCollectionPermitRepository;
 
     @Override
     public EnvironmentClearanceRenewalResponseDTO saveDraft(
@@ -70,6 +75,8 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         EnvironmentClearanceRenewal entity =
                 environmentClearanceRenewalMapper.toEntity(request);
 
+        Long regionId = 0L;
+
         entity.setApplicationNo(generateApplicationNumber());
         entity.setCreatedBy(userId);
         entity.setSubmittedOn(LocalDateTime.now());
@@ -82,25 +89,49 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         entity.setApplicationMaster(master);
 
         if (entity.getServiceType().equals("MINING LEASE") || entity.getServiceType().equals("QUARRY LEASE")) {
-            UserWorkloadProjection assignedMDEngineer = assignMD();
-            if (assignedMDEngineer != null) {
-                createTask(master, entity, "MINING ENGINEER", userId, assignedMDEngineer.getUserId());
-                entity.setAssignedMDId(assignedMDEngineer.getUserId());
 
-                notificationClient.sendEnvironmentalClearanceAssignmentNotification(
-                        assignedMDEngineer.getEmail(),
-                        assignedMDEngineer.getUsername(),
-                        entity.getApplicationNo(),
-                        "REVIEW APPLICATION");
+            if (entity.getServiceType().equals("MINING LEASE") ){
+                Optional<MiningLeaseApplication> application =
+                        miningLeaseApplicationRepository.findByApplicationNumber(request.getSiteApplicationNo());
 
-                String title = "Renewal environmental clearance application has been assigned.";
-                String message = "An application for environmental clearance lease has been assigned for review. Application No. "+ entity.getApplicationNo()+" Please login in review the Geological report.";
-                String serviceId = "78";
-                notificationClient.sendUserNotification(title, message, assignedMDEngineer.getUserId(), serviceId);
+                if (application.isPresent()) {
+                    regionId = application.get().getRegionId();
+                }
             }
 
+            if (entity.getServiceType().equals("QUARRY LEASE") ){
+                Optional<QuarryLeaseApplication> application =
+                        queryLeaseApplicationRepository.findByApplicationNumber(request.getSiteApplicationNo());
+
+                if (application.isPresent()) {
+                    regionId = application.get().getRegionId();
+                }
+            }
+
+            UserWorkloadProjection assignedMDEngineer = assignMD(regionId);
+
+            createTask(master, entity, "MINING ENGINEER", userId, assignedMDEngineer.getUserId());
+            entity.setAssignedMDId(assignedMDEngineer.getUserId());
+
+            notificationClient.sendEnvironmentalClearanceAssignmentNotification(
+                    assignedMDEngineer.getEmail(),
+                    assignedMDEngineer.getUsername(),
+                    entity.getApplicationNo(),
+                    "REVIEW APPLICATION");
+
+            String title = "Renewal environmental clearance application has been assigned.";
+            String message = "An application for environmental clearance lease has been assigned for review. Application No. "+ entity.getApplicationNo()+" Please login in review the Geological report.";
+            String serviceId = "78";
+            notificationClient.sendUserNotification(title, message, assignedMDEngineer.getUserId(), serviceId);
+
         }else {
-            UserWorkloadProjection assignedMPCD = assignMPCD();
+
+            Optional<SurfaceCollectionPermitEntity> surfaceCollectionPermitEntity = surfaceCollectionPermitRepository.findByApplicationNo(request.getSiteApplicationNo());
+            if (surfaceCollectionPermitEntity.isPresent()) {
+                regionId = surfaceCollectionPermitEntity.get().getRegionId();
+            }
+
+            UserWorkloadProjection assignedMPCD = assignMPCD(regionId);
 
             log.info(
                     "Assigned MPCD: id={}, username={}, email={}",
@@ -222,10 +253,10 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         );
     }
 
-    private UserWorkloadProjection assignMD() {
+    private UserWorkloadProjection assignMD(Long regionId) {
 
         UserWorkloadProjection md =
-                renewalEnvironmentalClearanceRepository.findMDEnvironmentalClearance();
+                renewalEnvironmentalClearanceRepository.findMDEnvironmentalClearance(regionId);
 
         if (md == null) {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND,
@@ -234,10 +265,10 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         return md;
     }
 
-    private UserWorkloadProjection assignMPCD() {
+    private UserWorkloadProjection assignMPCD(Long regionId) {
 
         UserWorkloadProjection mpcd =
-                renewalEnvironmentalClearanceRepository.findMPCDEnvironmentalClearance();
+                renewalEnvironmentalClearanceRepository.findMPCDEnvironmentalClearance(regionId);
 
         if (mpcd == null) {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND,
@@ -270,6 +301,8 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             Long userId
     ) {
 
+        Long regionId = 0L;
+
         EnvironmentClearanceRenewal entity =
                 renewalEnvironmentalClearanceRepository
                         .findById(request.getRenewalId())
@@ -277,6 +310,36 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                                 new RuntimeException(
                                         "Application not found"
                                 ));
+
+        if (entity.getServiceType().equals("MINING LEASE") || entity.getServiceType().equals("QUARRY LEASE")) {
+
+            if (entity.getServiceType().equals("MINING LEASE")) {
+                Optional<MiningLeaseApplication> application =
+                        miningLeaseApplicationRepository.findByApplicationNumber(entity.getSiteApplicationNo());
+
+                if (application.isPresent()) {
+                    regionId = application.get().getRegionId();
+                }
+            }
+
+            if (entity.getServiceType().equals("QUARRY LEASE")) {
+                Optional<QuarryLeaseApplication> application =
+                        queryLeaseApplicationRepository.findByApplicationNumber(entity.getSiteApplicationNo());
+
+                if (application.isPresent()) {
+                    regionId = application.get().getRegionId();
+                }
+            }
+        }else {
+            Optional<SurfaceCollectionPermitEntity> surfaceCollectionPermitEntity =
+                    surfaceCollectionPermitRepository.findByApplicationNo(
+                            entity.getSiteApplicationNo()
+                    );
+
+            if (surfaceCollectionPermitEntity.isPresent()) {
+                regionId = surfaceCollectionPermitEntity.get().getRegionId();
+            }
+        }
 
         ApplicationMaster applicationMaster = entity.getApplicationMaster();
 
@@ -305,7 +368,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             entity.setIomSubmittedOn(LocalDateTime.now());
             entity.setStatus("IOM_SUBMITTED_TO_MD");
 
-            UserWorkloadProjection assignedMD = assignMD();
+            UserWorkloadProjection assignedMD = assignMD(regionId);
             entity.setAssignedMDId(assignedMD.getUserId());
 
             applicationMaster.setCurrentStatus(entity.getStatus());
@@ -1089,6 +1152,65 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             // Terminal state — mark completion so the citizen tracking dashboard archives it
             entity.getApplicationMaster()
                     .setCompletedOn(LocalDateTime.now());
+        }
+
+        if (entity.getServiceType().equals("MINING LEASE") || entity.getServiceType().equals("QUARRY LEASE")) {
+
+            if (entity.getServiceType().equals("MINING LEASE")) {
+                Optional<MiningLeaseApplication> application =
+                        miningLeaseApplicationRepository.findByApplicationNumber(entity.getSiteApplicationNo());
+
+                if (application.isPresent()) {
+                   MiningLeaseApplication miningLeaseApplication = application.get();
+
+                   miningLeaseApplication.setECStatus("ACTIVE");
+                   miningLeaseApplication.setEcNumber(entity.getEcNumber());
+                   miningLeaseApplication.setEcExpiryDate(entity.getEcExpiryDate());
+                   miningLeaseApplication.setEcFileId(entity.getEcFileId());
+
+                   miningLeaseApplicationRepository.save(miningLeaseApplication);
+
+
+                }
+            }
+
+            if (entity.getServiceType().equals("QUARRY LEASE")) {
+                Optional<QuarryLeaseApplication> application =
+                        queryLeaseApplicationRepository.findByApplicationNumber(entity.getSiteApplicationNo());
+
+                if (application.isPresent()) {
+                    QuarryLeaseApplication quarryLeaseApplication = application.get();
+
+                    quarryLeaseApplication.setECStatus("ACTIVE");
+                    quarryLeaseApplication.setECExpiryDate(entity.getEcExpiryDate());
+                    quarryLeaseApplication.setEcNumber(entity.getEcNumber());
+                    quarryLeaseApplication.setEcFileId(entity.getEcFileId());
+
+                    queryLeaseApplicationRepository.save(quarryLeaseApplication);
+
+                }
+            }
+        }else{
+
+            Optional<SurfaceCollectionPermitEntity> surfaceCollectionPermitEntity = surfaceCollectionPermitRepository.findByApplicationNo(entity.getSiteApplicationNo());
+
+            if (surfaceCollectionPermitEntity.isPresent()) {
+                SurfaceCollectionPermitEntity surfaceCollectionPermit = surfaceCollectionPermitEntity.get();
+
+                LocalDate ecExpiryDate = entity.getEcExpiryDate() == null
+                        ? null
+                        : entity.getEcExpiryDate()
+                        .toInstant()
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDate();
+
+                surfaceCollectionPermit.setECStatus("ACTIVE");
+                surfaceCollectionPermit.setEcFileId(entity.getEcFileId());
+                surfaceCollectionPermit.setEcNo(entity.getEcNumber());
+                surfaceCollectionPermit.setEcValidUpto(ecExpiryDate);
+                surfaceCollectionPermitRepository.save(surfaceCollectionPermit);
+
+            }
         }
 
         entity.getApplicationMaster()

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.Date;
 
 @Entity
 @Table(name = "t_environment_clearance_renewal")
@@ -17,6 +18,8 @@ public class EnvironmentClearanceRenewal {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    private String siteApplicationNo;
+
     private String applicationNo;
 
     private String serviceType;
@@ -29,6 +32,13 @@ public class EnvironmentClearanceRenewal {
     private Long previousEcFileId;
 
     private Long selfMonitoringReportFileId;
+
+    private String ecNumber;
+
+    private Date ecExpiryDate;
+
+    @Column(name = "ec_file_id")
+    private String ecFileId;
 
     // Reference to master application
     @OneToOne(fetch = FetchType.LAZY)
