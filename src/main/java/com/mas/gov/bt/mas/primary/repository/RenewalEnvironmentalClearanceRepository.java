@@ -43,11 +43,12 @@ public interface RenewalEnvironmentalClearanceRepository extends JpaRepository<E
         AND ecr.status NOT IN ('APPROVED', 'REJECTED', 'EC_RENEWED')
     WHERE ur.role_id = 21
       AND u.account_status = 'ACTIVE'
+      AND u.region_id = :regionId
     GROUP BY u.id, u.email, u.username
     ORDER BY workload ASC
     LIMIT 1
     """, nativeQuery = true)
-    UserWorkloadProjection findMDEnvironmentalClearance();
+    UserWorkloadProjection findMDEnvironmentalClearance(Long regionId);
 
     @Query(value = """
     SELECT
@@ -63,11 +64,12 @@ public interface RenewalEnvironmentalClearanceRepository extends JpaRepository<E
         AND ecr.status NOT IN ('APPROVED', 'REJECTED', 'EC_RENEWED')
     WHERE ur.role_id = 23
       AND u.account_status = 'ACTIVE'
+      AND u.region_id = :regionId
     GROUP BY u.id, u.email, u.username
     ORDER BY workload ASC
     LIMIT 1
     """, nativeQuery = true)
-    UserWorkloadProjection findMPCDEnvironmentalClearance();
+    UserWorkloadProjection findMPCDEnvironmentalClearance(Long regionId);
 
 
     @Query(value = """
