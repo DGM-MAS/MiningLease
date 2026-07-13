@@ -110,6 +110,10 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
 
             UserWorkloadProjection assignedMDEngineer = assignMD(regionId);
 
+            if (assignedMDEngineer == null) {
+                assignedMDEngineer = assignMD(9L);
+            }
+
             createTask(master, entity, "MINING ENGINEER", userId, assignedMDEngineer.getUserId());
             entity.setAssignedMDId(assignedMDEngineer.getUserId());
 
@@ -133,6 +137,10 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
 
             UserWorkloadProjection assignedMPCD = assignMPCD(regionId);
 
+            if (assignedMPCD == null) {
+                assignedMPCD = assignMPCD(9L);
+            }
+
             log.info(
                     "Assigned MPCD: id={}, username={}, email={}",
                     assignedMPCD.getUserId(),
@@ -140,21 +148,19 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                     assignedMPCD.getEmail()
             );
 
-            if(assignedMPCD != null) {
-                createTask(master, entity, "MPCD", userId, assignedMPCD.getUserId());
-                entity.setAssignedMPCDId(assignedMPCD.getUserId());
+            createTask(master, entity, "MPCD", userId, assignedMPCD.getUserId());
+            entity.setAssignedMPCDId(assignedMPCD.getUserId());
 
-                notificationClient.sendEnvironmentalClearanceAssignmentNotification(
-                        assignedMPCD.getEmail(),
-                        assignedMPCD.getUsername(),
-                        entity.getApplicationNo(),
-                        "REVIEW APPLICATION");
+            notificationClient.sendEnvironmentalClearanceAssignmentNotification(
+                    assignedMPCD.getEmail(),
+                    assignedMPCD.getUsername(),
+                    entity.getApplicationNo(),
+                    "REVIEW APPLICATION");
 
-                String title = "Renewal environmental clearance application has been assigned.";
-                String message = "An application for environmental clearance lease has been assigned for review. Application No. "+ entity.getApplicationNo()+" Please login in review the Geological report.";
-                String serviceId = "78";
-                notificationClient.sendUserNotification(title, message, assignedMPCD.getUserId(), serviceId);
-            }
+            String title = "Renewal environmental clearance application has been assigned.";
+            String message = "An application for environmental clearance lease has been assigned for review. Application No. "+ entity.getApplicationNo()+" Please login in review the Geological report.";
+            String serviceId = "78";
+            notificationClient.sendUserNotification(title, message, assignedMPCD.getUserId(), serviceId);
 
         }
 
@@ -258,10 +264,11 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         UserWorkloadProjection md =
                 renewalEnvironmentalClearanceRepository.findMDEnvironmentalClearance(regionId);
 
-        if (md == null) {
+        if (regionId == 9L && md == null) {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND,
-                    "No active MD engineer available for assignment. Please ensure an MD engineer is registered in the system.");
+                    "No active MPCD officer available for assignment. Please ensure an MPCD officer is registered in the system.");
         }
+
         return md;
     }
 
@@ -270,7 +277,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         UserWorkloadProjection mpcd =
                 renewalEnvironmentalClearanceRepository.findMPCDEnvironmentalClearance(regionId);
 
-        if (mpcd == null) {
+        if (regionId == 9L && mpcd == null) {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND,
                     "No active MPCD officer available for assignment. Please ensure an MPCD officer is registered in the system.");
         }
@@ -369,6 +376,10 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             entity.setStatus("IOM_SUBMITTED_TO_MD");
 
             UserWorkloadProjection assignedMD = assignMD(regionId);
+
+            if (assignedMD != null) {
+                assignedMD = assignMD(9L);
+            }
             entity.setAssignedMDId(assignedMD.getUserId());
 
             applicationMaster.setCurrentStatus(entity.getStatus());

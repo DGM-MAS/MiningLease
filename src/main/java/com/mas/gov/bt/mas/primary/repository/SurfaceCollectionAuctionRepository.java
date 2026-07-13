@@ -55,7 +55,7 @@ public interface SurfaceCollectionAuctionRepository
     WHERE ur.role_id = 20
       AND t.permission_id = 71 
       AND u.account_status = 'ACTIVE'
-      AND u.region_id = :id
+      AND u.region_id IN :id
     GROUP BY u.id, u.email, u.username
     ORDER BY workload ASC
     LIMIT 1

@@ -738,7 +738,8 @@ public class MiningLeaseService {
         List<String> archivedStatuses = List.of(
                 "MINING LEASE APPROVED",
                 "REJECTED",
-                "TERMINATION APPROVED"
+                "TERMINATION APPROVED",
+                "RENEWAL APPLICATION"
         );
 
         Page<MiningLeaseApplication> applications;
@@ -785,7 +786,8 @@ public class MiningLeaseService {
         List<String> archivedStatuses = List.of(
                 "MINING LEASE APPROVED",
                 "REJECTED",
-                "TERMINATION APPROVED"
+                "TERMINATION APPROVED",
+                "RENEWAL APPLICATION"
         );
 
         if (search == null || search.isBlank()) {
@@ -1106,6 +1108,14 @@ public class MiningLeaseService {
                 miningLeaseApplicationRepository.save(miningLeaseApplication);
 
                 UserWorkloadProjection assignedMineEngineer = miningLeaseApplicationRepository.findLeastBusyMineEngineer(20L, miningLeaseApplication.getRegionId());
+
+                if(assignedMineEngineer == null){
+                    assignedMineEngineer = miningLeaseApplicationRepository.findLeastBusyMineEngineer(20L, 9L);
+
+                    if (assignedMineEngineer == null) {
+                        throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Mining Engineer with required premission, role and region not found.");
+                    }
+                }
 
                 createTask(applicationMaster,miningLeaseApplication,"MINE ENGINEER", userId, assignedMineEngineer.getUserId());
 
@@ -1487,6 +1497,8 @@ public class MiningLeaseService {
         MiningLeaseApplication miningLeaseApplication = findApplicationById(reviewQuarryLeaseApplicationGeologist.getId());
         ApplicationMaster applicationMaster = miningLeaseApplication.getApplicationMaster();
 
+        miningLeaseApplication.setRegionId(geologistRegionId);
+
         // Complete current task
         completeCurrentTask(applicationMaster, reviewQuarryLeaseApplicationGeologist.getStatus(), reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
 
@@ -1513,6 +1525,14 @@ public class MiningLeaseService {
                     // otherwise this is still waiting on the other reviewer.
                     if (fullyApprovedPfs && applicationMaster != null) {
                         UserWorkloadProjection assignedMineEngineer = miningLeaseApplicationRepository.findLeastBusyMineEngineer(20L, geologistRegionId);
+
+                        if(assignedMineEngineer == null){
+                            assignedMineEngineer = miningLeaseApplicationRepository.findLeastBusyMineEngineer(20L, 9L);
+                            if (assignedMineEngineer == null) {
+                                throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Mining Engineer with required permission, role and region not found.");
+                            }
+                        }
+
                         if (assignedMineEngineer != null) {
                             createTask(applicationMaster, miningLeaseApplication, "MINE ENGINEER", userId, assignedMineEngineer.getUserId());
 
@@ -2177,7 +2197,11 @@ public class MiningLeaseService {
                     // 8. ASSIGN DIRECTOR + CREATE TASK
                     // =====================================================
                     UserWorkloadProjection assignedMiningChief =
-                            assignMiningChief();
+                            assignMiningChief(app.getRegionId());
+
+                    if(assignedMiningChief == null){
+                        assignedMiningChief = assignMiningChief(9L);
+                    }
 
                     assert master != null;
                     createTask(master, app, "MINING_CHIEF", userId, assignedMiningChief.getUserId());
@@ -2331,7 +2355,11 @@ public class MiningLeaseService {
                     // 8. ASSIGN DIRECTOR + CREATE TASK
                     // =====================================================
                     UserWorkloadProjection assignedMiningChief =
-                            assignMiningChief();
+                            assignMiningChief(app.getRegionId());
+
+                    if(assignedMiningChief == null){
+                        assignedMiningChief = assignMiningChief(9L);
+                    }
 
                     assert master != null;
                     createTask(master, app, "MINING_CHIEF_REVIEW", userId, assignedMiningChief.getUserId());
@@ -2412,15 +2440,15 @@ public class MiningLeaseService {
     }
 
     @Transactional
-    public UserWorkloadProjection assignMiningChief() {
+    public UserWorkloadProjection assignMiningChief(Long regionId) {
 
-        UserWorkloadProjection director =
-                miningLeaseApplicationRepository.findChiefQuarrying();
+        UserWorkloadProjection miningChief =
+                miningLeaseApplicationRepository.findChiefQuarrying(regionId);
 
-        if (director == null) {
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
+        if (miningChief == null && regionId == 9L) {
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Mining chief with required permission, role and region not found.");
         }
-        return director;
+        return miningChief;
     }
 
     public SuccessResponse<List<MiningLeaseResponse>> getAssignedToMineEngineer(Long userId, Pageable pageable, String search) {
