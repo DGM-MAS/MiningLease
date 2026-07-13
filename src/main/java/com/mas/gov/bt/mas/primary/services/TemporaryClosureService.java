@@ -73,7 +73,11 @@ public class TemporaryClosureService {
         // =====================================================
         // 2. ASSIGN RC
         // =====================================================
-        UserWorkloadProjection assignedRC = assignRC();
+        UserWorkloadProjection assignedRC = assignRC(miningLeaseApplication1.getRegionId());
+
+        if (assignedRC == null) {
+            assignedRC = assignRC(9L);
+        }
 
         // =====================================================
         // 3. Application master and create task for director
@@ -110,13 +114,13 @@ public class TemporaryClosureService {
     }
 
     @Transactional
-    public UserWorkloadProjection assignRC() {
+    public UserWorkloadProjection assignRC(Long regionId) {
 
         UserWorkloadProjection rc =
-                temporaryClosureRepository.findRCTemporaryClosure();
+                temporaryClosureRepository.findRCTemporaryClosure(regionId);
 
-        if (rc == null) {
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
+        if (rc == null && regionId == 9L) {
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "RC with the required permission, role and region not found.");
         }
         return rc;
     }

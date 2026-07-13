@@ -100,22 +100,30 @@ public class MineRestorationService {
             }
 
             // Auto-assign ME by workload
-            UserWorkloadProjection assignedME = restorationApplicationRepository.findMEWithLeastWorkload();
-            if (assignedME != null) {
-                restoration.setAssignedMeUserId(assignedME.getUserId());
-                notificationClient.sendAssignmentNotification(
-                        assignedME.getEmail(),
-                        assignedME.getUsername(),
-                        restoration.getApplicationNumber(),
-                        "Mine Restoration Plan Review"
-                );
-                notificationClient.sendUserNotification(
-                        "New Mine Restoration Plan assigned",
-                        "A Mine Restoration Plan has been assigned to you for review.",
-                        assignedME.getUserId(),
-                        SERVICE_CODE
-                );
+            UserWorkloadProjection assignedME = restorationApplicationRepository.findMEWithLeastWorkload(lease.getRegionId());
+
+            if (assignedME == null) {
+                assignedME = restorationApplicationRepository.findMEWithLeastWorkload(9L);
+
+                if (assignedME == null) {
+                    throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Mining Engineer with required permission, role and region not found.");
+                }
+
             }
+
+            restoration.setAssignedMeUserId(assignedME.getUserId());
+            notificationClient.sendAssignmentNotification(
+                    assignedME.getEmail(),
+                    assignedME.getUsername(),
+                    restoration.getApplicationNumber(),
+                    "Mine Restoration Plan Review"
+            );
+            notificationClient.sendUserNotification(
+                    "New Mine Restoration Plan assigned",
+                    "A Mine Restoration Plan has been assigned to you for review.",
+                    assignedME.getUserId(),
+                    SERVICE_CODE
+            );
         }
 
         restorationApplicationRepository.save(restoration);
