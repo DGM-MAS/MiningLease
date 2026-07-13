@@ -389,11 +389,12 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     WHERE ur.role_id = 30
       AND t.permission_id = 78
       AND u.account_status = 'ACTIVE'
+      AND u.region_id = :regionId
     GROUP BY u.id, u.email, u.username
     ORDER BY workload ASC
     LIMIT 1
     """, nativeQuery = true)
-    UserWorkloadProjection findChiefQuarrying();
+    UserWorkloadProjection findChiefQuarrying(Long regionId);
 
 
     @Query("""
