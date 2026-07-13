@@ -71,7 +71,8 @@ public class MiningLeaseRenewalService {
 
             applications = miningLeaseApplicationRepository.findArchivedAssignedToUserAndSearch(
                             userId,
-                    archivedStatuses, search.trim(),
+                            statusIns,
+                            search.trim(),
                             pageable
                     );
         }

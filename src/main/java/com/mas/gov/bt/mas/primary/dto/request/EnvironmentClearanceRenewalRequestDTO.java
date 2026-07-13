@@ -1,6 +1,9 @@
 package com.mas.gov.bt.mas.primary.dto.request;
 
+import jakarta.persistence.Column;
 import lombok.*;
+
+import java.util.Date;
 
 @Getter
 @Setter
@@ -9,6 +12,8 @@ import lombok.*;
 public class EnvironmentClearanceRenewalRequestDTO {
 
     private Long id; // for draft update
+
+    private String siteApplicationNo;
 
     private String serviceType;
 
@@ -20,4 +25,11 @@ public class EnvironmentClearanceRenewalRequestDTO {
     private Long previousEcFileId;
 
     private Long selfMonitoringReportFileId;
+
+    private String ecNumber;
+
+    private Date ecExpiryDate;
+
+    private String ecFileId;
+
 }

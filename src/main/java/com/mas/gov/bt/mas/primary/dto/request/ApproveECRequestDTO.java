@@ -20,4 +20,6 @@ public class ApproveECRequestDTO {
 
     private Boolean forwardToDECC;
 
+
+
 }

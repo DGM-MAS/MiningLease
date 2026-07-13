@@ -330,4 +330,10 @@ public class QuarryLeaseApplication {
 
     @Column(name = "name_of_quarry")
     private String nameOfQuarry;
+
+    @Column(name = "ec_file_id")
+    private String ecFileId;
+
+    @Column(name = "ec_number")
+    private String ecNumber;
 }
