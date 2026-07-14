@@ -17,6 +17,8 @@ import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
+
 /**
  * Client for sending notifications (Email/SMS).
  */
@@ -34,6 +36,19 @@ public class NotificationClient {
 
     @Value("${app.email.enabled:true}")
     private boolean emailEnabled;
+
+    // SMS config mirrors mas-backend-masters' SmsProperties/SmsService (same G2C
+    // gateway) — duplicated here rather than shared cross-module, same reasoning
+    // as PasswordGenerator: MiningLease is a separate deployable with no shared
+    // dependency on masters.
+    @Value("${app.sms.enabled:true}")
+    private boolean smsEnabled;
+
+    @Value("${app.sms.base-url:http://172.30.16.136/g2csms/push.php}")
+    private String smsBaseUrl;
+
+    @Value("${app.sms.country-code:975}")
+    private String smsCountryCode;
 
     private static final Logger logger = LoggerFactory.getLogger(NotificationClient.class);
 
@@ -143,6 +158,55 @@ public class NotificationClient {
                 """, fullName, typeDisplay, to, tempPassword);
 
         sendHtmlEmail(to, subject, htmlContent);
+    }
+
+    /**
+     * Send a raw SMS via the G2C gateway.
+     */
+    @Async
+    public void sendSms(String phoneNumber, String message) {
+        if (!smsEnabled) {
+            log.info("SMS disabled. Would have sent to: {}", phoneNumber);
+            return;
+        }
+        if (phoneNumber == null || phoneNumber.isBlank()) {
+            log.info("Skipping SMS - no phone number supplied");
+            return;
+        }
+
+        try {
+            String fullNumber = formatPhoneNumber(phoneNumber);
+
+            URI uri = UriComponentsBuilder.fromUriString(smsBaseUrl)
+                    .queryParam("to", fullNumber)
+                    .queryParam("msg", message)
+                    .build()
+                    .toUri();
+
+            String response = restTemplate.getForObject(uri, String.class);
+            log.info("SMS sent successfully to: {}. Response: {}", fullNumber, response);
+        } catch (Exception e) {
+            log.error("Failed to send SMS to: {}", phoneNumber, e);
+        }
+    }
+
+    private String formatPhoneNumber(String phoneNumber) {
+        String cleaned = phoneNumber.replaceAll("[\\s\\-()]+", "");
+        if (cleaned.startsWith(smsCountryCode)) {
+            return cleaned;
+        }
+        return smsCountryCode + cleaned;
+    }
+
+    /**
+     * Send the auto-generated login credentials via SMS to an applicant whose
+     * citizen account was just provisioned from a manual-entry submission.
+     */
+    @Async
+    public void sendApplicantAccountCredentialsSms(String phoneNumber, String username, String tempPassword) {
+        String message = "Welcome to MAS! Your username: " + username + ", Temporary password: " + tempPassword
+                + ". Please change your password on first login.";
+        sendSms(phoneNumber, message);
     }
 
     /**
