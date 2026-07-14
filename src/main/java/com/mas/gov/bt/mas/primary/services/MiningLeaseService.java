@@ -464,15 +464,23 @@ public class MiningLeaseService {
 //         ============================================================
 //         0. Checking if the user has not more than two mining lease
 //         ============================================================
-        String householdNumber = miningLeaseApplicationRepository.findUserHouseHoldNumber(userId);
-
-        Integer total = miningLeaseApplicationRepository
-                .countMiningLeasesByHousehold(householdNumber);
+//        String householdNumber = miningLeaseApplicationRepository.findUserHouseHoldNumber(userId);
+//
+//        Integer total = miningLeaseApplicationRepository
+//                .countMiningLeasesByHousehold(householdNumber);
+//
+//        if (total >= 2) {
+//            throw new BusinessException(
+//                    ErrorCodes.DATA_INTEGRITY_VIOLATION,
+//                    "Only two mining leases/applications are permitted per household."
+//            );
+//        }
+        Integer total = getExistingPermitCount(request, userId);
 
         if (total >= 2) {
             throw new BusinessException(
                     ErrorCodes.DATA_INTEGRITY_VIOLATION,
-                    "Only two mining leases/applications are permitted per household."
+                    "Only two mining leases/applications are permitted."
             );
         }
 
@@ -487,6 +495,9 @@ public class MiningLeaseService {
         miningLeaseApplication.setApplicantEmail(request.getApplicantEmail());
         miningLeaseApplication.setApplicantName(request.getApplicantName());
         miningLeaseApplication.setLicenseNo(request.getLicenseNo());
+        miningLeaseApplication.setBusinessLicenseNo(request.getBusinessLicenseNo());
+        miningLeaseApplication.setBusinessName(request.getBusinessName());
+        miningLeaseApplication.setCompanyRegistrationNo(request.getCompanyRegistrationNo());
         miningLeaseApplication.setCompanyName(request.getCompanyName());
         miningLeaseApplication.setCurrentStatus("GR SUBMITTED");
         miningLeaseApplication.setCreatedBy(userId);
@@ -2736,5 +2747,34 @@ public class MiningLeaseService {
         }
 
         return SuccessResponse.fromPage("Applications fetched successfully", page.map(mapper::toResponse));
+    }
+
+    private Integer getExistingPermitCount(MiningLeaseGRRequest request, Long userId) {
+
+        String applicantType = request.getApplicantType();
+
+        if ("INDIVIDUAL".equalsIgnoreCase(applicantType)) {
+            String householdNumber =
+                    miningLeaseApplicationRepository.findUserHouseHoldNumber(userId);
+
+            return miningLeaseApplicationRepository
+                    .countMiningLeasesByHousehold(householdNumber);
+        }
+
+        String identifier;
+
+        if ("BUSINESS_LICENSE".equalsIgnoreCase(applicantType)) {
+            identifier = request.getBusinessLicenseNo();
+        } else if ("REGISTERED_COMPANY".equalsIgnoreCase(applicantType)) {
+            identifier = request.getCompanyRegistrationNo();
+        } else {
+            throw new BusinessException(
+                    ErrorCodes.INVALID_REQUEST,
+                    "Invalid applicant type."
+            );
+        }
+
+        return miningLeaseApplicationRepository
+                .countByApplicantCidAndServiceType(identifier, SERVICE_CODE);
     }
 }
