@@ -2046,7 +2046,10 @@ public class MiningLeaseService {
 
         completeCurrentTask(master, request.getStatus(), request.getRemarks());
 
-        Long directorId = request.getDirectorId();
+        TaskManagement task = taskManagementRepository.findByApplicationNumberAndAssignedToRoleAndTaskStatusAndServiceCode
+                (app.getApplicationNumber(),"DIRECTOR", "GR SUBMITTED", SERVICE_CODE);
+
+        Long directorId = task.getAssignedToUserId();
 
         if (request.getStatus() != null) {
             switch (request.getStatus()) {
