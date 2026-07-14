@@ -1266,7 +1266,10 @@ public class MiningLeaseRenewalService {
         MiningLeaseRenewalApplication app = findApplicationById(request.getId());
         ApplicationMaster master = app.getApplicationMaster();
 
-        Long directorId = request.getDirectorId();
+        TaskManagement task = taskManagementRepository.findByApplicationNumberAndAssignedToRoleAndTaskStatusAndServiceCode
+                (app.getApplicationNumber(),"DIRECTOR", "RENEWAL APPLICATION", SERVICE_CODE);
+
+        Long directorId = task.getAssignedToUserId();
 
         if (request.getStatus() != null) {
             switch (request.getStatus()) {
