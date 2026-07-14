@@ -20,6 +20,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -52,7 +54,32 @@ public class ManualMiningLeaseService {
 
     private final NotificationClient notificationClient;
 
+    private final ApplicantAccountProvisioningService applicantAccountProvisioningService;
+
     private static final String SERVICE_CODE = "MINING_LEASE_MANUAL_ENTRY";
+
+    // Runs only once the submission has actually committed, in its own transaction,
+    // so a failure provisioning the applicant's account/email can never roll back
+    // (or be rolled back by) the manual-entry submission itself.
+    private void registerApplicantAccountAfterCommit(String applicantType, String applicantCid, String applicantName,
+                                                       String applicantContact, String applicantEmail,
+                                                       String licenseNo, String businessLicenseNo,
+                                                       String companyName) {
+        Runnable provision = () -> applicantAccountProvisioningService.provisionForApplicant(
+                applicantType, applicantCid, applicantName, applicantContact, applicantEmail,
+                licenseNo, businessLicenseNo, null, companyName, null);
+
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            provision.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                provision.run();
+            }
+        });
+    }
 
     /**
      * Create a new application.
@@ -185,6 +212,13 @@ public class ManualMiningLeaseService {
             application.setCreatedBy(userId);
             application.setLeaseStartDate(LocalDate.from(now.plusYears(Long.parseLong(request.getProposedLeasePeriod()))));
             miningLeaseApplicationRepository.save(application);
+
+            if (!isDraft) {
+                registerApplicantAccountAfterCommit(
+                        request.getApplicantType(), request.getApplicantCid(), request.getApplicantName(),
+                        request.getApplicantContact(), request.getApplicantEmail(),
+                        request.getLicenseNo(), request.getBusinessLicenseNo(), request.getCompanyName());
+            }
 
             log.info("Application submitted successfully: {}",
                     application.getApplicationNumber());
@@ -379,6 +413,13 @@ public class ManualMiningLeaseService {
         ApplicationMaster master1 = app.getApplicationMaster();
 
         applicationRepository.save(application);
+
+        if (!isDraft) {
+            registerApplicantAccountAfterCommit(
+                    request.getApplicantType(), request.getApplicantCid(), request.getApplicantName(),
+                    request.getApplicantContact(), request.getApplicantEmail(),
+                    request.getLicenseNo(), request.getBusinessLicenseNo(), request.getCompanyName());
+        }
 
         log.info("Application submitted successfully: {}",
                 application.getApplicationNumber());
