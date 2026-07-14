@@ -739,7 +739,8 @@ public class MiningLeaseService {
                 "MINING LEASE APPROVED",
                 "REJECTED",
                 "TERMINATION APPROVED",
-                "RENEWAL APPLICATION"
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED"
         );
 
         Page<MiningLeaseApplication> applications;
@@ -787,7 +788,8 @@ public class MiningLeaseService {
                 "MINING LEASE APPROVED",
                 "REJECTED",
                 "TERMINATION APPROVED",
-                "RENEWAL APPLICATION"
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED"
         );
 
         if (search == null || search.isBlank()) {

@@ -9,8 +9,6 @@ import lombok.*;
 @Builder
 public class SampleTransportClearanceDTO {
 
-    private String siteName;
-    private String siteApplicationNo;
     private String applicantName;
     private String contactNo;
     private String emailAddress;
@@ -23,4 +21,8 @@ public class SampleTransportClearanceDTO {
     private String shippingPurpose;
     private String shippingMode;
     private String destination;
+
+    private String dzongkhagID;
+    private String gewogID;
+    private String villageID;
 }

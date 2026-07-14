@@ -38,11 +38,12 @@ public interface SampleTransportClearanceRepository extends JpaRepository<Sample
     WHERE ur.role_id = 39
       AND t.permission_id = 149
       AND u.account_status = 'ACTIVE'
+      AND U.region_Id = :regionId
     GROUP BY u.id, u.email, u.username
     ORDER BY workload ASC
     LIMIT 1
     """, nativeQuery = true)
-    UserWorkloadProjection findChiefGSDSample();
+    UserWorkloadProjection findChiefGSDSample(Long regionId);
 
     Page<SampleTransportClearanceEntity> findByCreatedByAndStatusIn(Long userId, List<String> applicationStatus, Pageable pageable);
 
