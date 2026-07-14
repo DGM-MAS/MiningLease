@@ -9,5 +9,4 @@ public class ReviewMiningLeaseApplicationChief {
     private Long id;
     private String status;
     private String remarks;
-    private Long directorId;
 }
