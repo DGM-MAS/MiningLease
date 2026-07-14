@@ -160,7 +160,8 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     'NOTE SHEET UPLOADED',
     'MLA SUBMITTED',
     'FORWARDED TO DIRECTOR',
-    'DIRECTOR APPROVED FMFS')
+    'DIRECTOR APPROVED FMFS'
+    )
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseApplication> findAssignedToUserAndSearchDirector(Long userId, String search, Pageable pageable);
@@ -549,39 +550,8 @@ SELECT
     JOIN t_citizens c
       ON c.cid = mla.applicant_cid
     WHERE c.household_number = :householdNumber
-      AND mla.current_status IN (
-     "SUBMITTED",
-     "DRAFT",
-     "ASSIGNED",
-     "MPCD ASSIGNED",
-     "GEOLOGIST_REVIEW",
-     "GR SUBMITTED",
-     "LLC UPLOADED",
-     "PAYMENT PENDING",
-     "ACCEPTED PFS",
-     "ADDITIONAL DATA NEEDED",
-     "MA SUBMITTED",
-     "PA/FC SUBMITTED",
-     "APPROVED GR",
-     "NOTE SHEET UPLOADED",
-     "GR SUBMITTED",
-     "BG SUBMITTED",
-     "FMFS SUBMITTED",
-     "MLA SUBMITTED",
-     "APPROVED BY DIRECTOR",
-     "RESUBMITTED PFS",
-     "RESUBMIT GR",
-     "RESUBMITTED GR",
-     "RESUBMIT FMFS",
-     "RESUBMITTED FMFS",
-     "RESUBMIT APPLICATION",
-     "RESUBMIT PFS GEOLOGIST",
-     "RESUBMIT PFS MPCD",
-     "RESUBMIT PA/FC",
-     "APPROVED PA/FC",
-     "RENEWAL APPLICATION",
-     "TEMPORARY CLOSURE APPROVED",
-     "TERMINATION APPROVED"
+    AND mla.current_status NOT IN (
+     "DRAFT"
       )
 )
 """, nativeQuery = true)
