@@ -111,6 +111,26 @@ public class SampleTransportClearanceEntity {
     @Column(name = "status")
     private String status;
 
+    @Column(name = "region_id")
+    private Long regionId;
+
+    // Dzongkhag, gewog and village details have been saved
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "dzongkhag_id")
+    private DzongkhagLookup dzongkhagId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "gewog_id")
+    private GewogLookup gewogId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "village_id")
+    private VillageLookup villageId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "region_master")
+    private RegionMaster regionMaster;
+
     @PrePersist
     protected void onCreate() {
         this.createdOn = LocalDateTime.now();

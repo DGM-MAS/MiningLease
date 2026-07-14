@@ -40,34 +40,62 @@ public class TemporaryClosureService {
     private final NotificationClient notificationClient;
     private  final TemporaryClosureMapper TemporaryClosureMapper;
     private final MiningLeaseApplicationRepository miningLeaseApplicationRepository;
+    private final QuarryLeaseApplicationRepository queryLeaseApplicationRepository;
     private final ApplicationRevisionHistoryRepository revisionHistoryRepository;
 
     @Transactional
     public TemporaryClosureNotificationResponse submitApplication(@Valid TemporaryClosureNotificationRequest request, Long userId, String email, String applicantType) {
         Optional<MiningLeaseApplication> miningLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationId());
+        Optional<QuarryLeaseApplication> quarryLeaseApplication = queryLeaseApplicationRepository.findByApplicationNumber(request.getApplicationId());
+
         MiningLeaseApplication miningLeaseApplication1 = null;
+        QuarryLeaseApplication quarryLeaseApplication1 = null;
+
+        String applicationType = null;
+
+
         if (miningLeaseApplication.isPresent()) {
             miningLeaseApplication1 = miningLeaseApplication.get();
+            applicationType = "MINING LEASE";
+        }
+        if (quarryLeaseApplication.isPresent()) {
+            quarryLeaseApplication1 = quarryLeaseApplication.get();
+            applicationType = "QUARRY LEASE";
+        }
+        if (miningLeaseApplication1 == null && quarryLeaseApplication1 == null){
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Application Detail not found for the given Id.");
         }
 
         TemporaryClosureEntity temporaryClosureEntity = new TemporaryClosureEntity();
         temporaryClosureEntity.setSubmittedAt(LocalDateTime.now());
         temporaryClosureEntity.setCurrentStatus("SUBMITTED");
         temporaryClosureEntity.setApplicantUserId(userId);
+        temporaryClosureEntity.setApplicationType(applicationType);
+
         assert miningLeaseApplication1 != null;
-        temporaryClosureEntity.setApplicantName(miningLeaseApplication1.getApplicantName());
-        temporaryClosureEntity.setApplicantCid(miningLeaseApplication1.getApplicantCid());
+
+        if(applicationType.equalsIgnoreCase("MINING LEASE")){
+            temporaryClosureEntity.setApplicantName(miningLeaseApplication1.getApplicantName());
+            temporaryClosureEntity.setApplicantCid(miningLeaseApplication1.getApplicantCid());
+            temporaryClosureEntity.setApplicantContact(miningLeaseApplication1.getApplicantContact());
+            temporaryClosureEntity.setApplicationId(miningLeaseApplication1.getApplicationNumber());
+
+        }
+        if(applicationType.equalsIgnoreCase("QUARRY LEASE")){
+            temporaryClosureEntity.setApplicantName(quarryLeaseApplication1.getApplicantName());
+            temporaryClosureEntity.setApplicantCid(quarryLeaseApplication1.getApplicantCid());
+            temporaryClosureEntity.setApplicantContact(quarryLeaseApplication1.getApplicantContact());
+            temporaryClosureEntity.setApplicationId(quarryLeaseApplication1.getApplicationNumber());
+        }
+
         temporaryClosureEntity.setApplicantEmail(email);
-        temporaryClosureEntity.setApplicantContact(miningLeaseApplication1.getApplicantContact());
         temporaryClosureEntity.setApplicantType(applicantType);
-        temporaryClosureEntity.setApplicationId(request.getApplicationId());
 
         // Closure files, reason and duration of closure
         temporaryClosureEntity.setApplicantFileId(request.getFileId());
         temporaryClosureEntity.setReasonForClosure(request.getReasonForClosure());
         temporaryClosureEntity.setNumberOfMonthsForClosure(request.getNumberOfMonthsForClosure());
         temporaryClosureEntity.setRemarksApplicant(request.getRemarksApplicant());
-
         temporaryClosureRepository.save(temporaryClosureEntity);
 
         // =====================================================
@@ -219,11 +247,8 @@ public class TemporaryClosureService {
 
         temporaryClosureEntity = findApplicationById(request.getId());
         ApplicationMaster applicationMaster ;
-        if(temporaryClosureEntity != null) {
-            applicationMaster = temporaryClosureEntity.getApplicationMaster();
-        }else {
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
-        }
+
+        applicationMaster = temporaryClosureEntity.getApplicationMaster();
         if (request.getMIFocalId() != null ) {
             temporaryClosureEntity.setCurrentStatus("MI ASSIGNED");
             temporaryClosureEntity.setRemarksRC(request.getRemarksRC());
@@ -282,7 +307,7 @@ public class TemporaryClosureService {
             switch (request.getStatus()) {
                 case "Approved" -> {
                     LocalDateTime now = LocalDateTime.now();
-                    app.setCurrentStatus("APPROVED BY RC");
+                    app.setCurrentStatus("TEMPORARY CLOSURE APPROVED");
                     app.setRemarksRC(request.getRemarks());
                     app.setFileUploadIdRC(request.getFileUploadIdRC());
                     app.setRcReviewedAt(now);
@@ -290,7 +315,7 @@ public class TemporaryClosureService {
                     temporaryClosureRepository.save(app);
 
                     if (master != null) {
-                        master.setCurrentStatus("APPROVED BY RC");
+                        master.setCurrentStatus("TEMPORARY CLOSURE APPROVED");
                         master.setApprovedAt(now);
                         master.setCompletedAt(now);
                         applicationMasterRepository.save(master);
@@ -303,14 +328,29 @@ public class TemporaryClosureService {
                                 app.getApplicationId());
                     }
 
-                    Optional<MiningLeaseApplication> miningLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(app.getApplicationId());
-                    MiningLeaseApplication miningLeaseApplicationEntity = null;
-                    if (miningLeaseApplication.isPresent()) {
-                        miningLeaseApplicationEntity = miningLeaseApplication.get();
+                    if(app.getApplicationType().equalsIgnoreCase("MINING LEASE")){
+                        Optional<MiningLeaseApplication> miningLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(app.getApplicationId());
+                        MiningLeaseApplication miningLeaseApplicationEntity = null;
+                        if (miningLeaseApplication.isPresent()) {
+                            miningLeaseApplicationEntity = miningLeaseApplication.get();
+                        }
+                        assert miningLeaseApplicationEntity != null;
+                        miningLeaseApplicationEntity.setCurrentStatus("TEMPORARY CLOSURE APPROVED");
+                        miningLeaseApplicationEntity.setUpdatedAt(now);
+                        miningLeaseApplicationEntity.setUpdatedBy(userId);
+                        miningLeaseApplicationRepository.save(miningLeaseApplicationEntity);
                     }
-                    assert miningLeaseApplicationEntity != null;
-                    miningLeaseApplicationEntity.setCurrentStatus("TEMPORARY CLOSURE APPROVED");
-                    miningLeaseApplicationRepository.save(miningLeaseApplicationEntity);
+                    if(app.getApplicationType().equalsIgnoreCase("QUARRY LEASE")){
+                        Optional<QuarryLeaseApplication> quarryLeaseApplication = queryLeaseApplicationRepository.findByApplicationNumber(app.getApplicationId());
+                        QuarryLeaseApplication quarryLeaseApplicationEntity = null;
+                        if (quarryLeaseApplication.isPresent()) {
+                            quarryLeaseApplicationEntity = quarryLeaseApplication.get();
+                        }
+                        assert quarryLeaseApplicationEntity != null;
+                        quarryLeaseApplicationEntity.setCurrentStatus("TEMPORARY CLOSURE APPROVED");
+                        queryLeaseApplicationRepository.save(quarryLeaseApplicationEntity);
+                    }
+
                 }
                 case "Rectification" -> {
                     app.setCurrentStatus("RECTIFICATION BY RC");
