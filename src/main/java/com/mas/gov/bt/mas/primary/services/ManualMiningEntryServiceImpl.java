@@ -841,18 +841,23 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
     }
 
+    // Query t_application_master — it is the table the unique constraint actually
+    // lives on, so it can never drift out of sync with itself the way the
+    // per-type table can (e.g. rows removed from the type table without removing
+    // the corresponding application_master row, which is what caused
+    // MAN-SC-2026-000001 to be regenerated and collide with an already-issued number).
     private synchronized String generateMlAppNumber(String prefix) {
-        Integer max = mlRepo.findMaxDraftSequenceByPrefix(prefix);
+        Integer max = applicationMasterRepository.findMaxSequenceByApplicationNumberPrefix(prefix);
         return prefix + String.format("%06d", (max == null ? 0L : max) + 1L);
     }
 
     private synchronized String generateQlAppNumber(String prefix) {
-        Integer max = qlRepo.findMaxManualEntrySequenceByPrefix(prefix);
+        Integer max = applicationMasterRepository.findMaxSequenceByApplicationNumberPrefix(prefix);
         return prefix + String.format("%06d", (max == null ? 0L : max) + 1L);
     }
 
     private synchronized String generateScAppNumber(String prefix) {
-        Integer max = scRepo.findMaxSequenceByPrefix(prefix);
+        Integer max = applicationMasterRepository.findMaxSequenceByApplicationNumberPrefix(prefix);
         return prefix + String.format("%06d", (max == null ? 0L : max) + 1L);
     }
 
