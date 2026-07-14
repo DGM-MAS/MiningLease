@@ -14,6 +14,8 @@ public class EnvironmentClearanceRenewalResponseDTO {
 
     private String applicationNo;
 
+    private String siteApplicationNo;
+
     private String serviceType;
 
     private String location;

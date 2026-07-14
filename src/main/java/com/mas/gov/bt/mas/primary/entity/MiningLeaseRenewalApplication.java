@@ -190,6 +190,9 @@ public class MiningLeaseRenewalApplication {
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
     private String rejectionReason;
 
+    @Column(name = "region_id")
+    private Long regionId;
+
     /* ===== Soft Delete ===== */
     @Column(name = "is_active")
     private Boolean isActive = true;

@@ -62,8 +62,12 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
             SurfaceCollectionAuctionRequestDTO dto,
             Long userId
     ) {
+        Long regionId;
+
         DzongkhagLookup dzongkhagLookup =
                 lookupHelper.fetchLookup(dto.getDzongkhagId(), dzongkhagLookupRepository, "Dzongkhag");
+
+        regionId = dzongkhagLookup.getRegion().getId();
 
         GewogLookup gewogLookup =
                 lookupHelper.fetchLookup(dto.getGewogId(), gewogLookupRepository, "Gewog");
@@ -73,6 +77,15 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
 
         RegionMaster regionMaster =
                 lookupHelper.fetchLookup(dzongkhagLookup.getRegion().getId(), regionMasterRepository, "RegionMaster");
+
+        // =====================================================
+        // 2. ASSIGN MINING DIRECTOR
+        // =====================================================
+        UserWorkloadProjection assignedMD = assignMD(regionId);
+
+        if(assignedMD == null){
+            assignedMD = assignMD(9L);
+        }
 
         try {
             SurfaceCollectionAuctionApplication entity =
@@ -102,11 +115,6 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                         .toList();
 
         entity.setAttachments(attachments);
-
-        // =====================================================
-        // 2. ASSIGN MINING DIRECTOR
-        // =====================================================
-        UserWorkloadProjection assignedMD = assignMD(regionMaster.getId());
 
         entity.setAssignedMdUserId(assignedMD.getUserId());
 
@@ -201,7 +209,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
         UserWorkloadProjection miningDirector =
                 auctionRepository.findMDSurfaceCollection(id);
 
-        if (miningDirector == null || miningDirector.getUserId() == null) {
+        if (miningDirector == null && id == 9L) {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Mining Engineer with required permission, region and role not found.");
         }
         return miningDirector;
