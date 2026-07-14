@@ -112,7 +112,8 @@ public class ApplicantAccountProvisioningService {
             applicantAccountRepository.assignRole(saved.getId(), DEFAULT_ROLE);
 
             notificationClient.sendApplicantAccountCredentialsEmail(email, account.getFullName(), registrationType, tempPassword);
-            log.info("Auto-registered applicant account id {} ({}) from manual entry submission and queued credentials email",
+            notificationClient.sendApplicantAccountCredentialsSms(applicantContact, email, tempPassword);
+            log.info("Auto-registered applicant account id {} ({}) from manual entry submission and queued credentials email/SMS",
                     saved.getId(), registrationType);
         } catch (Exception e) {
             log.error("Failed to auto-register applicant account for manual entry submission (email={})", applicantEmail, e);
