@@ -8,6 +8,7 @@ import lombok.Setter;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Date;
 
 @Entity
 @Getter
@@ -24,6 +25,7 @@ public class SurfaceCollectionPermitEntity {
     @Column(name = "name_of_surface_collection")
     private String nameOfSurfaceCollection;
 
+    private String draftNo;
     private String applicationNo;
     private String permitNo;
     private String ecNo;
@@ -127,6 +129,9 @@ public class SurfaceCollectionPermitEntity {
     @Column(name = "iom_file_id")
     private String iomFileId;
 
+    @Column(name = "iom_amount")
+    private java.math.BigDecimal iomAmount;
+
     // ── RC (Regional Coordinator) ─────────────────────────────────────────────
     @Column(name = "assigned_rc_id")
     private Long assignedRcId;
@@ -156,6 +161,9 @@ public class SurfaceCollectionPermitEntity {
 
     @Column(name = "ec_file_id")
     private String ecFileId;
+
+    @Column(name = "ec_valid_upto")
+    private LocalDate ecValidUpto;
 
     // ── MD (Mine Director) ────────────────────────────────────────────────────
     @Column(name = "assigned_md_id")
@@ -208,7 +216,6 @@ public class SurfaceCollectionPermitEntity {
 
     @Column(name = "origin")
     private String origin;
-
     @Column(name = "is_manual_entry")
     private String isManualEntry;
 
@@ -218,6 +225,14 @@ public class SurfaceCollectionPermitEntity {
     @Column(name = "manual_entry_on")
     private LocalDateTime manualEntryOn;
 
+    @Column(name = "permit_validity_from")
+    private Date permitValidityFrom;
+
+    @Column(name = "permit_validity_to")
+    private Date permitValidityTo;
+
+    @Column(name = "ec_status", length = 30)
+    private String eCStatus;
 
     @PrePersist
     public void onCreate() {
@@ -230,4 +245,5 @@ public class SurfaceCollectionPermitEntity {
     public void onUpdate() {
         this.updatedOn = LocalDateTime.now();
     }
+
 }

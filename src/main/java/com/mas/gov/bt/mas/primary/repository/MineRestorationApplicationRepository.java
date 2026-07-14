@@ -71,11 +71,12 @@ public interface MineRestorationApplicationRepository extends JpaRepository<Mine
             AND r.current_status NOT IN ('ERB_RELEASED', 'ERB_UTILIZED', 'MRP_REJECTED')
         WHERE ur.role_id = 21
           AND u.account_status = 'ACTIVE'
+          AND u.region_id = :regionId
         GROUP BY u.id, u.email, u.username
         ORDER BY workload ASC
         LIMIT 1
     """, nativeQuery = true)
-    UserWorkloadProjection findMEWithLeastWorkload();
+    UserWorkloadProjection findMEWithLeastWorkload(Long regionId);
 
     // All applications for Director (full oversight)
     @Query("""

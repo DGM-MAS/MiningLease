@@ -93,7 +93,8 @@ public class MiningLeaseRenewalService {
 
             applications = miningLeaseApplicationRepository.findArchivedAssignedToUserAndSearch(
                             userId,
-                    statusIns, search.trim(),
+                    statusIns,
+                    search.trim(),
                             pageable
                     );
         }
@@ -111,8 +112,10 @@ public class MiningLeaseRenewalService {
             throw new BusinessException(ErrorCodes.DUPLICATE_ENTRY);
         }
 
+
         MiningLeaseRenewalApplication miningLeaseRenewalApplication = existingRenewal.orElse(new MiningLeaseRenewalApplication());
         if (miningLeaseApplication.isPresent()) {
+            MiningLeaseApplication miningLeaseApplication1 = miningLeaseApplication.get();
             // 1
             // Map all data to renewal application table
             // IF THE DATA IS PRESENT
@@ -127,6 +130,7 @@ public class MiningLeaseRenewalService {
             miningLeaseRenewalApplication.setLeasePeriodYears(request.getLeasePeriodYears());
             miningLeaseRenewalApplication.setProposedLeaseRenewalPeriod(request.getProposedLeaseRenewalPeriod());
             miningLeaseRenewalApplication.setCreatedBy(userId);
+            miningLeaseRenewalApplication.setRegionId(miningLeaseApplication1.getRegionId());
             // Application master
             ApplicationMaster applicationMaster = miningLeaseApplication.get().getApplicationMaster();
             miningLeaseRenewalApplication.setApplicationMaster(applicationMaster);
@@ -173,12 +177,16 @@ public class MiningLeaseRenewalService {
             applicationMaster.setSubmittedAt(LocalDateTime.now());
             applicationMaster.setServiceCode(SERVICE_CODE);
 
+
+            miningLeaseApplication1.setCurrentStatus("RENEWAL APPLICATION");
+
             // =====================================================
             // 4. TASK CREATION FOR DIRECTOR
             // =====================================================
             createTask(applicationMaster, miningLeaseRenewalApplication, "DIRECTOR", userId, assignedDirector.getUserId());
             miningLeaseRenewalApplicationRepository.save(miningLeaseRenewalApplication);
             applicationMasterRepository.save(applicationMaster);
+            miningLeaseApplicationRepository.save(miningLeaseApplication1);
 
         } else {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
@@ -469,23 +477,32 @@ public class MiningLeaseRenewalService {
                             applicationMasterRepository.save(master);
                         }
 
+                        UserWorkloadProjection meTasks = miningLeaseApplicationRepository.findLeastBusyMineEngineer(20L, app.getRegionId());
+
+                        if (meTasks == null) {
+                            meTasks = miningLeaseApplicationRepository.findLeastBusyMineEngineer(20L, 9L);
+
+                            if (meTasks == null) {
+                                throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Mining Engineer with required permission, role and region not found.");
+                            }
+                        }
+
                         // Notify ME to upload work order
-                        List<TaskManagement> meTasks = taskManagementRepository
-                                .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
-                                        app.getApplicationNumber(), "FMFS SUBMITTED", "MINE ENGINEER", SERVICE_CODE);
-                        Long meId = (meTasks != null && !meTasks.isEmpty()) ? meTasks.getFirst().getAssignedToUserId() : null;
+//                        List<TaskManagement> meTasks = taskManagementRepository
+//                                .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+//                                        app.getApplicationNumber(), "FMFS SUBMITTED", "MINE ENGINEER", SERVICE_CODE);
+//                        Long meId = (meTasks != null && !meTasks.isEmpty()) ? meTasks.getFirst().getAssignedToUserId() : null;
 
                         assert master != null;
-                        createTask(master, app, "MINE ENGINEER", userId, meId);
+                        createTask(master, app, "MINE ENGINEER", userId, meTasks.getUserId());
 
-                        if (meId != null) {
-                            UserWorkloadProjection me = miningLeaseRenewalApplicationRepository.findUserDetailsME(meId);
-                            if (me != null && me.getUserId() != null) {
-                                notificationClient.sendUserNotification(
-                                        "Director has given final approval.",
-                                        "Please upload the work order for application " + app.getApplicationNumber() + ".",
-                                        me.getUserId(), "85");
-                            }
+                        UserWorkloadProjection me = miningLeaseRenewalApplicationRepository.findUserDetailsME(meTasks.getUserId());
+
+                        if (me != null && me.getUserId() != null) {
+                            notificationClient.sendUserNotification(
+                                    "Director has given final approval.",
+                                    "Please upload the work order for application " + app.getApplicationNumber() + ".",
+                                    me.getUserId(), "85");
                         }
 
                         if (app.getApplicantEmail() != null) {
@@ -598,6 +615,7 @@ public class MiningLeaseRenewalService {
 
         if (meId != null) {
             UserWorkloadProjection me = miningLeaseRenewalApplicationRepository.findUserDetailsME(meId);
+
             if (me != null && me.getUserId() != null) {
                 notificationClient.sendUserNotification(
                         "ERB regularization payment confirmed.",
@@ -717,7 +735,11 @@ public class MiningLeaseRenewalService {
                     // 8. ASSIGN DIRECTOR + CREATE TASK
                     // =====================================================
                     UserWorkloadProjection assignedMiningChief =
-                            assignMiningChief();
+                            assignMiningChief(app.getRegionId());
+
+                    if (assignedMiningChief == null){
+                        assignedMiningChief = assignMiningChief(9L);
+                    }
 
                     assert master != null;
                     createTask(master, app, "MINING_CHIEF_REVIEW", userId, assignedMiningChief.getUserId());
@@ -820,15 +842,15 @@ public class MiningLeaseRenewalService {
     }
 
     @Transactional
-    public UserWorkloadProjection assignMiningChief() {
+    public UserWorkloadProjection assignMiningChief(Long regionId) {
 
-        UserWorkloadProjection director =
-                miningLeaseApplicationRepository.findChiefQuarrying();
+        UserWorkloadProjection assignMiningChief =
+                miningLeaseApplicationRepository.findChiefQuarrying(regionId);
 
-        if (director == null) {
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
+        if (assignMiningChief == null || regionId == 9L) {
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Mining chief with required permission, role and region not found.");
         }
-        return director;
+        return assignMiningChief;
     }
 
     @Transactional
@@ -1311,16 +1333,27 @@ public class MiningLeaseRenewalService {
                         applicationMasterRepository.save(master);
                     }
 
-                    List<TaskManagement> meTasks = taskManagementRepository
-                            .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
-                                    app.getApplicationNumber(), "FMFS SUBMITTED", "MINE ENGINEER", SERVICE_CODE);
-                    Long meId = (meTasks != null && !meTasks.isEmpty()) ? meTasks.getFirst().getAssignedToUserId() : null;
+                    UserWorkloadProjection meTasks = miningLeaseApplicationRepository.findLeastBusyMineEngineer(20L, app.getRegionId());
+
+                    if (meTasks == null) {
+                        meTasks = miningLeaseApplicationRepository.findLeastBusyMineEngineer(20L, 9L);
+
+                        if (meTasks == null) {
+                            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Mining Engineer with required permission, role and region not found.");
+                        }
+                    }
+
+//                    List<TaskManagement> meTasks = taskManagementRepository
+//                            .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+//                                    app.getApplicationNumber(), "FMFS SUBMITTED", "MINE ENGINEER", SERVICE_CODE);
+//                    Long meId = (meTasks != null && !meTasks.isEmpty()) ? meTasks.getFirst().getAssignedToUserId() : null;
 
                     assert master != null;
-                    createTask(master, app, "MINE ENGINEER", userId, meId);
+                    createTask(master, app, "MINE ENGINEER", userId, meTasks.getUserId());
 
-                    if (meId != null) {
-                        UserWorkloadProjection me = miningLeaseRenewalApplicationRepository.findUserDetailsME(meId);
+                    if (meTasks.getUserId() != null) {
+                        UserWorkloadProjection me = miningLeaseRenewalApplicationRepository.findUserDetailsME(meTasks.getUserId());
+
                         if (me != null && me.getUserId() != null) {
                             notificationClient.sendUserNotification(
                                     "Application returned for review.",
@@ -1668,7 +1701,12 @@ public class MiningLeaseRenewalService {
                 applicationMasterRepository.save(master);
             }
 
-            UserWorkloadProjection assignedMiningChief = assignMiningChief();
+            UserWorkloadProjection assignedMiningChief = assignMiningChief(app.getRegionId());
+
+            if(assignedMiningChief == null){
+                assignedMiningChief = assignMiningChief(9L);
+            }
+
             if (master != null) {
                 createTask(master, app, "MINING_CHIEF", userId, assignedMiningChief.getUserId());
                 if (assignedMiningChief.getUserId() != null) {
