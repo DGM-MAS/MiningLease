@@ -148,7 +148,7 @@ public class TerminationService {
             if (!"MINING LEASE APPROVED".equalsIgnoreCase(application.getCurrentStatus())) {
                 throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
             }
-            application.setCurrentStatus("Under-Review-Termination");
+            application.setCurrentStatus("UNDER-REVIEW-TERMINATION");
             miningLeaseApplicationRepository.save(application);
             return new LeaseApplicationRef(
                     application.getApplicantName(), application.getApplicantEmail(), application.getApplicationMaster());
@@ -162,7 +162,7 @@ public class TerminationService {
             if (!"QUARRY LEASE APPROVED".equalsIgnoreCase(application.getCurrentStatus())) {
                 throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
             }
-            application.setCurrentStatus("Under-Review-Termination");
+            application.setCurrentStatus("UNDER-REVIEW-TERMINATION");
             quarryLeaseApplicationRepository.save(application);
             return new LeaseApplicationRef(
                     application.getApplicantName(), application.getApplicantEmail(), application.getApplicationMaster());
