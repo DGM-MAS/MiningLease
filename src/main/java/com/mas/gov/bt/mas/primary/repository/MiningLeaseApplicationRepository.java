@@ -536,7 +536,7 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
 SELECT
 (
     SELECT COUNT(*)
-    FROM household_permit_threshold h
+    FROM mas_db.t_household_permit_threshold h
     JOIN t_citizens c
       ON c.cid = h.applicant_cid
     WHERE c.household_number = :householdNumber
@@ -546,7 +546,7 @@ SELECT
 +
 (
     SELECT COUNT(*)
-    FROM t_mining_lease_application mla
+    FROM  mas_db.t_mining_lease_application mla
     JOIN t_citizens c
       ON c.cid = mla.applicant_cid
     WHERE c.household_number = :householdNumber
@@ -556,4 +556,15 @@ SELECT
 )
 """, nativeQuery = true)
     Integer countMiningLeasesByHousehold(String householdNumber);
+
+    @Query(value = """
+    SELECT COUNT(*)
+    FROM mas_db.t_household_permit_threshold h
+    WHERE h.applicant_cid = :applicantCid
+      AND h.service_type = :serviceType
+      AND h.status = 'ACTIVE'
+    """,
+            nativeQuery = true)
+    Integer countByApplicantCidAndServiceType(@Param("applicantCid") String applicantCid,
+                                              @Param("serviceType") String serviceType);
 }
