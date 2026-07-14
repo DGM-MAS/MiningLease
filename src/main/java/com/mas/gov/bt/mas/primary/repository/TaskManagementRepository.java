@@ -38,7 +38,7 @@ public interface TaskManagementRepository extends JpaRepository<TaskManagement, 
     @Query("SELECT t FROM TaskManagement t WHERE t.taskStatus = 'PENDING' AND t.deadlineDate IS NOT NULL AND t.deadlineDate < :now")
     List<TaskManagement> findOverdueTasks(@Param("now") LocalDateTime now);
 
-    List<TaskManagement> findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(String applicationNumber, String assigned, String geologist);
+//    List<TaskManagement> findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(String applicationNumber, String assigned, String geologist);
 
     List<TaskManagement> findByApplicationNumberAndTaskStatusInAndAssignedToRole(String applicationNumber, List<String> status, String director);
 
