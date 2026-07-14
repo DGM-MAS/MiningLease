@@ -1,21 +1,18 @@
 package com.mas.gov.bt.mas.primary.services;
 
+import com.mas.gov.bt.mas.primary.entity.*;
+import com.mas.gov.bt.mas.primary.repository.*;
 import com.mas.gov.bt.mas.primary.utility.CustomRuntimeException;
 
 
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
 import com.mas.gov.bt.mas.primary.dto.request.*;
 import com.mas.gov.bt.mas.primary.dto.response.SampleTransportClearanceResponseDTO;
-import com.mas.gov.bt.mas.primary.entity.ApplicationMaster;
-import com.mas.gov.bt.mas.primary.entity.SampleTransportClearanceEntity;
-import com.mas.gov.bt.mas.primary.entity.TaskManagement;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.mapper.SampleTransportClearanceMapper;
-import com.mas.gov.bt.mas.primary.repository.ApplicationMasterRepository;
-import com.mas.gov.bt.mas.primary.repository.SampleTransportClearanceRepository;
-import com.mas.gov.bt.mas.primary.repository.TaskManagementRepository;
 import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
+import com.mas.gov.bt.mas.primary.utility.LookupHelper;
 import com.mas.gov.bt.mas.primary.utility.SuccessResponse;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -41,18 +38,54 @@ public class SampleTransportClearanceServiceImpl
     private final TaskManagementRepository taskManagementRepository;
     private final NotificationClient notificationClient;
 
+
+    private final DzongkhagLookupRepository dzongkhagLookupRepository;
+
+    private final GewogLookupRepository gewogLookupRepository;
+
+    private final VillageLookupRepository villageLookupRepository;
+
+    private final RegionMasterRepository regionMasterRepository;
+
+    private final LookupHelper lookupHelper;
+
         @Override
         public SampleTransportClearanceResponseDTO createApplication(
                 SampleTransportClearanceDTO request,
                 Long userId) {
+
+            Long regionId;
+
+            DzongkhagLookup dzongkhagLookup =
+                    lookupHelper.fetchLookup(request.getDzongkhagID(), dzongkhagLookupRepository, "Dzongkhag");
+
+            regionId = dzongkhagLookup.getRegion().getId();
+
+            GewogLookup gewogLookup =
+                    lookupHelper.fetchLookup(request.getGewogID(), gewogLookupRepository, "Gewog");
+
+            VillageLookup villageLookup =
+                    lookupHelper.fetchLookup(request.getVillageID(), villageLookupRepository, "Village");
+
+            RegionMaster regionMaster =
+                    lookupHelper.fetchLookup(dzongkhagLookup.getRegion().getId(), regionMasterRepository, "RegionMaster");
 
             SampleTransportClearanceEntity entity =
                     sampleTransportClearanceMapper.toEntity(request);
 
 
             // Site Details
-            entity.setSiteApplicationNo(request.getSiteApplicationNo());
-            entity.setSiteName(request.getSiteName());
+//            entity.setSiteApplicationNo(request.getSiteApplicationNo());
+//            entity.setSiteName(request.getSiteName());
+
+
+
+            entity.setDzongkhagId(dzongkhagLookup);
+            entity.setGewogId(gewogLookup);
+            entity.setVillageId(villageLookup);
+            entity.setRegionMaster(regionMaster);
+
+            entity.setRegionId(regionId);
 
             entity.setApplicationNo(generateApplicationNumber());
             entity.setCreatedOn(LocalDateTime.now());
@@ -64,13 +97,14 @@ public class SampleTransportClearanceServiceImpl
 
             UserWorkloadProjection assignedChief = null;
 
-            assignedChief = assignChief();
+            assignedChief = assignChief(regionId);
 
-            if (assignedChief.getUserId() == null) {
-                throw new CustomRuntimeException("No available chief for assignment");
+            if (assignedChief == null) {
+                assignedChief = assignChief(9L);
             }
 
             entity.setAssignedGSDChiefId(assignedChief.getUserId());
+
             repository.save(entity);
 
             ApplicationMaster master = createApplicationMaster(entity, userId);
@@ -620,12 +654,12 @@ public class SampleTransportClearanceServiceImpl
         );
     }
 
-    private UserWorkloadProjection assignChief() {
+    private UserWorkloadProjection assignChief(Long regionId) {
         UserWorkloadProjection chief =
-                repository.findChiefGSDSample();
+                repository.findChiefGSDSample(regionId);
 
-        if (chief == null) {
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
+        if (chief == null && regionId == 9L) {
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "GSD Chief with required permission permission, role and region not found");
         }
         return chief;
     }
@@ -657,4 +691,5 @@ public class SampleTransportClearanceServiceImpl
         taskManagementRepository.save(task);
         log.info("Created task for role {}", role);
     }
+
 }

@@ -39,4 +39,9 @@ public class SampleTransportClearanceResponseDTO {
     private LocalDateTime updatedOn;
 
     private String status;
+
+    private String dzongkhagName;
+    private String gewogName;
+    private String villageName;
+    private String regionName;
 }
