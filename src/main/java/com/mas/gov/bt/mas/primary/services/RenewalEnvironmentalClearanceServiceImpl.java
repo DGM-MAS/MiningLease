@@ -126,7 +126,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             String title = "Renewal environmental clearance application has been assigned.";
             String message = "An application for environmental clearance lease has been assigned for review. Application No. "+ entity.getApplicationNo()+" Please login in review the Geological report.";
             String serviceId = "78";
-            notificationClient.sendUserNotification(title, message, assignedMDEngineer.getUserId(), serviceId);
+            notificationClient.sendUserNotification(title, message, assignedMDEngineer.getUserId(), serviceId, "STAFF");
 
         }else {
 
@@ -160,7 +160,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             String title = "Renewal environmental clearance application has been assigned.";
             String message = "An application for environmental clearance lease has been assigned for review. Application No. "+ entity.getApplicationNo()+" Please login in review the Geological report.";
             String serviceId = "78";
-            notificationClient.sendUserNotification(title, message, assignedMPCD.getUserId(), serviceId);
+            notificationClient.sendUserNotification(title, message, assignedMPCD.getUserId(), serviceId, "STAFF");
 
         }
 
@@ -400,7 +400,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                     "Renewal environmental clearance IOM has been assigned.",
                     "An IOM for environmental clearance renewal has been forwarded for your review. Application No. " + entity.getApplicationNo(),
                     assignedMD.getUserId(),
-                    "78");
+                    "78", "STAFF");
 
             return environmentClearanceRenewalMapper.toResponseDTO(saved);
 
@@ -545,7 +545,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             String title = "An new application has been reassigned.";
             String message = "An application for environmental clearance renewal has been assigned for review. Application No. "+ request.getApplicationNumber()+" Please login in review the application";
             String serviceId = "78";
-            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId);
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF");
         }else {
             throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }

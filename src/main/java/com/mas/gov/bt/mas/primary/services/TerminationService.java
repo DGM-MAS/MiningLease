@@ -117,7 +117,7 @@ public class TerminationService {
                 String title = "Termination application has been assigned.";
                 String message = "Application No. " + entity.getApplicationNumber() + " assigned for review.";
                 String serviceId = "112";
-                notificationClient.sendUserNotification(title, message, assignedCMSHead.getUserId(), serviceId);
+                notificationClient.sendUserNotification(title, message, assignedCMSHead.getUserId(), serviceId, "STAFF");
             }
 
             // ✅ Add to response list
@@ -291,7 +291,7 @@ public class TerminationService {
             String title = "An new application has been reassigned.";
             String message = "An application for termination has been assigned for review. Application No. "+request.getApplicationNumber()+" Please login to review the application";
             String serviceId = "112";
-            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId);
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF");
         }else {
             throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
