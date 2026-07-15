@@ -161,7 +161,8 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     'NOTE SHEET UPLOADED',
     'MLA SUBMITTED',
     'FORWARDED TO DIRECTOR',
-    'DIRECTOR APPROVED FMFS')
+    'DIRECTOR APPROVED FMFS'
+    )
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseApplication> findAssignedToUserAndSearchDirector(Long userId, String search, Pageable pageable);
@@ -610,4 +611,40 @@ SELECT
 )
 """, nativeQuery = true)
     Integer countMiningLeasesForGrouping(@Param("groupingType") String groupingType, @Param("groupingKey") String groupingKey);
+
+    @Query(value = """
+SELECT
+(
+    SELECT COUNT(*)
+    FROM mas_db.t_household_permit_threshold h
+    JOIN t_citizens c
+      ON c.cid = h.applicant_cid
+    WHERE c.household_number = :householdNumber
+      AND h.service_type = 'MINING_LEASE'
+      AND h.status = 'ACTIVE'
+)
++
+(
+    SELECT COUNT(*)
+    FROM  mas_db.t_mining_lease_application mla
+    JOIN t_citizens c
+      ON c.cid = mla.applicant_cid
+    WHERE c.household_number = :householdNumber
+    AND mla.current_status NOT IN (
+     "DRAFT"
+      )
+)
+""", nativeQuery = true)
+    Integer countMiningLeasesByHousehold(String householdNumber);
+
+    @Query(value = """
+    SELECT COUNT(*)
+    FROM mas_db.t_household_permit_threshold h
+    WHERE h.applicant_cid = :applicantCid
+      AND h.service_type = :serviceType
+      AND h.status = 'ACTIVE'
+    """,
+            nativeQuery = true)
+    Integer countByApplicantCidAndServiceType(@Param("applicantCid") String applicantCid,
+                                              @Param("serviceType") String serviceType);
 }
