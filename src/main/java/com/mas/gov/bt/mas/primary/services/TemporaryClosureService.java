@@ -43,6 +43,8 @@ public class TemporaryClosureService {
     private final QuarryLeaseApplicationRepository queryLeaseApplicationRepository;
     private final ApplicationRevisionHistoryRepository revisionHistoryRepository;
 
+    private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
+
     @Transactional
     public TemporaryClosureNotificationResponse submitApplication(@Valid TemporaryClosureNotificationRequest request, Long userId, String email, String applicantType) {
         Optional<MiningLeaseApplication> miningLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationId());
@@ -349,6 +351,17 @@ public class TemporaryClosureService {
                         assert quarryLeaseApplicationEntity != null;
                         quarryLeaseApplicationEntity.setCurrentStatus("TEMPORARY CLOSURE APPROVED");
                         queryLeaseApplicationRepository.save(quarryLeaseApplicationEntity);
+                    }
+
+                    Optional<HouseholdPermitThresholdEntity> entity = householdPermitThresholdRepository.findByApplicationNoAndServiceType(app.getApplicationId(), SERVICE_CODE);
+
+                    if (entity.isPresent()) {
+                        throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "The application number is not present in household permit table.");
+                    }else {
+                        HouseholdPermitThresholdEntity householdPermitThresholdEntity = entity.get();
+
+                        householdPermitThresholdEntity.setStatus("TEMPORARY CLOSURE APPROVED");
+                        householdPermitThresholdRepository.save(householdPermitThresholdEntity);
                     }
 
                 }

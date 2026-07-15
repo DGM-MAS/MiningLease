@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.Year;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 
 @Service
@@ -54,18 +55,38 @@ public class MineRestorationService {
     private final MiningLeaseApplicationRepository miningLeaseApplicationRepository;
     private final NotificationClient notificationClient;
 
+    private final QuarryLeaseApplicationRepository queryLeaseApplicationRepository;
+
+    private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
+
     // =====================================================
     // PROMOTER — MRP Submission
     // =====================================================
 
     @Transactional
     public MineRestorationResponse submitMRP(MineRestorationMRPRequest request, Long userId) {
-        MiningLeaseApplication lease = miningLeaseApplicationRepository
-                .findByApplicationNumber(request.getMiningLeaseApplicationNumber())
-                .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
+
+        MiningLeaseApplication miningLeaseApplication = null;
+        QuarryLeaseApplication quarryLeaseApplication = null;
+        Long regionId = null;
+        Optional<MiningLeaseApplication> lease = miningLeaseApplicationRepository
+                .findByApplicationNumber(request.getMiningLeaseApplicationNumber());
+
+        if (lease.isPresent()){
+            miningLeaseApplication = lease.get();
+        }else{
+            Optional<QuarryLeaseApplication> quarry = queryLeaseApplicationRepository.findByApplicationNumber(request.getMiningLeaseApplicationNumber());
+
+            if(quarry.isPresent()){
+                quarryLeaseApplication = quarry.get();
+            }else {
+                throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "The application number is not present in Quarry and Mining lease table.");
+            }
+        }
 
         // Load existing draft if ID provided, otherwise create new
         MineRestorationApplication restoration;
+
         if (request.getRestorationApplicationId() != null) {
             restoration = findById(request.getRestorationApplicationId());
             if (!STATUS_MRP_DRAFT.equals(restoration.getCurrentStatus())) {
@@ -77,12 +98,29 @@ public class MineRestorationService {
             restoration.setMiningLeaseApplicationNumber(request.getMiningLeaseApplicationNumber());
             restoration.setRestorationType(request.getRestorationType());
             restoration.setApplicantUserId(userId);
-            restoration.setApplicantName(lease.getApplicantName());
-            restoration.setApplicantEmail(lease.getApplicantEmail());
-            restoration.setApplicantContact(lease.getApplicantContact());
-            restoration.setNameOfMine(lease.getNameOfMine());
-            restoration.setLeaseAreaAcres(lease.getTotalLand());
-            restoration.setLeaseEndDate(lease.getLeaseEndDate());
+
+            if (miningLeaseApplication != null){
+                restoration.setApplicantName(miningLeaseApplication.getApplicantName());
+                restoration.setApplicantEmail(miningLeaseApplication.getApplicantEmail());
+                restoration.setApplicantContact(miningLeaseApplication.getApplicantContact());
+                restoration.setNameOfMine(miningLeaseApplication.getNameOfMine());
+                restoration.setLeaseAreaAcres(miningLeaseApplication.getTotalLand());
+                restoration.setLeaseEndDate(miningLeaseApplication.getLeaseEndDate());
+                restoration.setRegionId(miningLeaseApplication.getRegionId());
+                regionId = miningLeaseApplication.getRegionId();
+            }
+
+            if (quarryLeaseApplication != null){
+                restoration.setApplicantName(quarryLeaseApplication.getApplicantName());
+                restoration.setApplicantEmail(quarryLeaseApplication.getApplicantEmail());
+                restoration.setApplicantContact(quarryLeaseApplication.getApplicantContact());
+                restoration.setNameOfMine(quarryLeaseApplication.getNameOfQuarry());
+                restoration.setLeaseAreaAcres(quarryLeaseApplication.getTotalLand());
+                restoration.setLeaseEndDate(quarryLeaseApplication.getLeaseEndDate());
+                restoration.setRegionId(quarryLeaseApplication.getRegionId());
+                regionId = quarryLeaseApplication.getRegionId();
+            }
+
             restoration.setCreatedBy(userId);
 
         }
@@ -100,7 +138,7 @@ public class MineRestorationService {
             }
 
             // Auto-assign ME by workload
-            UserWorkloadProjection assignedME = restorationApplicationRepository.findMEWithLeastWorkload(lease.getRegionId());
+            UserWorkloadProjection assignedME = restorationApplicationRepository.findMEWithLeastWorkload(regionId);
 
             if (assignedME == null) {
                 assignedME = restorationApplicationRepository.findMEWithLeastWorkload(9L);
@@ -112,6 +150,7 @@ public class MineRestorationService {
             }
 
             restoration.setAssignedMeUserId(assignedME.getUserId());
+
             notificationClient.sendAssignmentNotification(
                     assignedME.getEmail(),
                     assignedME.getUsername(),
@@ -367,6 +406,7 @@ public class MineRestorationService {
                         restoration.getApplicantUserId(),
                         SERVICE_CODE
                 );
+                updateLeaseApplicationStatus(restoration.getMiningLeaseApplicationNumber(),STATUS_MRP_APPROVED,STATUS_MRP_APPROVED);
             }
             case "REVISION_REQUESTED" -> {
                 restoration.setCurrentStatus(STATUS_MRP_REVISION_REQUESTED);
@@ -859,5 +899,37 @@ public class MineRestorationService {
             case "ERB_UTILIZED" -> "ERB Utilized by DGM";
             default -> status.replace("_", " ");
         };
+    }
+
+    /**
+     * Updates the underlying lease application's status once a termination is decided, trying
+     * Mining Lease first and falling back to Quarry Lease, mirroring resolveAndMarkUnderReview.
+     */
+    private void updateLeaseApplicationStatus(String appNo, String miningStatus, String quarryStatus) {
+        Optional<MiningLeaseApplication> miningLeaseApplication =
+                miningLeaseApplicationRepository.findByApplicationNumber(appNo);
+
+        if (miningLeaseApplication.isPresent()) {
+            MiningLeaseApplication application = miningLeaseApplication.get();
+            application.setCurrentStatus(miningStatus);
+            miningLeaseApplicationRepository.save(application);
+            return;
+        }
+
+        QuarryLeaseApplication application = queryLeaseApplicationRepository.findByApplicationNumber(appNo)
+                .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
+        application.setCurrentStatus(quarryStatus);
+        queryLeaseApplicationRepository.save(application);
+
+        Optional<HouseholdPermitThresholdEntity> householdPermitThresholdEntity = householdPermitThresholdRepository.findByApplicationNoAndServiceType(appNo, SERVICE_CODE);
+
+        if (householdPermitThresholdEntity.isPresent()) {
+            HouseholdPermitThresholdEntity thresholdEntity = householdPermitThresholdEntity.get();
+            thresholdEntity.setStatus(quarryStatus);
+
+            householdPermitThresholdRepository.save(thresholdEntity);
+        }else {
+            throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION, "The application is not present in household permit table.");
+        }
     }
 }

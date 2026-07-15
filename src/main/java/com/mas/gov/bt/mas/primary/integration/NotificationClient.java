@@ -37,6 +37,12 @@ public class NotificationClient {
     @Value("${app.email.enabled:true}")
     private boolean emailEnabled;
 
+    @Value("${app.notification.api-url}")
+    private String notificationApiUrl;
+
+    @Value("${app.notification.email-builder-url}")
+    private String notificationEmailBuilderUrl;
+
     // SMS config mirrors mas-backend-masters' SmsProperties/SmsService (same G2C
     // gateway) — duplicated here rather than shared cross-module, same reasoning
     // as PasswordGenerator: MiningLease is a separate deployable with no shared
@@ -52,8 +58,6 @@ public class NotificationClient {
 
     private static final Logger logger = LoggerFactory.getLogger(NotificationClient.class);
 
-    private static final String NOTIFICATION_API_URL =  "http://localhost:8082/api/notifications";
-    private static final String NOTIFICATION_API_URL_EMAIL_BUILDER =  "http://localhost:8082/api/notifications/send";
     private final RestTemplate restTemplate;
 
     public NotificationClient(JavaMailSender mailSender, RestTemplate restTemplate) {
@@ -232,7 +236,7 @@ public class NotificationClient {
         request.setRecipientName(applicantName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -261,7 +265,7 @@ public class NotificationClient {
         request.setRecipientName(applicantName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -292,7 +296,7 @@ public class NotificationClient {
         request.setRecipientName(applicantName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -325,7 +329,7 @@ public class NotificationClient {
         request.setRecipientName(applicantName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -358,7 +362,7 @@ public class NotificationClient {
         request.setRecipientName(applicantName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -391,7 +395,7 @@ public class NotificationClient {
         request.setRecipientName(applicantName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -421,7 +425,7 @@ public class NotificationClient {
         request.setRecipientName(applicantName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -450,7 +454,7 @@ public class NotificationClient {
         request.setRecipientName(applicantName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -479,7 +483,7 @@ public class NotificationClient {
         request.setRecipientName(applicantName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -508,7 +512,7 @@ public class NotificationClient {
         request.setRecipientName(applicantName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -535,7 +539,7 @@ public class NotificationClient {
         request.setRecipientName(chiefName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -564,7 +568,7 @@ public class NotificationClient {
         request.setRecipientName(officerName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -593,7 +597,7 @@ public class NotificationClient {
         request.setRecipientName(officerName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -622,7 +626,7 @@ public class NotificationClient {
         request.setRecipientName(officerName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -658,7 +662,7 @@ public class NotificationClient {
         request.setRecipientName(applicantName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -685,7 +689,7 @@ public class NotificationClient {
         request.setRecipientName(applicantName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -713,7 +717,7 @@ public class NotificationClient {
         request.setRecipientName(applicantName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -742,7 +746,7 @@ public class NotificationClient {
         request.setRecipientName(applicantName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -769,7 +773,7 @@ public class NotificationClient {
         request.setRecipientName(applicantName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -796,7 +800,7 @@ public class NotificationClient {
         request.setRecipientName(applicantName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -823,7 +827,7 @@ public class NotificationClient {
         request.setRecipientName(applicantName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -849,7 +853,7 @@ public class NotificationClient {
         request.setRecipientName(applicantName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -881,7 +885,7 @@ public class NotificationClient {
         request.setRecipientName(officerName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -913,7 +917,7 @@ public class NotificationClient {
         request.setRecipientName(officerName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -945,7 +949,7 @@ public class NotificationClient {
         request.setRecipientName(officerName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -975,7 +979,7 @@ public class NotificationClient {
         request.setRecipientName(officerName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -1005,7 +1009,7 @@ public class NotificationClient {
         request.setRecipientName(officerName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -1015,7 +1019,7 @@ public class NotificationClient {
     public void sendUserNotification(String title, String message, Long userId, String serviceId) {
 
         String url = UriComponentsBuilder
-                .fromHttpUrl(NOTIFICATION_API_URL + "/user/{userId}")
+                .fromHttpUrl(notificationApiUrl + "/user/{userId}")
                 .queryParam("title", title)
                 .queryParam("message", message)
                 .queryParam("serviceId", serviceId)
@@ -1061,7 +1065,7 @@ public class NotificationClient {
         request.setRecipientName(directorName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -1085,7 +1089,7 @@ public class NotificationClient {
         request.setRecipientName(directorName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -1108,7 +1112,7 @@ public class NotificationClient {
         request.setRecipientName(directorName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -1131,7 +1135,7 @@ public class NotificationClient {
         request.setRecipientName(directorName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -1155,7 +1159,7 @@ public class NotificationClient {
         request.setRecipientName(directorName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -1179,7 +1183,7 @@ public class NotificationClient {
         request.setRecipientName(directorName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
@@ -1206,7 +1210,7 @@ public class NotificationClient {
         request.setRecipientName(applicantName);
 
         restTemplate.postForObject(
-                NOTIFICATION_API_URL_EMAIL_BUILDER,
+                notificationEmailBuilderUrl,
                 request,
                 String.class
         );
