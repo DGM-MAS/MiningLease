@@ -3,6 +3,9 @@ app:
     base-url: http://172.30.3.10:30082
   self:
     base-url: http://172.30.3.10:30085
+  notification:
+    api-url: http://localhost:8080/master/api/notifications
+    email-builder-url: http://localhost:8080/master/api/notifications/send
 
 # Set to false to bypass payment and let applications flow through directly (dev/testing only)
 payment:
