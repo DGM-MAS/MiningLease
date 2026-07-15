@@ -304,9 +304,6 @@ public class MiningLeaseService {
 
                 log.info("Application submitted successfully: {}", application.getApplicationNumber());
                 return mapper.toResponse(application);
-//            }else {
-//                throw new BusinessException("The number of mining lease count has exceeded");
-//            }
 
     }
 
@@ -594,45 +591,19 @@ public class MiningLeaseService {
 
         log.debug("Sending notifications to director: {}", assignedDirector.getUserId());
 
-        try {
-            if (assignedDirector.getEmail() != null || !assignedDirector.getEmail().trim().isEmpty()) {
-                try {
-                    notificationClient.sendMiningLeaseMailToDirectorAssigned(
-                            assignedDirector.getEmail(),
-                            assignedDirector.getUsername(),
-                            miningLeaseApplication.getApplicationNumber());
-                    log.info("Email notification sent to director: {}", assignedDirector.getEmail());
-                } catch (Exception ex) {
-                    log.warn("Failed to send email notification to director", ex);
-                    throw new BusinessException(
-                            ErrorCodes.RECORD_NOT_FOUND,
-                            "Director Email is missing",
-                            ex
-                    );
-                }
-            }
+        if (assignedDirector.getEmail() != null || !assignedDirector.getEmail().trim().isEmpty()) {
+                notificationClient.sendMiningLeaseMailToDirectorAssigned(
+                        assignedDirector.getEmail(),
+                        assignedDirector.getUsername(),
+                        miningLeaseApplication.getApplicationNumber());
+                log.info("Email notification sent to director: {}", assignedDirector.getEmail());
+        }
 
         if(assignedDirector.getUserId()!= null) {
-            try {
-                String title = "Mining lease application has been assigned.";
-                String message = "An application for mining lease has been assigned for review. Application No. " + miningLeaseApplication.getApplicationNumber() + " Please login in review the Geological report.";
-                String serviceId = "78";
-                notificationClient.sendUserNotification(title, message, assignedDirector.getUserId(), serviceId);
-            }catch (Exception ex) {
-                log.warn("Failed to send in-app notification to director", ex);
-                throw new BusinessException(
-                        ErrorCodes.RECORD_NOT_FOUND,
-                        "Director User ID  is missing",
-                        ex
-                );
-            }
-        }
-        } catch (Exception ex) {
-            log.error("Unexpected error sending notifications", ex);
-            throw new BusinessException(
-                    ErrorCodes.EXTERNAL_SERVICE_ERROR,
-                    "Failed to send notifications to director",
-                    ex);
+            String title = "Mining lease application has been assigned.";
+            String message = "An application for mining lease has been assigned for review. Application No. " + miningLeaseApplication.getApplicationNumber() + " Please login in review the Geological report.";
+            String serviceId = "78";
+            notificationClient.sendUserNotification(title, message, assignedDirector.getUserId(), serviceId);
         }
 
         return mapper.toResponse(miningLeaseApplication);
@@ -846,7 +817,7 @@ public class MiningLeaseService {
      */
     @Transactional(readOnly = true)
     public Page<ApplicationListResponse> getMyArchivedApplications(Long userId, Pageable pageable, String search) {
-        List<String> archivedStatuses = List.of("MINING LEASE APPROVED", "REJECTED", "PAID", "BG SUBMITTED");
+        List<String> archivedStatuses = List.of("MINING LEASE APPROVED", "REJECTED");
         Page<MiningLeaseApplication> applications ;
 
         if (search == null || search.isBlank()) {

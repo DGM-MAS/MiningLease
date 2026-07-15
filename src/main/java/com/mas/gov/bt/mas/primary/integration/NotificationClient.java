@@ -1048,6 +1048,7 @@ public class NotificationClient {
     }
 
     public void sendMiningLeaseMailToDirectorAssigned(String directorEmail, String directorName, String applicationNumber) {
+        try {
         String subject = "New Application Assigned - " + applicationNumber;
         String body = String.format("""
                 A new mining lease application has been assigned to you.
@@ -1069,6 +1070,13 @@ public class NotificationClient {
                 request,
                 String.class
         );
+
+        log.info("Mining lease assignment notification sent to {}", directorEmail);
+
+    } catch (Exception ex) {
+        log.error("Failed to send mining lease assignment notification to {} for application {}",
+                directorEmail, applicationNumber, ex);
+    }
     }
 
     public void sendSurfaceCollectionAuctionMailToMDAssigned(String directorEmail, String directorName, String applicationNumber) {
