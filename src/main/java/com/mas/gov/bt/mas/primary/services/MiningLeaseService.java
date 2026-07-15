@@ -304,9 +304,6 @@ public class MiningLeaseService {
 
                 log.info("Application submitted successfully: {}", application.getApplicationNumber());
                 return mapper.toResponse(application);
-//            }else {
-//                throw new BusinessException("The number of mining lease count has exceeded");
-//            }
 
     }
 
@@ -846,7 +843,7 @@ public class MiningLeaseService {
      */
     @Transactional(readOnly = true)
     public Page<ApplicationListResponse> getMyArchivedApplications(Long userId, Pageable pageable, String search) {
-        List<String> archivedStatuses = List.of("MINING LEASE APPROVED", "REJECTED", "PAID", "BG SUBMITTED");
+        List<String> archivedStatuses = List.of("MINING LEASE APPROVED", "REJECTED");
         Page<MiningLeaseApplication> applications ;
 
         if (search == null || search.isBlank()) {
