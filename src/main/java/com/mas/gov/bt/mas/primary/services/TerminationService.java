@@ -1,5 +1,6 @@
 package com.mas.gov.bt.mas.primary.services;
 
+import com.mas.gov.bt.mas.primary.repository.*;
 import com.mas.gov.bt.mas.primary.utility.CustomRuntimeException;
 
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
@@ -12,11 +13,6 @@ import com.mas.gov.bt.mas.primary.exception.BusinessException;
 import com.mas.gov.bt.mas.primary.exception.ResourceNotFoundException;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.mapper.TerminationMapper;
-import com.mas.gov.bt.mas.primary.repository.ApplicationMasterRepository;
-import com.mas.gov.bt.mas.primary.repository.MiningLeaseApplicationRepository;
-import com.mas.gov.bt.mas.primary.repository.QuarryLeaseApplicationRepository;
-import com.mas.gov.bt.mas.primary.repository.TaskManagementRepository;
-import com.mas.gov.bt.mas.primary.repository.TerminationApplicationRepository;
 import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
 import com.mas.gov.bt.mas.primary.utility.SuccessResponse;
 import jakarta.validation.Valid;
@@ -52,6 +48,8 @@ public class TerminationService {
     private final MiningLeaseApplicationRepository miningLeaseApplicationRepository;
 
     private final QuarryLeaseApplicationRepository quarryLeaseApplicationRepository;
+
+    private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
 
     @Transactional
     public List<TerminationApplicationResponse> submitTerminationApplication(
@@ -190,6 +188,17 @@ public class TerminationService {
                 .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
         application.setCurrentStatus(quarryStatus);
         quarryLeaseApplicationRepository.save(application);
+
+        Optional<HouseholdPermitThresholdEntity> householdPermitThresholdEntity = householdPermitThresholdRepository.findByApplicationNoAndServiceType(appNo, SERVICE_CODE);
+
+        if (householdPermitThresholdEntity.isPresent()) {
+            HouseholdPermitThresholdEntity thresholdEntity = householdPermitThresholdEntity.get();
+            thresholdEntity.setStatus(quarryStatus);
+
+            householdPermitThresholdRepository.save(thresholdEntity);
+        }else {
+            throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION, "The application is not present in household permit table.");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -303,14 +312,14 @@ public class TerminationService {
 
                 case "Approved" -> {
                     LocalDateTime now = LocalDateTime.now();
-                    app.setCurrentStatus("CMS HEAD APPROVED");
+                    app.setCurrentStatus("TERMINATION APPROVED");
                     app.setRemarksCMSHead(request.getRemarks());
                     app.setCmsHeadReviewedAt(now);
                     app.setCmsHeadFileId(request.getFileId());
                     app.setApprovedAt(now);
 
                     if (master != null) {
-                        master.setCurrentStatus("CMS HEAD APPROVED");
+                        master.setCurrentStatus("TERMINATION APPROVED");
                         master.setApprovedAt(now);
                         master.setCompletedAt(now);
                         applicationMasterRepository.save(master);
