@@ -269,7 +269,7 @@ public class MiningLeaseService {
                                 "Application pending for payment",
                                 "Your application will be processed after payment.",
                                 application.getApplicantUserId(),
-                                "78");
+                                "78", "CITIZEN");
                     }
 
                     MiningLeaseResponse response = mapper.toResponse(application);
@@ -299,7 +299,7 @@ public class MiningLeaseService {
                             "Application submitted successfully",
                             "Your mining lease application has been submitted.",
                             application.getApplicantUserId(),
-                            "78");
+                            "78", "CITIZEN");
                 }
 
                 log.info("Application submitted successfully: {}", application.getApplicationNumber());
@@ -344,7 +344,7 @@ public class MiningLeaseService {
                     "Application submitted successfully",
                     "Your payment has been confirmed and your mining lease application has been submitted.",
                     application.getApplicantUserId(),
-                    "78");
+                    "78", "CITIZEN");
         }
         log.info("Payment confirmed — application {} transitioned to SUBMITTED", applicationNo);
     }
@@ -617,7 +617,7 @@ public class MiningLeaseService {
                 String title = "Mining lease application has been assigned.";
                 String message = "An application for mining lease has been assigned for review. Application No. " + miningLeaseApplication.getApplicationNumber() + " Please login in review the Geological report.";
                 String serviceId = "78";
-                notificationClient.sendUserNotification(title, message, assignedDirector.getUserId(), serviceId);
+                notificationClient.sendUserNotification(title, message, assignedDirector.getUserId(), serviceId, "STAFF");
             }catch (Exception ex) {
                 log.warn("Failed to send in-app notification to director", ex);
                 throw new BusinessException(
@@ -929,7 +929,7 @@ public class MiningLeaseService {
             String title = "An new application has been reassigned.";
             String message = "An application for quarry lease has been assigned for review. Application No. "+request.getApplicationNumber()+" Please login in review the application";
             String serviceId = "78";
-            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId);
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF");
         }else {
             throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
@@ -968,7 +968,7 @@ public class MiningLeaseService {
             String title = "An new application has been reassigned.";
             String message = "An application for quarry lease has been assigned for review. Application No. "+ request.getApplicationNumber()+" Please login in review the application";
             String serviceId = "78";
-            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId);
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF");
         }else {
             throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
@@ -1010,7 +1010,7 @@ public class MiningLeaseService {
             String title = "An new application has been reassigned.";
             String message = "An application for quarry lease has been assigned for review. Application No. "+request.getApplicationNumber()+" Please login in review the application";
             String serviceId = "78";
-            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId);
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF");
         }else {
             throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
@@ -1053,7 +1053,7 @@ public class MiningLeaseService {
             String title = "An new application has been reassigned.";
             String message = "An application for quarry lease has been assigned for review. Application No. "+request.getApplicationNumber()+" Please login in review the application";
             String serviceId = "78";
-            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId);
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF");
         }else {
             throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
@@ -1092,7 +1092,7 @@ public class MiningLeaseService {
                     String title = "PA/FC submitted. ";
                     String message = "PA/FC has been submitted by applicant. Please login an process the application."+ "Application No. : "+ miningLeaseApplication.getApplicationNumber();
                     String serviceId = "78";
-                    notificationClient.sendUserNotification(title, message, assignedMPCDFocalId, serviceId);
+                    notificationClient.sendUserNotification(title, message, assignedMPCDFocalId, serviceId, "STAFF");
                 }
 
                 if(miningLeaseApplication.getApplicantEmail() != null) {
@@ -1142,7 +1142,7 @@ public class MiningLeaseService {
                     String title = "PA/FC resubmitted. ";
                     String message = "PA/FC has been resubmitted by applicant. Please login to process the application."+ "Application No. : "+ miningLeaseApplication.getApplicationNumber();
                     String serviceId = "78";
-                    notificationClient.sendUserNotification(title, message, assignedMPCDFocalId, serviceId);
+                    notificationClient.sendUserNotification(title, message, assignedMPCDFocalId, serviceId, "STAFF");
                 }
 
                 if(miningLeaseApplication.getApplicantEmail() != null) {
@@ -1213,7 +1213,7 @@ public class MiningLeaseService {
                     String title = "Mining lease application has been assigned for FMFS review.";
                     String message = "Mining lease application has been  assigned for FMFS review.";
                     String serviceId = "78";
-                    notificationClient.sendUserNotification(title, message, assignedMineEngineer.getUserId(), serviceId);
+                    notificationClient.sendUserNotification(title, message, assignedMineEngineer.getUserId(), serviceId, "STAFF");
                 }
 
             }else {
@@ -1522,7 +1522,7 @@ public class MiningLeaseService {
                 String title = "A new mining application has been assigned.";
                 String message = "A new mining application has been assigned.";
                 String serviceId = "78";
-                notificationClient.sendUserNotification(title, message, userGeologist.getUserId(), serviceId);
+                notificationClient.sendUserNotification(title, message, userGeologist.getUserId(), serviceId, "STAFF");
             }
         }
 
@@ -1556,7 +1556,7 @@ public class MiningLeaseService {
                 String title = "A new mining application has been assigned.";
                 String message = "A new mining application has been assigned.";
                 String serviceId = "78";
-                notificationClient.sendUserNotification(title, message, userGeologist.getUserId(), serviceId);
+                notificationClient.sendUserNotification(title, message, userGeologist.getUserId(), serviceId, "STAFF");
             }
         }
         return mapper.toResponse(miningLeaseApplication);
@@ -1621,7 +1621,7 @@ public class MiningLeaseService {
                                 String meTitle = "Mining lease application has been assigned for review.";
                                 String meMessage = "A mining lease application has been forwarded to you for review.";
                                 String meServiceId = "78";
-                                notificationClient.sendUserNotification(meTitle, meMessage, assignedMineEngineer.getUserId(), meServiceId);
+                                notificationClient.sendUserNotification(meTitle, meMessage, assignedMineEngineer.getUserId(), meServiceId, "STAFF");
                             }
                         }
                     }
@@ -1640,7 +1640,7 @@ public class MiningLeaseService {
                     String title = "Application status updated.";
                     String message = "Your application has been forwarded to geologist to review.";
                     String serviceId = "78";
-                    notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId);
+                    notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN");
                 }
                 case "ACCEPTED GR" -> {
                     miningLeaseApplication.setCurrentStatus("APPROVED GR");
@@ -1670,7 +1670,7 @@ public class MiningLeaseService {
                         String title = "Geological report has been approved successfully.";
                         String message = "Geological Report has been accepted. Please upload mining lease application and PFS to proceed further.";
                         String serviceId = "78";
-                        notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId);
+                        notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN");
                     }else {
                         throw new BusinessException(ErrorCodes.DATA_INTEGRITY_VIOLATION, "Applicant user ID is not present.");
                     }
@@ -1884,7 +1884,7 @@ public class MiningLeaseService {
                     String title = "Application status updated.";
                     String message = "Your application has been forwarded to geologist to review.";
                     String serviceId = "78";
-                    notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId);
+                    notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN");
                 }
                 case "ACCEPTED" -> {
                     if (Objects.equals(miningLeaseApplication.getCurrentStatus(), "ACCEPTED PFS")) {
@@ -1915,7 +1915,7 @@ public class MiningLeaseService {
                     String title = "Application status updated.";
                     String message = "Your application has been forwarded to MPCD for review.";
                     String serviceId = "78";
-                    notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId);
+                    notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN");
 
                 }
                 case "Approved PA/FC" -> {
@@ -1943,7 +1943,7 @@ public class MiningLeaseService {
                     String title = "Application status updated.";
                     String message = "PA/FC has been approved by MPCD. Please proceed by uploading FMFS before the set deadline.";
                     String serviceId = "78";
-                    notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId);
+                    notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN");
 
                 }
                 case "Rejected" -> {
@@ -2088,7 +2088,7 @@ public class MiningLeaseService {
                     String title = "Mining lease application has been send to you with MA document.";
                     String message = "Mining lease application has been  send to you with MA document. Please log in the system to upload PA/FC document.";
                     String serviceId = "78";
-                    notificationClient.sendUserNotification(title, message, miningleaseapplication.getApplicantUserId(), serviceId);
+                    notificationClient.sendUserNotification(title, message, miningleaseapplication.getApplicantUserId(), serviceId, "CITIZEN");
                 }
 
             }else {
@@ -2468,7 +2468,7 @@ public class MiningLeaseService {
                             String title = "An new application has been assigned.";
                             String message = "An application for mining lease has been assigned for review. Application No. "+ app.getApplicationNumber() +" Please login in review the application";
                             String serviceId = "78";
-                            notificationClient.sendUserNotification(title, message, assignedMiningChief.getUserId(), serviceId);
+                            notificationClient.sendUserNotification(title, message, assignedMiningChief.getUserId(), serviceId, "STAFF");
                         }else {
                             throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
                         }
@@ -2613,7 +2613,7 @@ public class MiningLeaseService {
                     String title = "LLC has been uploaded by mine engineer.";
                     String message = "LLC for you application has been uploaded by mine engineer.";
                     String serviceId = "78";
-                    notificationClient.sendUserNotification(title, message, quarryLeaseApplication1.getApplicantUserId(), serviceId);
+                    notificationClient.sendUserNotification(title, message, quarryLeaseApplication1.getApplicantUserId(), serviceId, "CITIZEN");
                 }
 
             }else {
@@ -2646,7 +2646,7 @@ public class MiningLeaseService {
                     String title = "Note sheet has been uploaded by mine engineer.";
                     String message = "Note sheet for you application has been uploaded by mine engineer.";
                     String serviceId = "78";
-                    notificationClient.sendUserNotification(title, message, quarryLeaseApplication1.getApplicantUserId(), serviceId);
+                    notificationClient.sendUserNotification(title, message, quarryLeaseApplication1.getApplicantUserId(), serviceId, "CITIZEN");
                 }
 
             }else {
@@ -2687,7 +2687,7 @@ public class MiningLeaseService {
                     String title = "Work order has been uploaded by mine engineer.";
                     String message = "Work order for your application has been uploaded by mine engineer. Your application for mining lease has been approved.";
                     String serviceId = "78";
-                    notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId);
+                    notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN");
                 }
 
                 HouseholdPermitThresholdEntity entity = new HouseholdPermitThresholdEntity();
@@ -2741,14 +2741,14 @@ public class MiningLeaseService {
                     String title = "Mining lease application has been assigned for MLA review.";
                     String message = "Mining lease application has been  assigned for MLA review.";
                     String serviceId = "78";
-                    notificationClient.sendUserNotification(title, message, assignedDirectorDetails.getUserId(), serviceId);
+                    notificationClient.sendUserNotification(title, message, assignedDirectorDetails.getUserId(), serviceId, "STAFF");
                 }
 
                 if(quarryLeaseApplication1.getApplicantUserId() != null) {
                     String title = "MLA submitted successfully.";
                     String message = "Your MLA has been submitted and forwarded to the Director for review."+ "Application No. : "+ quarryLeaseApplication1.getApplicationNumber();
                     String serviceId = "78";
-                    notificationClient.sendUserNotification(title, message, quarryLeaseApplication1.getApplicantUserId(), serviceId);
+                    notificationClient.sendUserNotification(title, message, quarryLeaseApplication1.getApplicantUserId(), serviceId, "CITIZEN");
                 }
 
             }else {

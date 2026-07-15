@@ -271,7 +271,7 @@ public class ImmediateSuspensionService {
             String title = "Immediate Suspension application has been issued related to your lease.";
             String message = "Application No. " + appNo;
 
-            notificationClient.sendUserNotification(title, message, userId, "116");
+            notificationClient.sendUserNotification(title, message, userId, "116", "CITIZEN");
         }
     }
 
@@ -414,7 +414,7 @@ public class ImmediateSuspensionService {
                 String title = "A new immediate suspension application has been assigned.";
                 String message = "A new immediate suspension application has been assigned.";
                 String serviceId = "116";
-                notificationClient.sendUserNotification(title, message, userMI.getUserId(), serviceId);
+                notificationClient.sendUserNotification(title, message, userMI.getUserId(), serviceId, "STAFF");
             }
         }
         return immediateSuspensionMapper.toResponse(immediateSuspensionApplication);
@@ -770,7 +770,7 @@ public class ImmediateSuspensionService {
                 String title = "A new immediate suspension application has been assigned.";
                 String message = "A new immediate suspension application has been assigned.";
                 String serviceId = "116";
-                notificationClient.sendUserNotification(title, message, userMI.getUserId(), serviceId);
+                notificationClient.sendUserNotification(title, message, userMI.getUserId(), serviceId, "STAFF");
             }
         return immediateSuspensionMapper.toResponse(immediateSuspensionApplication);
 

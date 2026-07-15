@@ -501,7 +501,7 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     WHERE q.createdBy = :userId
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
-    Page<MiningLeaseApplication> findByAssignedToUserAndSearch(Long userId, String Search, Pageable pageable);
+    Page<MiningLeaseApplication> findByAssignedToUserAndSearch(Long userId, String search, Pageable pageable);
 
     @Query("""
     SELECT q FROM MiningLeaseApplication q

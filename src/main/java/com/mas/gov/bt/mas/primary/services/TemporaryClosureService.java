@@ -135,7 +135,7 @@ public class TemporaryClosureService {
             String title = "Temporary closure application has been assigned.";
             String message = "An application for temporary has been assigned for review. Application No. "+ temporaryClosureEntity.getApplicationId()+" Please login to review the temporary closure application.";
             String serviceId = "108";
-            notificationClient.sendUserNotification(title, message, assignedRC.getUserId(), serviceId);
+            notificationClient.sendUserNotification(title, message, assignedRC.getUserId(), serviceId, "STAFF");
         }else {
             throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
@@ -288,7 +288,7 @@ public class TemporaryClosureService {
                 String title = "A new temporary closure application has been assigned.";
                 String message = "A new temporary closure application has been assigned.";
                 String serviceId = "108";
-                notificationClient.sendUserNotification(title, message, userMI.getUserId(), serviceId);
+                notificationClient.sendUserNotification(title, message, userMI.getUserId(), serviceId, "STAFF");
             }
         }
         return TemporaryClosureMapper.toResponse(temporaryClosureEntity);
@@ -492,7 +492,7 @@ public class TemporaryClosureService {
             String title = "Mining lease application has been assigned for MLA review.";
             String message = "Mining lease application has been  assigned for MLA review.";
             String serviceId = "108";
-            notificationClient.sendUserNotification(title, message, assignedMIDetails.getUserId(), serviceId);
+            notificationClient.sendUserNotification(title, message, assignedMIDetails.getUserId(), serviceId, "STAFF");
         }
 
         return  TemporaryClosureMapper.toResponse(temporaryClosureRepository.save(temporaryClosureEntity));
@@ -529,7 +529,7 @@ public class TemporaryClosureService {
             String title = "An new application has been reassigned.";
             String message = "An application for temporary closure has been assigned for review. Application No. "+ request.getApplicationNumber()+" Please login in review the application";
             String serviceId = "108";
-            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId);
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF");
         }else {
             throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
@@ -591,7 +591,7 @@ public class TemporaryClosureService {
             String title = "An new application has been reassigned.";
             String message = "An application for temporary closure has been assigned for review. Application No. "+ request.getApplicationNumber()+" Please login in review the application";
             String serviceId = "108";
-            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId);
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF");
         }else {
             throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }

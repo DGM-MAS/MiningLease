@@ -150,7 +150,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
             String title = "Surface Collection Auction application has been assigned.";
             String message = "An application for surface collection auction has been assigned for review. Application No. "+ entity.getApplicationNo();
             String serviceId = "71";
-            notificationClient.sendUserNotification(title, message, assignedMD.getUserId(), serviceId);
+            notificationClient.sendUserNotification(title, message, assignedMD.getUserId(), serviceId, "STAFF");
         }else {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND,"Assigned MD user ID not Found");
         }
@@ -267,7 +267,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
             String title = "EC for Surface Collection Auction application has been approved.";
             String message = "EC for surface collection auction has been APPROVED. Application No. "+ entity.getApplicationNo();
             String serviceId = "71";
-            notificationClient.sendUserNotification(title, message, entity.getCreatedBy(), serviceId);
+            notificationClient.sendUserNotification(title, message, entity.getCreatedBy(), serviceId, "STAFF");
         }else {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "MPCD User details not present for notification.");
         }
@@ -347,7 +347,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
             String title = "Surface Collection Auction Winner";
             String message = "Surface collection auction application has been won by you. Application No. "+ entity.getApplicationNo();
             String serviceId = "71";
-            notificationClient.sendUserNotification(title, message, assignedUser.getUserId(), serviceId);
+            notificationClient.sendUserNotification(title, message, assignedUser.getUserId(), serviceId, "STAFF");
         }else {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Bid winner user ID not present for notification.");
         }
