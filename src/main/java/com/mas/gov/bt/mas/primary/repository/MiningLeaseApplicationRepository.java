@@ -1,5 +1,6 @@
 package com.mas.gov.bt.mas.primary.repository;
 
+import com.mas.gov.bt.mas.primary.dto.CitizenGroupingProjection;
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
 import com.mas.gov.bt.mas.primary.entity.MiningLeaseApplication;
 import org.springframework.data.domain.Page;
@@ -531,56 +532,82 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
 
     List<MiningLeaseApplication> findByIsManualEntryAndManualEntryBy(String isManualEntry, Long manualEntryBy);
 
+    /** Resolves the fields needed to pick the application-cap grouping key for a user. */
+    @Query(value = """
+    SELECT registration_type AS registrationType,
+           household_number AS householdNumber,
+           license_no AS licenseNo,
+           company_registration_number AS companyRegistrationNumber,
+           cid AS cid
+    FROM mas_db.t_citizens
+    WHERE id = :userId
+    """, nativeQuery = true)
+    Optional<CitizenGroupingProjection> findGroupingInfoByUserId(@Param("userId") Long userId);
+
+    /**
+     * Counts in-progress (excluding DRAFT) + ACTIVE mining lease applications for
+     * everyone sharing the given grouping key. groupingType is one of
+     * INDIVIDUAL | BUSINESS_LICENSE | REGISTERED_COMPANY | CID (CID = fallback
+     * when the applicant has no household/license/company number on file).
+     */
     @Query(value = """
 SELECT
 (
     SELECT COUNT(*)
-    FROM household_permit_threshold h
-    JOIN t_citizens c
+    FROM mas_db.household_permit_threshold h
+    JOIN mas_db.t_citizens c
       ON c.cid = h.applicant_cid
-    WHERE c.household_number = :householdNumber
-      AND h.service_type = 'MINING_LEASE'
+    WHERE h.service_type = 'MINING_LEASE'
       AND h.status = 'ACTIVE'
+      AND (
+        (:groupingType = 'INDIVIDUAL' AND c.household_number = :groupingKey) OR
+        (:groupingType = 'BUSINESS_LICENSE' AND c.license_no = :groupingKey) OR
+        (:groupingType = 'REGISTERED_COMPANY' AND c.company_registration_number = :groupingKey) OR
+        (:groupingType = 'CID' AND c.cid = :groupingKey)
+      )
 )
 +
 (
     SELECT COUNT(*)
-    FROM t_mining_lease_application mla
-    JOIN t_citizens c
+    FROM mas_db.t_mining_lease_application mla
+    JOIN mas_db.t_citizens c
       ON c.cid = mla.applicant_cid
-    WHERE c.household_number = :householdNumber
-      AND mla.current_status IN (
-     "SUBMITTED",
-     "DRAFT",
-     "ASSIGNED",
-     "MPCD ASSIGNED",
-     "GEOLOGIST_REVIEW",
-     "GR SUBMITTED",
-     "LLC UPLOADED",
-     "PAYMENT PENDING",
-     "ACCEPTED PFS",
-     "ADDITIONAL DATA NEEDED",
-     "MA SUBMITTED",
-     "PA/FC SUBMITTED",
-     "APPROVED GR",
-     "NOTE SHEET UPLOADED",
-     "GR SUBMITTED",
-     "BG SUBMITTED",
-     "FMFS SUBMITTED",
-     "MLA SUBMITTED",
-     "APPROVED BY DIRECTOR",
-     "RESUBMITTED PFS",
-     "RESUBMIT GR",
-     "RESUBMITTED GR",
-     "RESUBMIT FMFS",
-     "RESUBMITTED FMFS",
-     "RESUBMIT APPLICATION",
-     "RESUBMIT PFS GEOLOGIST",
-     "RESUBMIT PFS MPCD",
-     "RESUBMIT PA/FC",
-     "APPROVED PA/FC"
+    WHERE mla.current_status IN (
+     'SUBMITTED',
+     'ASSIGNED',
+     'MPCD ASSIGNED',
+     'GEOLOGIST_REVIEW',
+     'GR SUBMITTED',
+     'LLC UPLOADED',
+     'PAYMENT PENDING',
+     'ACCEPTED PFS',
+     'ADDITIONAL DATA NEEDED',
+     'MA SUBMITTED',
+     'PA/FC SUBMITTED',
+     'APPROVED GR',
+     'NOTE SHEET UPLOADED',
+     'BG SUBMITTED',
+     'FMFS SUBMITTED',
+     'MLA SUBMITTED',
+     'APPROVED BY DIRECTOR',
+     'RESUBMITTED PFS',
+     'RESUBMIT GR',
+     'RESUBMITTED GR',
+     'RESUBMIT FMFS',
+     'RESUBMITTED FMFS',
+     'RESUBMIT APPLICATION',
+     'RESUBMIT PFS GEOLOGIST',
+     'RESUBMIT PFS MPCD',
+     'RESUBMIT PA/FC',
+     'APPROVED PA/FC'
+      )
+      AND (
+        (:groupingType = 'INDIVIDUAL' AND c.household_number = :groupingKey) OR
+        (:groupingType = 'BUSINESS_LICENSE' AND c.license_no = :groupingKey) OR
+        (:groupingType = 'REGISTERED_COMPANY' AND c.company_registration_number = :groupingKey) OR
+        (:groupingType = 'CID' AND c.cid = :groupingKey)
       )
 )
 """, nativeQuery = true)
-    Integer countMiningLeasesByHousehold(String householdNumber);
+    Integer countMiningLeasesForGrouping(@Param("groupingType") String groupingType, @Param("groupingKey") String groupingKey);
 }

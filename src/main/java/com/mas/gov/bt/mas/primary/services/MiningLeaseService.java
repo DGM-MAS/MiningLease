@@ -8,6 +8,7 @@ import com.mas.gov.bt.mas.primary.dto.payment.PaymentInitiationRequest;
 import com.mas.gov.bt.mas.primary.dto.payment.PaymentInitiationResponse;
 import com.mas.gov.bt.mas.primary.dto.request.*;
 import com.mas.gov.bt.mas.primary.dto.response.ApplicationListResponse;
+import com.mas.gov.bt.mas.primary.dto.response.CapCheckResponse;
 import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
 import com.mas.gov.bt.mas.primary.dto.response.TaskManagementAssignedUser;
 import com.mas.gov.bt.mas.primary.entity.*;
@@ -78,6 +79,13 @@ public class MiningLeaseService {
     private final WorkflowTrackingService workflowTrackingService;
 
     private final UserRepository userRepository;
+
+    private final HouseholdPermitCapConfigRefRepository capConfigRepository;
+
+    private final HouseholdPermitThresholdEntryRepository thresholdEntryRepository;
+
+    private static final int DEFAULT_MAX_APPLICATIONS = 2;
+    private static final String THRESHOLD_SERVICE_TYPE = "MINING_LEASE";
 
     @Value("${app.self.base-url}")
     private String selfBaseUrl;
@@ -439,6 +447,77 @@ public class MiningLeaseService {
         return String.format("ML-%d-%06d", year, nextSequence);
     }
 
+    /**
+     * Resolves the application-cap grouping key for a user based on their
+     * t_citizens.registration_type: household_number for INDIVIDUAL, license_no
+     * for BUSINESS_LICENSE, company_registration_number for REGISTERED_COMPANY.
+     * Falls back to the applicant's own CID (for counting) when the natural
+     * key is blank, so applicants with no household/license/company number on
+     * file still get capped individually instead of the check silently doing
+     * nothing. The applicant's real registration type is always returned as
+     * element [2] so the admin-configured cap for that type still applies.
+     * Returns {groupingType, groupingKey, registrationType}.
+     */
+    private String[] resolveGroupingKey(Long userId) {
+        return miningLeaseApplicationRepository.findGroupingInfoByUserId(userId)
+                .map(info -> {
+                    String rt = info.getRegistrationType();
+                    if ("INDIVIDUAL".equals(rt) && isNotBlank(info.getHouseholdNumber())) {
+                        return new String[]{"INDIVIDUAL", info.getHouseholdNumber(), rt};
+                    }
+                    if ("BUSINESS_LICENSE".equals(rt) && isNotBlank(info.getLicenseNo())) {
+                        return new String[]{"BUSINESS_LICENSE", info.getLicenseNo(), rt};
+                    }
+                    if ("REGISTERED_COMPANY".equals(rt) && isNotBlank(info.getCompanyRegistrationNumber())) {
+                        return new String[]{"REGISTERED_COMPANY", info.getCompanyRegistrationNumber(), rt};
+                    }
+                    return new String[]{"CID", info.getCid(), rt};
+                })
+                .orElse(new String[]{"CID", null, "INDIVIDUAL"});
+    }
+
+    private boolean isNotBlank(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private int getMaxAllowedForService(String serviceType, String registrationType) {
+        String rt = isNotBlank(registrationType) ? registrationType : "INDIVIDUAL";
+        return capConfigRepository.findByServiceTypeAndRegistrationType(serviceType, rt)
+                .map(c -> c.getMaxAllowed() != null ? c.getMaxAllowed() : DEFAULT_MAX_APPLICATIONS)
+                .orElse(DEFAULT_MAX_APPLICATIONS);
+    }
+
+    /**
+     * Pre-flight cap check — called when the applicant clicks to open the
+     * application form, before they fill anything in. Also reused by
+     * submitGR as the authoritative server-side guard.
+     */
+    public CapCheckResponse checkCap(Long userId) {
+        String[] grouping = resolveGroupingKey(userId);
+        int maxAllowed = getMaxAllowedForService("MINING_LEASE", grouping[2]);
+        Integer total = miningLeaseApplicationRepository.countMiningLeasesForGrouping(grouping[0], grouping[1]);
+        int current = total != null ? total : 0;
+        boolean allowed = current < maxAllowed;
+        String message = allowed ? null
+                : "Only " + maxAllowed + " mining lease application(s) are permitted per " +
+                        ("CID".equals(grouping[0]) ? "applicant" : "household/entity") + ".";
+        return new CapCheckResponse(allowed, current, maxAllowed, message);
+    }
+
+    /** Records an ACTIVE entry in the shared threshold table when a lease is finally approved. */
+    private void recordApprovedForThreshold(MiningLeaseApplication app) {
+        if (app.getApplicantCid() == null || app.getApplicantCid().isBlank()) return;
+        if (thresholdEntryRepository.existsByServiceTypeAndApplicationNo(THRESHOLD_SERVICE_TYPE, app.getApplicationNumber())) {
+            return;
+        }
+        HouseholdPermitThresholdEntry entry = new HouseholdPermitThresholdEntry();
+        entry.setApplicantCid(app.getApplicantCid());
+        entry.setServiceType(THRESHOLD_SERVICE_TYPE);
+        entry.setApplicationNo(app.getApplicationNumber());
+        entry.setStatus("ACTIVE");
+        thresholdEntryRepository.save(entry);
+    }
+
     @Transactional
     private synchronized String generateDraftApplicationNumber() {
         int year = Year.now().getValue();
@@ -462,18 +541,11 @@ public class MiningLeaseService {
         validateApplicationRequest(request);
 
 //         ============================================================
-//         0. Checking if the user has not more than two mining lease
+//         0. Checking the applicant hasn't exceeded the configured cap
 //         ============================================================
-        String householdNumber = miningLeaseApplicationRepository.findUserHouseHoldNumber(userId);
-
-        Integer total = miningLeaseApplicationRepository
-                .countMiningLeasesByHousehold(householdNumber);
-
-        if (total >= 2) {
-            throw new BusinessException(
-                    ErrorCodes.DATA_INTEGRITY_VIOLATION,
-                    "Only two mining leases/applications are permitted per household."
-            );
+        CapCheckResponse cap = checkCap(userId);
+        if (!cap.isAllowed()) {
+            throw new BusinessException(ErrorCodes.DATA_INTEGRITY_VIOLATION, cap.getMessage());
         }
 
         miningLeaseApplication.setExpPermitNo(request.getExpPermitNo());
@@ -2591,6 +2663,7 @@ public class MiningLeaseService {
                 miningLeaseApplicationRepository.save(quarryLeaseApplication1);
 
                 siteProvisioningService.provisionSiteForApprovedLease(quarryLeaseApplication1);
+                recordApprovedForThreshold(quarryLeaseApplication1);
 
                 // Terminal approval — close out the open Mining Engineer task instead of leaving
                 // it dangling in the queue forever.
