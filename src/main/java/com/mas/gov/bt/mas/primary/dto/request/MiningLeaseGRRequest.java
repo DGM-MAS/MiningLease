@@ -28,9 +28,15 @@ public class MiningLeaseGRRequest {
     @Size(max = 255, message = "Email must not exceed 255 characters")
     private String applicantEmail;
 
+    private String businessName;
+
+    private String businessLicenseNo;
+
     private String licenseNo;
 
     private String companyName;
+
+    private String companyRegistrationNo;
 
     private Long gRDocId;
 

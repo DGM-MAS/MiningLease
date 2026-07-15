@@ -70,6 +70,9 @@ public class MiningLeaseApplication {
     @Column(name = "license_no", length = 50)
     private String licenseNo;
 
+    @Column(name = "business_name")
+    private String businessName;
+
     @Column(name = "business_license_no", length = 50)
     private String businessLicenseNo;
 

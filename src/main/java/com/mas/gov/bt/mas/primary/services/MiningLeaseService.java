@@ -87,6 +87,8 @@ public class MiningLeaseService {
     private static final int DEFAULT_MAX_APPLICATIONS = 2;
     private static final String THRESHOLD_SERVICE_TYPE = "MINING_LEASE";
 
+    private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
+
     @Value("${app.self.base-url}")
     private String selfBaseUrl;
 
@@ -559,6 +561,9 @@ public class MiningLeaseService {
         miningLeaseApplication.setApplicantEmail(request.getApplicantEmail());
         miningLeaseApplication.setApplicantName(request.getApplicantName());
         miningLeaseApplication.setLicenseNo(request.getLicenseNo());
+        miningLeaseApplication.setBusinessLicenseNo(request.getBusinessLicenseNo());
+        miningLeaseApplication.setBusinessName(request.getBusinessName());
+        miningLeaseApplication.setCompanyRegistrationNo(request.getCompanyRegistrationNo());
         miningLeaseApplication.setCompanyName(request.getCompanyName());
         miningLeaseApplication.setCurrentStatus("GR SUBMITTED");
         miningLeaseApplication.setCreatedBy(userId);
@@ -811,7 +816,9 @@ public class MiningLeaseService {
                 "MINING LEASE APPROVED",
                 "REJECTED",
                 "TERMINATION APPROVED",
-                "RENEWAL APPLICATION"
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION"
         );
 
         Page<MiningLeaseApplication> applications;
@@ -859,7 +866,9 @@ public class MiningLeaseService {
                 "MINING LEASE APPROVED",
                 "REJECTED",
                 "TERMINATION APPROVED",
-                "RENEWAL APPLICATION"
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION"
         );
 
         if (search == null || search.isBlank()) {
@@ -2114,7 +2123,10 @@ public class MiningLeaseService {
 
         completeCurrentTask(master, request.getStatus(), request.getRemarks());
 
-        Long directorId = request.getDirectorId();
+        TaskManagement task = taskManagementRepository.findByApplicationNumberAndAssignedToRoleAndTaskStatusAndServiceCode
+                (app.getApplicationNumber(),"DIRECTOR", "GR SUBMITTED", SERVICE_CODE);
+
+        Long directorId = task.getAssignedToUserId();
 
         if (request.getStatus() != null) {
             switch (request.getStatus()) {
@@ -2646,43 +2658,53 @@ public class MiningLeaseService {
 
     @Transactional
     public MiningLeaseResponse submitWorkOrder(@Valid MiningLeaseWorkOrderRequest request) {
-        MiningLeaseApplication quarryLeaseApplication1 = null;
+        MiningLeaseApplication miningLeaseApplication = null;
         if (request.getApplicationNo() != null) {
             Optional<MiningLeaseApplication> quarryLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationNo());
             if (quarryLeaseApplication.isPresent()) {
-                quarryLeaseApplication1 = quarryLeaseApplication.get();
-                ApplicationMaster applicationMaster = quarryLeaseApplication1.getApplicationMaster();
+                miningLeaseApplication = quarryLeaseApplication.get();
+                ApplicationMaster applicationMaster = miningLeaseApplication.getApplicationMaster();
                 LocalDateTime now = LocalDateTime.now();
                 applicationMaster.setCurrentStatus("MINING LEASE APPROVED");
                 applicationMaster.setApprovedAt(now);
                 applicationMaster.setCompletedAt(now);
-                quarryLeaseApplication1.setWorkOrderDocId(request.getWorkOrderDocId());
-                quarryLeaseApplication1.setWorkOrderRemarks(request.getRemarks());
-                quarryLeaseApplication1.setCurrentStatus("MINING LEASE APPROVED");
+                miningLeaseApplication.setWorkOrderDocId(request.getWorkOrderDocId());
+                miningLeaseApplication.setWorkOrderRemarks(request.getRemarks());
+                miningLeaseApplication.setCurrentStatus("MINING LEASE APPROVED");
                 applicationMasterRepository.save(applicationMaster);
-                miningLeaseApplicationRepository.save(quarryLeaseApplication1);
+                miningLeaseApplicationRepository.save(miningLeaseApplication);
 
-                siteProvisioningService.provisionSiteForApprovedLease(quarryLeaseApplication1);
-                recordApprovedForThreshold(quarryLeaseApplication1);
+                siteProvisioningService.provisionSiteForApprovedLease(miningLeaseApplication);
+                recordApprovedForThreshold(miningLeaseApplication);
 
                 // Terminal approval — close out the open Mining Engineer task instead of leaving
                 // it dangling in the queue forever.
                 workflowTrackingService.completeCurrentTask(
-                        quarryLeaseApplication1.getApplicationNumber(), SERVICE_CODE,
+                        miningLeaseApplication.getApplicationNumber(), SERVICE_CODE,
                         "APPROVED", "Work order uploaded; mining lease approved.");
 
-                if(quarryLeaseApplication1.getApplicantUserId() != null) {
+                if(miningLeaseApplication.getApplicantUserId() != null) {
                     String title = "Work order has been uploaded by mine engineer.";
                     String message = "Work order for your application has been uploaded by mine engineer. Your application for mining lease has been approved.";
                     String serviceId = "78";
-                    notificationClient.sendUserNotification(title, message, quarryLeaseApplication1.getApplicantUserId(), serviceId);
+                    notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId);
                 }
+
+                HouseholdPermitThresholdEntity entity = new HouseholdPermitThresholdEntity();
+
+                entity.setServiceType(SERVICE_CODE);
+                entity.setApplicationNo(miningLeaseApplication.getApplicationNumber());
+                entity.setPermitNo(miningLeaseApplication.getExpPermitNo());
+                entity.setApplicantCid(miningLeaseApplication.getApplicantCid());
+                entity.setStatus("ACTIVE");
+
+                householdPermitThresholdRepository.save(entity);
 
             }else {
                 throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
             }
         }
-        return mapper.toResponse(quarryLeaseApplication1);
+        return mapper.toResponse(miningLeaseApplication);
     }
 
     @Transactional
@@ -2802,5 +2824,34 @@ public class MiningLeaseService {
         }
 
         return SuccessResponse.fromPage("Applications fetched successfully", page.map(mapper::toResponse));
+    }
+
+    private Integer getExistingPermitCount(MiningLeaseGRRequest request, Long userId) {
+
+        String applicantType = request.getApplicantType();
+
+        if ("INDIVIDUAL".equalsIgnoreCase(applicantType)) {
+            String householdNumber =
+                    miningLeaseApplicationRepository.findUserHouseHoldNumber(userId);
+
+            return miningLeaseApplicationRepository
+                    .countMiningLeasesByHousehold(householdNumber);
+        }
+
+        String identifier;
+
+        if ("BUSINESS_LICENSE".equalsIgnoreCase(applicantType)) {
+            identifier = request.getBusinessLicenseNo();
+        } else if ("REGISTERED_COMPANY".equalsIgnoreCase(applicantType)) {
+            identifier = request.getCompanyRegistrationNo();
+        } else {
+            throw new BusinessException(
+                    ErrorCodes.INVALID_REQUEST,
+                    "Invalid applicant type."
+            );
+        }
+
+        return miningLeaseApplicationRepository
+                .countByApplicantCidAndServiceType(identifier, SERVICE_CODE);
     }
 }
