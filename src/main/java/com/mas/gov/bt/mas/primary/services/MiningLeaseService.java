@@ -79,6 +79,8 @@ public class MiningLeaseService {
 
     private final UserRepository userRepository;
 
+    private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
+
     @Value("${app.self.base-url}")
     private String selfBaseUrl;
 
@@ -2592,42 +2594,52 @@ public class MiningLeaseService {
 
     @Transactional
     public MiningLeaseResponse submitWorkOrder(@Valid MiningLeaseWorkOrderRequest request) {
-        MiningLeaseApplication quarryLeaseApplication1 = null;
+        MiningLeaseApplication miningLeaseApplication = null;
         if (request.getApplicationNo() != null) {
             Optional<MiningLeaseApplication> quarryLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationNo());
             if (quarryLeaseApplication.isPresent()) {
-                quarryLeaseApplication1 = quarryLeaseApplication.get();
-                ApplicationMaster applicationMaster = quarryLeaseApplication1.getApplicationMaster();
+                miningLeaseApplication = quarryLeaseApplication.get();
+                ApplicationMaster applicationMaster = miningLeaseApplication.getApplicationMaster();
                 LocalDateTime now = LocalDateTime.now();
                 applicationMaster.setCurrentStatus("MINING LEASE APPROVED");
                 applicationMaster.setApprovedAt(now);
                 applicationMaster.setCompletedAt(now);
-                quarryLeaseApplication1.setWorkOrderDocId(request.getWorkOrderDocId());
-                quarryLeaseApplication1.setWorkOrderRemarks(request.getRemarks());
-                quarryLeaseApplication1.setCurrentStatus("MINING LEASE APPROVED");
+                miningLeaseApplication.setWorkOrderDocId(request.getWorkOrderDocId());
+                miningLeaseApplication.setWorkOrderRemarks(request.getRemarks());
+                miningLeaseApplication.setCurrentStatus("MINING LEASE APPROVED");
                 applicationMasterRepository.save(applicationMaster);
-                miningLeaseApplicationRepository.save(quarryLeaseApplication1);
+                miningLeaseApplicationRepository.save(miningLeaseApplication);
 
-                siteProvisioningService.provisionSiteForApprovedLease(quarryLeaseApplication1);
+                siteProvisioningService.provisionSiteForApprovedLease(miningLeaseApplication);
 
                 // Terminal approval — close out the open Mining Engineer task instead of leaving
                 // it dangling in the queue forever.
                 workflowTrackingService.completeCurrentTask(
-                        quarryLeaseApplication1.getApplicationNumber(), SERVICE_CODE,
+                        miningLeaseApplication.getApplicationNumber(), SERVICE_CODE,
                         "APPROVED", "Work order uploaded; mining lease approved.");
 
-                if(quarryLeaseApplication1.getApplicantUserId() != null) {
+                if(miningLeaseApplication.getApplicantUserId() != null) {
                     String title = "Work order has been uploaded by mine engineer.";
                     String message = "Work order for your application has been uploaded by mine engineer. Your application for mining lease has been approved.";
                     String serviceId = "78";
-                    notificationClient.sendUserNotification(title, message, quarryLeaseApplication1.getApplicantUserId(), serviceId);
+                    notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId);
                 }
+
+                HouseholdPermitThresholdEntity entity = new HouseholdPermitThresholdEntity();
+
+                entity.setServiceType(SERVICE_CODE);
+                entity.setApplicationNo(miningLeaseApplication.getApplicationNumber());
+                entity.setPermitNo(miningLeaseApplication.getExpPermitNo());
+                entity.setApplicantCid(miningLeaseApplication.getApplicantCid());
+                entity.setStatus("ACTIVE");
+
+                householdPermitThresholdRepository.save(entity);
 
             }else {
                 throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
             }
         }
-        return mapper.toResponse(quarryLeaseApplication1);
+        return mapper.toResponse(miningLeaseApplication);
     }
 
     @Transactional
