@@ -41,6 +41,14 @@ public class MiningLeaseController {
 
     // ========== Applicant APIs ==========
 
+    // Pre-flight cap check — called when the applicant clicks to open the application form.
+    @GetMapping("/check-cap")
+    @Operation(summary = "Check application cap", description = "Checks whether the applicant can open a new mining lease application form")
+    public ResponseEntity<SuccessResponse<com.mas.gov.bt.mas.primary.dto.response.CapCheckResponse>> checkCap() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(new SuccessResponse<>("Cap check completed", miningLeaseService.checkCap(userId)));
+    }
+
     // Used by user to submit Geological report
     // The initial stage of mining lease application submission
     @PostMapping("/applicationsGR")
