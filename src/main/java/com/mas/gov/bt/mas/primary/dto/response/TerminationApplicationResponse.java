@@ -1,5 +1,6 @@
 package com.mas.gov.bt.mas.primary.dto.response;
 
+import jakarta.persistence.Column;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
@@ -16,6 +17,8 @@ public class TerminationApplicationResponse {
     private Long id;
 
     private String applicationNumber;
+
+    private String nameOfSite;
 
     private List<String> applicationNumbers;
 

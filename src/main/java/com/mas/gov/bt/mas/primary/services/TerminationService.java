@@ -76,6 +76,8 @@ public class TerminationService {
             entity.setApplicationNumber(appNo);
             entity.setPromoterUserId(request.getPromoterUserId());
 
+            entity.setNameOfSite(leaseRef.siteName);
+
             entity.setFileId(request.getFileId());
             entity.setCreatedBy(userId);
             entity.setCreatedAt(LocalDateTime.now());
@@ -134,7 +136,7 @@ public class TerminationService {
 
 
     /** Common fields the rest of submitTerminationApplication needs, regardless of lease type. */
-    private record LeaseApplicationRef(String applicantName, String applicantEmail, ApplicationMaster applicationMaster) {}
+    private record LeaseApplicationRef(String applicantName, String applicantEmail, ApplicationMaster applicationMaster, String siteName) {}
 
     /**
      * Looks up the application across every lease type that can be terminated (Mining Lease,
@@ -155,7 +157,11 @@ public class TerminationService {
             application.setCurrentStatus("UNDER-REVIEW-TERMINATION");
             miningLeaseApplicationRepository.save(application);
             return new LeaseApplicationRef(
-                    application.getApplicantName(), application.getApplicantEmail(), application.getApplicationMaster());
+                    application.getApplicantName(),
+                    application.getApplicantEmail(),
+                    application.getApplicationMaster(),
+                    application.getNameOfMine()
+            );
         }
 
         Optional<QuarryLeaseApplication> quarryLeaseApplication =
@@ -169,7 +175,11 @@ public class TerminationService {
             application.setCurrentStatus("UNDER-REVIEW-TERMINATION");
             quarryLeaseApplicationRepository.save(application);
             return new LeaseApplicationRef(
-                    application.getApplicantName(), application.getApplicantEmail(), application.getApplicationMaster());
+                    application.getApplicantName(),
+                    application.getApplicantEmail(),
+                    application.getApplicationMaster(),
+                    application.getNameOfQuarry()
+            );
         }
 
         throw new CustomRuntimeException("Invalid application number: " + appNo);
