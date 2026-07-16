@@ -54,15 +54,19 @@ public class TemporaryClosureService {
         QuarryLeaseApplication quarryLeaseApplication1 = null;
 
         String applicationType = null;
+        String siteName = null;
 
 
         if (miningLeaseApplication.isPresent()) {
             miningLeaseApplication1 = miningLeaseApplication.get();
-            applicationType = "MINING LEASE";
+            applicationType = "MINING_LEASE";
+            siteName = miningLeaseApplication1.getNameOfMine();
+
         }
         if (quarryLeaseApplication.isPresent()) {
             quarryLeaseApplication1 = quarryLeaseApplication.get();
-            applicationType = "QUARRY LEASE";
+            applicationType = "QUARRY_LEASE";
+            siteName = quarryLeaseApplication1.getNameOfQuarry();
         }
         if (miningLeaseApplication1 == null && quarryLeaseApplication1 == null){
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Application Detail not found for the given Id.");
@@ -73,17 +77,18 @@ public class TemporaryClosureService {
         temporaryClosureEntity.setCurrentStatus("SUBMITTED");
         temporaryClosureEntity.setApplicantUserId(userId);
         temporaryClosureEntity.setApplicationType(applicationType);
+        temporaryClosureEntity.setNameOfSite(siteName);
 
         assert miningLeaseApplication1 != null;
 
-        if(applicationType.equalsIgnoreCase("MINING LEASE")){
+        if(applicationType.equalsIgnoreCase("MINING_LEASE")){
             temporaryClosureEntity.setApplicantName(miningLeaseApplication1.getApplicantName());
             temporaryClosureEntity.setApplicantCid(miningLeaseApplication1.getApplicantCid());
             temporaryClosureEntity.setApplicantContact(miningLeaseApplication1.getApplicantContact());
             temporaryClosureEntity.setApplicationId(miningLeaseApplication1.getApplicationNumber());
 
         }
-        if(applicationType.equalsIgnoreCase("QUARRY LEASE")){
+        if(applicationType.equalsIgnoreCase("QUARRY_LEASE")){
             temporaryClosureEntity.setApplicantName(quarryLeaseApplication1.getApplicantName());
             temporaryClosureEntity.setApplicantCid(quarryLeaseApplication1.getApplicantCid());
             temporaryClosureEntity.setApplicantContact(quarryLeaseApplication1.getApplicantContact());
@@ -103,7 +108,16 @@ public class TemporaryClosureService {
         // =====================================================
         // 2. ASSIGN RC
         // =====================================================
-        UserWorkloadProjection assignedRC = assignRC(miningLeaseApplication1.getRegionId());
+        UserWorkloadProjection assignedRC = null;
+
+        ApplicationMaster master = null;
+        if (applicationType.equalsIgnoreCase("MINING_LEASE")) {
+            assignedRC = assignRC(miningLeaseApplication1.getRegionId());
+            master = miningLeaseApplication1.getApplicationMaster();
+        }else {
+            assignedRC = assignRC(quarryLeaseApplication1.getRegionId());
+            master = quarryLeaseApplication1.getApplicationMaster();
+        }
 
         if (assignedRC == null) {
             assignedRC = assignRC(9L);
@@ -112,7 +126,6 @@ public class TemporaryClosureService {
         // =====================================================
         // 3. Application master and create task for director
         // =====================================================
-        ApplicationMaster master = miningLeaseApplication1.getApplicationMaster();
         master.setSubmittedAt(LocalDateTime.now());
         master.setServiceId(SERVICE_ID);
         master.setSubmittedOn(LocalDateTime.now());
@@ -121,7 +134,9 @@ public class TemporaryClosureService {
         master.setApplicationNumber(temporaryClosureEntity.getApplicationId());
         master.setServiceCode(SERVICE_CODE);
         applicationMasterRepository.save(master);
+
         temporaryClosureEntity.setApplicationMaster(master);
+
         createTask(master,temporaryClosureEntity,"RC", userId, assignedRC.getUserId());
 
         if (assignedRC.getEmail() != null) {
@@ -135,9 +150,13 @@ public class TemporaryClosureService {
             String title = "Temporary closure application has been assigned.";
             String message = "An application for temporary has been assigned for review. Application No. "+ temporaryClosureEntity.getApplicationId()+" Please login to review the temporary closure application.";
             String serviceId = "108";
-            notificationClient.sendUserNotification(title, message, assignedRC.getUserId(), serviceId, "STAFF");
-        }else {
-            throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+            notificationClient.sendUserNotification(
+                    title,
+                    message,
+                    assignedRC.getUserId(),
+                    serviceId,
+                    "STAFF"
+            );
         }
 
         return TemporaryClosureMapper.toResponse(temporaryClosureEntity);
@@ -149,9 +168,6 @@ public class TemporaryClosureService {
         UserWorkloadProjection rc =
                 temporaryClosureRepository.findRCTemporaryClosure(regionId);
 
-        if (rc == null && regionId == 9L) {
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "RC with the required permission, role and region not found.");
-        }
         return rc;
     }
 
@@ -355,7 +371,7 @@ public class TemporaryClosureService {
                         queryLeaseApplicationRepository.save(quarryLeaseApplicationEntity);
                     }
 
-                    Optional<HouseholdPermitThresholdEntity> entity = householdPermitThresholdRepository.findByApplicationNoAndServiceType(app.getApplicationId(), serviceType);
+                    Optional<HouseholdPermitThresholdEntity> entity = householdPermitThresholdRepository.findByApplicationNoAndServiceType(app.getApplicationId(), app.getApplicationType());
 
                     if (entity.isEmpty()) {
                         throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "The application number is not present in household permit table.");
@@ -636,6 +652,7 @@ public class TemporaryClosureService {
 
             applications = temporaryClosureRepository.findArchivedAssignedToUserAndSearch(
                     userId,
+                    archivedStatuses,
                     search.trim(),
                     pageable
             );

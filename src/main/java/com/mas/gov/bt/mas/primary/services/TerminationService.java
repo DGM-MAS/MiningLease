@@ -77,6 +77,7 @@ public class TerminationService {
             entity.setPromoterUserId(request.getPromoterUserId());
 
             entity.setNameOfSite(leaseRef.siteName);
+            entity.setApplicationType(leaseRef.applicationType);
 
             entity.setFileId(request.getFileId());
             entity.setCreatedBy(userId);
@@ -136,7 +137,7 @@ public class TerminationService {
 
 
     /** Common fields the rest of submitTerminationApplication needs, regardless of lease type. */
-    private record LeaseApplicationRef(String applicantName, String applicantEmail, ApplicationMaster applicationMaster, String siteName) {}
+    private record LeaseApplicationRef(String applicantName, String applicantEmail, ApplicationMaster applicationMaster, String siteName, String applicationType) {}
 
     /**
      * Looks up the application across every lease type that can be terminated (Mining Lease,
@@ -160,7 +161,8 @@ public class TerminationService {
                     application.getApplicantName(),
                     application.getApplicantEmail(),
                     application.getApplicationMaster(),
-                    application.getNameOfMine()
+                    application.getNameOfMine(),
+                    "MINING_LEASE"
             );
         }
 
@@ -178,7 +180,8 @@ public class TerminationService {
                     application.getApplicantName(),
                     application.getApplicantEmail(),
                     application.getApplicationMaster(),
-                    application.getNameOfQuarry()
+                    application.getNameOfQuarry(),
+                    "QUARRY_LEASE"
             );
         }
 
