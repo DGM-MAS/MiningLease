@@ -2,6 +2,7 @@ package com.mas.gov.bt.mas.primary.controller.Termination;
 
 import com.mas.gov.bt.mas.primary.config.UserContext;
 import com.mas.gov.bt.mas.primary.dto.request.TerminationApplicationRequest;
+import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
 import com.mas.gov.bt.mas.primary.dto.response.TerminationApplicationResponse;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
 import com.mas.gov.bt.mas.primary.services.TerminationService;
@@ -138,5 +139,7 @@ public class TerminationController {
 
         return ResponseEntity.ok(new SuccessResponse<>("Application retrieved successfully", response));
     }
+
+
 
 }
