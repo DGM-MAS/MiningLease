@@ -11,7 +11,7 @@ app:
 
 # Set to false to bypass payment and let applications flow through directly (dev/testing only)
 payment:
-  enabled: false
+  enabled: true
 
   notification:
     cleanup:
@@ -52,7 +52,7 @@ spring:
 
   datasource:
 #    url: jdbc:postgresql://localhost:5432/postgres
-    url: jdbc:postgresql://172.30.3.10:30432/mas_db?tcpKeepAlive=true&socketTimeout=300
+    url: jdbc:postgresql://172.30.3.10:30432/mas_db?tcpKeepAlive=true&socketTimeout=300&prepareThreshold=0
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:4GbRIVm8KuYXzEJB}
 #    password: root
@@ -220,7 +220,7 @@ spring:
     activate:
       on-profile: prod
   datasource:
-    url: jdbc:postgresql://172.30.3.10:30432/mas_db?tcpKeepAlive=true&socketTimeout=300
+    url: jdbc:postgresql://172.30.3.10:30432/mas_db?tcpKeepAlive=true&socketTimeout=300&prepareThreshold=0
   jpa:
     hibernate:
       ddl-auto: validate
