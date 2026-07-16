@@ -23,6 +23,8 @@ public class TemporaryClosureNotificationResponse {
     private String applicantEmail;
     private Long applicantFileId;
 
+    private String nameOfSite;
+
     private String reasonForClosure;
 
     private Long numberOfMonthsForClosure;

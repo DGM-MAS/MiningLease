@@ -91,8 +91,7 @@ public interface TemporaryClosureRepository extends JpaRepository<TemporaryClosu
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationId
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('MI ASSIGNED')
-    AND q.currentStatus IN ('MI ASSIGNED')
+    AND q.currentStatus IN ('MI ASSIGNED', 'MI REVIEWED')
 """)
     Page<TemporaryClosureEntity> findAssignedToUserMI(Long userId, Pageable pageable);
 
@@ -102,7 +101,7 @@ public interface TemporaryClosureRepository extends JpaRepository<TemporaryClosu
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationId
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('MI ASSIGNED')
+    AND q.currentStatus IN ('MI ASSIGNED', 'MI REVIEWED')
     AND LOWER(q.applicationId) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<TemporaryClosureEntity> findAssignedToUserAndSearchMI(Long userId, String search, Pageable pageable);
@@ -122,10 +121,10 @@ public interface TemporaryClosureRepository extends JpaRepository<TemporaryClosu
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationId
     WHERE t.assignedToUserId = :userId
-    AND q.currentStatus IN ('APPROVED BY RC')
+    AND q.currentStatus IN :archivedStatuses
     AND LOWER(q.applicationId) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
-    Page<TemporaryClosureEntity> findArchivedAssignedToUserAndSearch(Long userId, String search, Pageable pageable);
+    Page<TemporaryClosureEntity> findArchivedAssignedToUserAndSearch(Long userId, List<String> archivedStatuses, String search, Pageable pageable);
 
     @Query("""
     SELECT q FROM TemporaryClosureEntity q
@@ -141,7 +140,7 @@ public interface TemporaryClosureRepository extends JpaRepository<TemporaryClosu
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationId
     WHERE t.assignedToUserId = :userId
-    AND q.currentStatus IN ('APPROVED BY RC')
+    AND q.currentStatus IN :archivedStatuses
 """)
     Page<TemporaryClosureEntity> findArchivedAssignedToUser(Long userId, List<String> archivedStatuses, Pageable pageable);
 }

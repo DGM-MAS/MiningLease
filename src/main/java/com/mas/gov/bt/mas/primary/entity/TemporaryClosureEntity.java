@@ -21,6 +21,9 @@ public class TemporaryClosureEntity {
     @Column(name = "application_id", nullable = false, length = 30)
     private String applicationId;
 
+    @Column(name = "name_of_site")
+    private String nameOfSite;
+
     @Column(name = "application_type")
     private String applicationType;
 
