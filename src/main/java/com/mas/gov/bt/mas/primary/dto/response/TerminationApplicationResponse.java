@@ -20,6 +20,8 @@ public class TerminationApplicationResponse {
 
     private String nameOfSite;
 
+    private String applicationType;
+
     private List<String> applicationNumbers;
 
     private String terminationId;

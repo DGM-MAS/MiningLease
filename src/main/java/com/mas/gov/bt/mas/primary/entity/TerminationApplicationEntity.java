@@ -41,6 +41,9 @@ public class TerminationApplicationEntity {
     @Column(name = "applicant_email", length = 255)
     private String applicantEmail;
 
+    @Column(name = "application_type")
+    private String applicationType;
+
     @Column(name = "applicant_name", length = 255)
     private String applicantName;
 
