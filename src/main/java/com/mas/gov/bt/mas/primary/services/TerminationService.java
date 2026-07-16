@@ -206,9 +206,6 @@ public class TerminationService {
         UserWorkloadProjection cmsHead =
                 terminationApplicationRepository.findCMSTermination();
 
-        if (cmsHead == null) {
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
-        }
         return cmsHead;
     }
 
