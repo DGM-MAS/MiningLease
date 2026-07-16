@@ -303,6 +303,7 @@ public class TemporaryClosureService {
     public TemporaryClosureNotificationResponse reviewApplicationRC(@Valid ReviewTemporaryClosureRCRequest request, Long userId) {
         log.info("Reviewing temporary closure application by RC user: {}", userId);
 
+        String serviceType = null;
         TemporaryClosureEntity app = findApplicationById(request.getId());
         ApplicationMaster master = app.getApplicationMaster();
         if (request.getStatus() != null) {
@@ -317,6 +318,7 @@ public class TemporaryClosureService {
                     temporaryClosureRepository.save(app);
 
                     if (master != null) {
+                        serviceType = master.getServiceCode();
                         master.setCurrentStatus("TEMPORARY CLOSURE APPROVED");
                         master.setApprovedAt(now);
                         master.setCompletedAt(now);
@@ -353,9 +355,9 @@ public class TemporaryClosureService {
                         queryLeaseApplicationRepository.save(quarryLeaseApplicationEntity);
                     }
 
-                    Optional<HouseholdPermitThresholdEntity> entity = householdPermitThresholdRepository.findByApplicationNoAndServiceType(app.getApplicationId(), SERVICE_CODE);
+                    Optional<HouseholdPermitThresholdEntity> entity = householdPermitThresholdRepository.findByApplicationNoAndServiceType(app.getApplicationId(), serviceType);
 
-                    if (entity.isPresent()) {
+                    if (entity.isEmpty()) {
                         throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "The application number is not present in household permit table.");
                     }else {
                         HouseholdPermitThresholdEntity householdPermitThresholdEntity = entity.get();
@@ -621,7 +623,7 @@ public class TemporaryClosureService {
     }
 
     public Page<TemporaryClosureNotificationResponse> getArchivedApplications(Pageable pageable, String search, Long userId) {
-        List<String> archivedStatuses = List.of("APPROVED BY RC");
+        List<String> archivedStatuses = List.of("TEMPORARY CLOSURE APPROVED");
         Page<TemporaryClosureEntity> applications;
 
         if (search == null || search.isBlank()) {
@@ -642,7 +644,7 @@ public class TemporaryClosureService {
     }
 
     public Page<TemporaryClosureNotificationResponse> getMyArchivedApplications(Long userId, Pageable pageable, String search) {
-        List<String> archivedStatuses = List.of("APPROVED BY RC");
+        List<String> archivedStatuses = List.of("TEMPORARY CLOSURE APPROVED");
         Page<TemporaryClosureEntity> applications ;
 
         if (search == null || search.isBlank()) {
