@@ -181,6 +181,7 @@ public class TerminationService {
      */
     private void updateLeaseApplicationStatus(String appNo, String miningStatus, String quarryStatus) {
         String serviceType = "";
+        ApplicationMaster master = null;
 
         Optional<MiningLeaseApplication> miningLeaseApplication =
                 miningLeaseApplicationRepository.findByApplicationNumber(appNo);
@@ -188,7 +189,10 @@ public class TerminationService {
         if (miningLeaseApplication.isPresent()) {
             MiningLeaseApplication application = miningLeaseApplication.get();
             application.setCurrentStatus(miningStatus);
+            master = application.getApplicationMaster();
+            master.setCurrentStatus(miningStatus);
             serviceType = "MINING_LEASE";
+            applicationMasterRepository.save(master);
             miningLeaseApplicationRepository.save(application);
         }
 
@@ -197,7 +201,10 @@ public class TerminationService {
         if (application.isPresent()) {
             QuarryLeaseApplication quarryLeaseApplication = application.get();
             quarryLeaseApplication.setCurrentStatus(quarryStatus);
+            master = quarryLeaseApplication.getApplicationMaster();
+            master.setCurrentStatus(quarryStatus);
             serviceType = "QUARRY_LEASE";
+            applicationMasterRepository.save(master);
             quarryLeaseApplicationRepository.save(quarryLeaseApplication);
         }
 

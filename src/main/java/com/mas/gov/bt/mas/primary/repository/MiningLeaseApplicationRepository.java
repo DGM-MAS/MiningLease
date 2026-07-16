@@ -41,8 +41,8 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
 """)
     Page<MiningLeaseApplication> findApplicationsAssignedToUser(Long currentUserId, Pageable pageable);
 
-    @Query("SELECT a FROM MiningLeaseApplication a WHERE a.applicantUserId = :userId AND a.currentStatus IN :applicationStatus ")
-    Page<MiningLeaseApplication> findByApplicantUserIdAndStatusIn(Long userId, List<String> applicationStatus, Pageable pageable);
+    @Query("SELECT a FROM MiningLeaseApplication a WHERE a.applicantUserId = :userId AND a.currentStatus NOT IN :applicationStatus ")
+    Page<MiningLeaseApplication> findByApplicantUserIdAndStatusInApplication(Long userId, List<String> applicationStatus, Pageable pageable);
 
     @Query("SELECT a FROM MiningLeaseApplication a WHERE a.applicantUserId = :userId ")
     Page<MiningLeaseApplication> findByApplicantUserId(Long userId, Pageable pageable);
@@ -580,4 +580,6 @@ SELECT
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseApplication> findByStatusInAndSearch(List<String> archivedStatuses, String search, Pageable pageable);
+
+    Page<MiningLeaseApplication> findByApplicantUserIdAndCurrentStatusIn(Long userId, List<String> archivedStatuses, Pageable pageable);
 }
