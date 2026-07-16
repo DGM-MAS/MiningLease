@@ -729,38 +729,13 @@ public class MiningLeaseService {
     @Transactional(readOnly = true)
     public Page<ApplicationListResponse> getMyApplications(Long userId, Pageable pageable, String search) {
         List<String> ApplicationStatus = List.of(
-                "SUBMITTED",
-                "DRAFT",
-                "ASSIGNED",
-                "MPCD ASSIGNED",
-                "GEOLOGIST_REVIEW",
-
-
-                "GR SUBMITTED",
-                "LLC UPLOADED",
-
-                "PAYMENT PENDING",
-                "ACCEPTED PFS",
-                "ADDITIONAL DATA NEEDED",
-                "MA SUBMITTED",
-                "PA/FC SUBMITTED",
-                "APPROVED GR",
-                "NOTE SHEET UPLOADED",
-                "GR SUBMITTED",
-                "BG SUBMITTED",
-                "FMFS SUBMITTED",
-                "MLA SUBMITTED",
-                "APPROVED BY DIRECTOR",
-                "RESUBMITTED PFS",
-                "RESUBMIT GR",
-                "RESUBMITTED GR",
-                "RESUBMIT FMFS",
-                "RESUBMITTED FMFS",
-                "RESUBMIT APPLICATION",
-                "RESUBMIT PFS GEOLOGIST",
-                "RESUBMIT PFS MPCD",
-                "RESUBMIT PA/FC",
-                "APPROVED PA/FC");
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION"
+        );
         Page<MiningLeaseApplication> applications;
 
         if (search == null || search.isBlank()) {
@@ -773,6 +748,7 @@ public class MiningLeaseService {
 
             applications = miningLeaseApplicationRepository.findByAssignedToUserAndSearch(
                     userId,
+                    ApplicationStatus,
                     search.trim(),
                     pageable
             );
@@ -807,7 +783,7 @@ public class MiningLeaseService {
         List<String> archivedStatuses = List.of(
                 "MINING LEASE APPROVED",
                 "REJECTED",
-                "TERMINATION APPROVED",
+                "TERMINATED",
                 "RENEWAL APPLICATION",
                 "TEMPORARY CLOSURE APPROVED",
                 "UNDER-REVIEW-TERMINATION"
@@ -838,7 +814,14 @@ public class MiningLeaseService {
      */
     @Transactional(readOnly = true)
     public Page<ApplicationListResponse> getMyArchivedApplications(Long userId, Pageable pageable, String search) {
-        List<String> archivedStatuses = List.of("MINING LEASE APPROVED", "REJECTED");
+        List<String> archivedStatuses = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION"
+        );
         Page<MiningLeaseApplication> applications ;
 
         if (search == null || search.isBlank()) {
@@ -857,7 +840,7 @@ public class MiningLeaseService {
         List<String> archivedStatuses = List.of(
                 "MINING LEASE APPROVED",
                 "REJECTED",
-                "TERMINATION APPROVED",
+                "TERMINATED",
                 "RENEWAL APPLICATION",
                 "TEMPORARY CLOSURE APPROVED",
                 "UNDER-REVIEW-TERMINATION"
@@ -1310,16 +1293,26 @@ public class MiningLeaseService {
     public SuccessResponse<List<MiningLeaseResponse>> getAssignedToDirector(Long userId, Pageable pageable, String search) {
         Page<MiningLeaseApplication> page;
 
+        List<String> archivedStatuses = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION"
+        );
+
         if (search == null || search.isBlank()) {
 
             page = miningLeaseApplicationRepository
-                    .findAssignedToUserDirector(userId, pageable);
+                    .findAssignedToUserDirector(userId, archivedStatuses, pageable);
 
         } else {
 
             page = miningLeaseApplicationRepository
                     .findAssignedToUserAndSearchDirector(
                             userId,
+                            archivedStatuses,
                             search.trim(),
                             pageable
                     );
@@ -2827,5 +2820,37 @@ public class MiningLeaseService {
 
         return miningLeaseApplicationRepository
                 .countByApplicantCidAndServiceType(identifier, SERVICE_CODE);
+    }
+
+    public SuccessResponse<List<MiningLeaseResponse>> getArchivedApplicationApproved(Long userId, Pageable pageable, String search) {
+
+        Page<MiningLeaseApplication> page;
+
+        List<String> archivedStatuses = List.of(
+                "MINING LEASE APPROVED"
+        );
+
+        if (search == null || search.isBlank()) {
+
+            page = miningLeaseApplicationRepository
+                    .findByStatusIn(archivedStatuses, pageable);
+
+        } else {
+
+            page = miningLeaseApplicationRepository
+                    .findByStatusInAndSearch(
+                            archivedStatuses,
+                            search,
+                            pageable
+                    );
+        }
+
+        Page<MiningLeaseResponse> responsePage =
+                page.map(mapper::toResponse);
+
+        return SuccessResponse.fromPage(
+                "Assigned applications fetched successfully",
+                responsePage
+        );
     }
 }

@@ -66,7 +66,7 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN :archivedStatuses
+    AND q.currentStatus IN :archivedStatuses
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseApplication> findArchivedAssignedToUserAndSearchMPCD(Long userId, List<String> archivedStatuses, String search, Pageable pageable);
@@ -90,20 +90,9 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND q.currentStatus IN (
-    'GR SUBMITTED',
-    'SUBMITTED',
-    'ASSIGNED',
-    "ACCEPTED PFS MPCD",
-    "ACCEPTED PFS",
-    "APPROVED",
-    'NOTE SHEET UPLOADED',
-    'MPCD ASSIGNED',
-    'MLA SUBMITTED',
-    'FORWARDED TO DIRECTOR',
-    'DIRECTOR APPROVED FMFS')
+    AND q.currentStatus NOT IN :archivedStatuses
 """)
-    Page<MiningLeaseApplication> findAssignedToUserDirector(Long userId, Pageable pageable);
+    Page<MiningLeaseApplication> findAssignedToUserDirector(Long userId, List<String> archivedStatuses, Pageable pageable);
 
     @Query("""
     SELECT q
@@ -111,19 +100,10 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND q.currentStatus IN (
-    'SUBMITTED',
-    'ASSIGNED',
-    'GR SUBMITTED',
-    'MPCD ASSIGNED',
-    'NOTE SHEET UPLOADED',
-    'MLA SUBMITTED',
-    'FORWARDED TO DIRECTOR',
-    'DIRECTOR APPROVED FMFS'
-    )
+    AND q.currentStatus NOT IN :archivedStatuses
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
-    Page<MiningLeaseApplication> findAssignedToUserAndSearchDirector(Long userId, String search, Pageable pageable);
+    Page<MiningLeaseApplication> findAssignedToUserAndSearchDirector(Long userId, List<String> archivedStatuses, String search, Pageable pageable);
 
     @Query(value = """
     SELECT 
@@ -443,9 +423,10 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     @Query("""
     SELECT q FROM MiningLeaseApplication q
     WHERE q.createdBy = :userId
+    AND q.currentStatus NOT IN :applicationStatus
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
-    Page<MiningLeaseApplication> findByAssignedToUserAndSearch(Long userId, String search, Pageable pageable);
+    Page<MiningLeaseApplication> findByAssignedToUserAndSearch(Long userId, List<String> applicationStatus, String search, Pageable pageable);
 
     @Query("""
     SELECT q FROM MiningLeaseApplication q
@@ -591,4 +572,12 @@ SELECT
             nativeQuery = true)
     Integer countByApplicantCidAndServiceType(@Param("applicantCid") String applicantCid,
                                               @Param("serviceType") String serviceType);
+
+    @Query("""
+    SELECT q
+    FROM MiningLeaseApplication q
+    WHERE q.currentStatus IN :archivedStatuses
+    AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
+""")
+    Page<MiningLeaseApplication> findByStatusInAndSearch(List<String> archivedStatuses, String search, Pageable pageable);
 }
