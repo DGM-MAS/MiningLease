@@ -89,7 +89,7 @@ public class MiningLeaseRenewalService {
         statusIns.add("MINING LEASE APPROVED");
         Page<MiningLeaseApplication> applications;
         if (search == null || search.isBlank()) {
-            applications = miningLeaseApplicationRepository.findByApplicantUserIdAndStatusIn(
+            applications = miningLeaseApplicationRepository.findByApplicantUserIdAndStatusInApplication(
                     userId,
                     statusIns,
                     pageable);

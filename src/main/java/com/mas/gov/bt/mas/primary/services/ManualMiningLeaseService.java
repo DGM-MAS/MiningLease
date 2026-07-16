@@ -449,7 +449,7 @@ public class ManualMiningLeaseService {
         Page<MiningLeaseApplication> applications;
 
         if (search == null || search.isBlank()) {
-            applications = miningLeaseApplicationRepository.findByApplicantUserIdAndStatusIn(
+            applications = miningLeaseApplicationRepository.findByApplicantUserIdAndStatusInApplication(
                     userId,
                     archivedStatuses,
                     pageable);
@@ -474,7 +474,7 @@ public class ManualMiningLeaseService {
         Page<MiningLeaseApplication> applications ;
 
         if (search == null || search.isBlank()) {
-            applications =  miningLeaseApplicationRepository.findByApplicantUserIdAndStatusIn(userId, archivedStatuses, pageable);
+            applications =  miningLeaseApplicationRepository.findByApplicantUserIdAndStatusInApplication(userId, archivedStatuses, pageable);
         } else {
             applications = miningLeaseApplicationRepository.findByApplicantUserIdAndSearch(userId, archivedStatuses, search.trim(), pageable);
         }
