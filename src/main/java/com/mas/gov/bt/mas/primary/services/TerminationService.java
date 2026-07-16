@@ -49,6 +49,8 @@ public class TerminationService {
 
     private final MiningLeaseMapper mapper;
 
+    private final SiteProvisioningService siteProvisioningService;
+
     private final MiningLeaseApplicationRepository miningLeaseApplicationRepository;
 
     private final QuarryLeaseApplicationRepository quarryLeaseApplicationRepository;
@@ -89,12 +91,12 @@ public class TerminationService {
             entity.setApplicantName(leaseRef.applicantName());
             entity.setApplicantEmail(leaseRef.applicantEmail());
 
-            // Application master
+            // Application master — this row belongs to the ORIGINAL lease (site-tagging,
+            // sidebar gating, and "my applications" all key off its serviceCode); a
+            // termination is a status overlay on that same record, not a new service,
+            // so serviceCode/applicantUserId must stay exactly as the lease set them.
             ApplicationMaster master = leaseRef.applicationMaster();
-            master.setSubmittedAt(LocalDateTime.now());
             master.setCurrentStatus("SUBMITTED");
-            master.setApplicantUserId(request.getPromoterUserId());
-            master.setServiceCode(SERVICE_CODE);
             applicationMasterRepository.save(master);
 
             entity.setApplicationMaster(master);
@@ -211,6 +213,11 @@ public class TerminationService {
         }else {
             throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION, "The application is not present in household permit table.");
         }
+
+        // "TERMINATED" deactivates the site (blocks Mine TP/etc.); a cancelled termination
+        // restores it back to "MINING LEASE APPROVED"/"QUARRY LEASE APPROVED" and reactivates.
+        boolean active = !"TERMINATED".equals(miningStatus);
+        siteProvisioningService.setSiteActive(serviceType, appNo, active);
     }
 
     @Transactional(readOnly = true)

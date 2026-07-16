@@ -49,6 +49,8 @@ public class ImmediateSuspensionService {
 
     private final ImmediateSuspensionReasonRepository immediateSuspensionReasonRepository;
 
+    private final SiteProvisioningService siteProvisioningService;
+
     private final TerminationApplicationRepository terminationApplicationRepository;
 
     private final SurfaceCollectionPermitRepository surfaceCollectionPermitRepository;
@@ -246,13 +248,14 @@ public class ImmediateSuspensionService {
         return suspension;
     }
 
-    // Application master table would be updated when a new action is being taken
+    // Application master table would be updated when a new action is being taken.
+    // This row belongs to the ORIGINAL lease/permit (site-tagging, sidebar
+    // gating, and "my applications" all key off its serviceCode) — an immediate
+    // suspension is a status overlay on that same record, not a new service, so
+    // serviceCode/applicantUserId must stay exactly as the lease itself set them.
     private ApplicationMaster updateApplicationMaster(ApplicationMaster master, Long userId) {
 
-        master.setSubmittedAt(LocalDateTime.now());
         master.setCurrentStatus("SUBMITTED");
-        master.setApplicantUserId(userId);
-        master.setServiceCode(SERVICE_CODE);
 
         return applicationMasterRepository.save(master);
     }
@@ -524,6 +527,8 @@ public class ImmediateSuspensionService {
                     app.setCurrentStatus("SUSPENDED");
                     app.setPromoterReviewedAt(now);
 
+                    String leaseType = app.getApplicationFrom().equalsIgnoreCase("M") ? "MINING_LEASE" : "QUARRY_LEASE";
+
                     if (app.getApplicationFrom().equalsIgnoreCase("M")) {
                         Optional<MiningLeaseApplication> miningLeaseApplication =
                                 miningLeaseApplicationRepository.findByApplicationNumber(app.getApplicationNumber());
@@ -548,6 +553,8 @@ public class ImmediateSuspensionService {
                         quarryLeaseApplication.setCurrentStatus("SUSPENDED");
                         quarryLeaseApplicationRepository.save(quarryLeaseApplication);
                     }
+
+                    siteProvisioningService.setSiteActive(leaseType, app.getApplicationNumber(), false);
 
                     if (master != null) {
                         master.setCurrentStatus("SUSPENDED");
@@ -592,6 +599,9 @@ public class ImmediateSuspensionService {
                     LocalDateTime now = LocalDateTime.now();
                     app.setCurrentStatus("SUSPENSION LIFTED");
                     app.setPromoterReviewedAt(now);
+
+                    String leaseType = app.getApplicationFrom().equalsIgnoreCase("M") ? "MINING_LEASE" : "QUARRY_LEASE";
+                    siteProvisioningService.setSiteActive(leaseType, app.getApplicationNumber(), true);
 
                     if (master != null) {
                         master.setCurrentStatus("SUSPENSION LIFTED");
