@@ -1231,6 +1231,13 @@ public class MiningLeaseService {
                 applicationMaster.setCurrentStatus("BG SUBMITTED");
                 applicationMasterRepository.save(applicationMaster);
                 miningLeaseApplicationRepository.save(miningLeaseApplication);
+
+                if (miningLeaseApplication.getApplicantUserId() != null) {
+                    notificationClient.sendUserNotification(
+                            "Bank guarantee details submitted.",
+                            "Your bank guarantee details for application " + miningLeaseApplication.getApplicationNumber() + " have been submitted.",
+                            miningLeaseApplication.getApplicantUserId(), "78", "CITIZEN");
+                }
             }
         }
         return mapper.toResponse(miningLeaseApplication);
@@ -1250,6 +1257,13 @@ public class MiningLeaseService {
         applicationMasterRepository.save(master);
         miningLeaseApplicationRepository.save(application);
         log.info("BG upfront payment confirmed — application {} transitioned to BG SUBMITTED", applicationNo);
+
+        if (application.getApplicantUserId() != null) {
+            notificationClient.sendUserNotification(
+                    "Bank guarantee payment confirmed.",
+                    "Your bank guarantee upfront payment for application " + applicationNo + " has been confirmed.",
+                    application.getApplicantUserId(), "78", "CITIZEN");
+        }
     }
 
     private PaymentInitiationRequest buildBgPaymentRequest(MiningLeaseApplication application, String serviceCode, BigDecimal upfrontAmount) {
@@ -1368,6 +1382,13 @@ public class MiningLeaseService {
                     }
                     assert master != null;
                     createTask( master, app, "DIRECTOR APPROVED FMFS", userId, mineEngineerId);
+
+                    if (mineEngineerId != null) {
+                        String title = "Mining lease application forwarded for review.";
+                        String message = "Director has approved FMFS. Application No. " + app.getApplicationNumber() + " has been forwarded to you for review.";
+                        String serviceId = "78";
+                        notificationClient.sendUserNotification(title, message, mineEngineerId, serviceId, "STAFF");
+                    }
                 }
                 case "Approved" -> {
                     LocalDateTime now = LocalDateTime.now();
@@ -1862,6 +1883,12 @@ public class MiningLeaseService {
                     String message = "Your application has been forwarded to geologist to review.";
                     String serviceId = "78";
                     notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN");
+
+                    if (geologistId != null) {
+                        String geoTitle = "Mining lease application forwarded for review.";
+                        String geoMessage = "Application No. " + miningLeaseApplication.getApplicationNumber() + " has been forwarded to you for review.";
+                        notificationClient.sendUserNotification(geoTitle, geoMessage, geologistId, serviceId, "STAFF");
+                    }
                 }
                 case "ACCEPTED" -> {
                     if (Objects.equals(miningLeaseApplication.getCurrentStatus(), "ACCEPTED PFS")) {
@@ -2175,6 +2202,15 @@ public class MiningLeaseService {
 
                     assert master != null;
                     createTask(master, app, "MINING_ENGINEER", userId, userId);
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendStatusUpdateNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber(),
+                                "Mining Engineer Review",
+                                "Your application has been returned to the Mining Engineer for review.");
+                    }
                 }
                 default -> throw new IllegalArgumentException("Application status not recognized");
             }
@@ -2280,6 +2316,13 @@ public class MiningLeaseService {
                                 app.getApplicationNumber(),
                                 "Mining Chief Review");
 
+                    }
+
+                    if (assignedMiningChief.getUserId() != null) {
+                        String title = "An new application has been assigned.";
+                        String message = "An application for mining lease has been assigned for review. Application No. "+ app.getApplicationNumber() +" Please login in review the application";
+                        String serviceId = "78";
+                        notificationClient.sendUserNotification(title, message, assignedMiningChief.getUserId(), serviceId, "STAFF");
                     }
                 }
                 case "Forwarded FMFS" -> {
@@ -2641,7 +2684,9 @@ public class MiningLeaseService {
                 applicationMasterRepository.save(applicationMaster);
                 miningLeaseApplicationRepository.save(miningLeaseApplication);
 
-                siteProvisioningService.provisionSiteForApprovedLease(miningLeaseApplication);
+                SiteMaster provisionedSite = siteProvisioningService.provisionSiteForApprovedLease(miningLeaseApplication);
+                applicationMaster.setSiteId(provisionedSite.getId());
+                applicationMasterRepository.save(applicationMaster);
                 recordApprovedForThreshold(miningLeaseApplication);
 
                 // Terminal approval — close out the open Mining Engineer task instead of leaving
@@ -2756,10 +2801,12 @@ public class MiningLeaseService {
                 applicationMaster.setCurrentStatus("RESUBMITTED PFS GEOLOGIST");
                 quarryLeaseApplication.setCurrentStatus("RESUBMITTED PFS GEOLOGIST");
                 createTask(applicationMaster,quarryLeaseApplication,"GEOLOGIST",userId,geologistId);
+                notifyStaffAssignment(geologistId, quarryLeaseApplication.getApplicationNumber(), "PFS resubmitted for your review.");
             }else {
                 applicationMaster.setCurrentStatus("RESUBMITTED PFS MPCD");
                 quarryLeaseApplication.setCurrentStatus("RESUBMITTED PFS MPCD");
                 createTask(applicationMaster,quarryLeaseApplication,"MPCD FOCAL",userId,mpcdId);
+                notifyStaffAssignment(mpcdId, quarryLeaseApplication.getApplicationNumber(), "PFS resubmitted for your review.");
             }
         } else if (request.getFileType().equals("GR")) {
             quarryLeaseApplication.setFileUploadIdGr(Long.valueOf(request.getFileId()));
@@ -2767,6 +2814,7 @@ public class MiningLeaseService {
             quarryLeaseApplication.setCurrentStatus("RESUBMITTED GR");
 
             createTask(applicationMaster,quarryLeaseApplication,"GEOLOGIST",userId,geologistId);
+            notifyStaffAssignment(geologistId, quarryLeaseApplication.getApplicationNumber(), "Geological report resubmitted for your review.");
 
         }else {
             quarryLeaseApplication.setFmfsDocId(request.getFileId());
@@ -2775,10 +2823,30 @@ public class MiningLeaseService {
 
             createTask(applicationMaster,quarryLeaseApplication,"GEOLOGIST",userId,geologistId);
             createTask(applicationMaster,quarryLeaseApplication,"MPCD FOCAL",userId,mpcdId);
+            notifyStaffAssignment(geologistId, quarryLeaseApplication.getApplicationNumber(), "FMFS resubmitted for your review.");
+            notifyStaffAssignment(mpcdId, quarryLeaseApplication.getApplicationNumber(), "FMFS resubmitted for your review.");
         }
         applicationMasterRepository.save(applicationMaster);
         miningLeaseApplicationRepository.save(quarryLeaseApplication);
+
+        if (quarryLeaseApplication.getApplicantUserId() != null) {
+            notificationClient.sendUserNotification(
+                    "Application resubmitted successfully.",
+                    "Your mining lease application " + quarryLeaseApplication.getApplicationNumber() + " has been resubmitted.",
+                    quarryLeaseApplication.getApplicantUserId(), "78", "CITIZEN");
+        }
+
         return mapper.toResponse(quarryLeaseApplication);
+    }
+
+    private void notifyStaffAssignment(Long staffUserId, String applicationNumber, String message) {
+        if (staffUserId == null) {
+            return;
+        }
+        notificationClient.sendUserNotification(
+                "Mining lease application resubmitted.",
+                "Application " + applicationNumber + ": " + message,
+                staffUserId, "78", "STAFF");
     }
 
     public SuccessResponse<List<MiningLeaseResponse>> getAllApplicationAdmin(Pageable pageable, String search) {
