@@ -161,7 +161,13 @@ public class NotificationClient {
                 </div>
                 """, fullName, typeDisplay, to, tempPassword);
 
-        sendHtmlEmail(to, subject, htmlContent);
+        try {
+            sendHtmlEmail(to, subject, htmlContent);
+        }
+        catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                     ex);
+        }
     }
 
     /**
@@ -235,11 +241,16 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(applicantName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
     }
 
     /**
@@ -264,11 +275,16 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(applicantName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
     }
 
     /**
@@ -295,11 +311,16 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(applicantName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
     }
 
     /**
@@ -328,11 +349,16 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(applicantName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
 
     }
 
@@ -361,11 +387,16 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(applicantName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
 
     }
 
@@ -394,11 +425,17 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(applicantName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
 
     }
 
@@ -424,11 +461,17 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(applicantName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
     }
 
     /**
@@ -453,11 +496,17 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(applicantName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
     }
 
     /**
@@ -482,11 +531,18 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(applicantName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }
+
+        catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
     }
 
     /**
@@ -511,11 +567,16 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(applicantName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
     }
 
 
@@ -538,11 +599,16 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(chiefName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
     }
 
     /**
@@ -567,11 +633,16 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(officerName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
     }
 
     /**
@@ -596,11 +667,16 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(officerName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
     }
 
     /**
@@ -625,11 +701,16 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(officerName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
     }
 
 
@@ -661,11 +742,16 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(applicantName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
     }
 
     @Async
@@ -688,11 +774,17 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(applicantName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
 
     }
 
@@ -716,11 +808,17 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(applicantName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
     }
 
 
@@ -745,11 +843,18 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(applicantName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }
+        catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
 
     }
 
@@ -772,11 +877,18 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(applicantName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }
+
+        catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
 
     }
 
@@ -799,11 +911,16 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(applicantName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
 
     }
 
@@ -826,11 +943,18 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(applicantName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }
+
+        catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
 
     }
 
@@ -852,11 +976,16 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(applicantName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
 
     }
 
@@ -884,11 +1013,17 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(officerName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }
+        catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
 
     }
 
@@ -916,11 +1051,18 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(officerName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }
+
+        catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    email, applicationNumber, ex);
+        }
 
     }
 
@@ -948,11 +1090,17 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(officerName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }
+        catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                     applicationNumber, ex);
+        }
 
     }
 
@@ -978,11 +1126,18 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(officerName);
 
+        try{
         restTemplate.postForObject(
                 notificationEmailBuilderUrl,
                 request,
                 String.class
         );
+        }
+        catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+
+                      applicationNumber, ex);
+        }
     }
 
     @Async
@@ -1008,11 +1163,16 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(officerName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }
+        catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",  applicationNumber, ex);
+        }
 
     }
 
@@ -1097,11 +1257,16 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(directorName);
 
+        try{
         restTemplate.postForObject(
                 notificationEmailBuilderUrl,
                 request,
                 String.class
-        );
+        );}
+        catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    directorEmail, applicationNumber, ex);
+        }
     }
 
     public void sendSurfaceCollectionAuctionMailToMDBGSubmitted(String directorEmail, String directorName, String applicationNumber) {
@@ -1120,11 +1285,16 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(directorName);
 
+        try{
         restTemplate.postForObject(
                 notificationEmailBuilderUrl,
                 request,
                 String.class
         );
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    directorEmail, applicationNumber, ex);
+        }
     }
 
     public void sendSurfaceCollectionAuctionMailToPromoterBGResubmit(String directorEmail, String directorName, String applicationNumber) {
@@ -1143,11 +1313,16 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(directorName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    directorEmail, applicationNumber, ex);
+        }
     }
 
     public void sendSurfaceCollectionAuctionWinnerEmail(String directorEmail, String directorName, String applicationNumber) {
@@ -1167,11 +1342,16 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(directorName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    directorEmail, applicationNumber, ex);
+        }
     }
 
     public void sendTerminationMailToCMSHeadAssigned(String directorEmail, String directorName, String applicationNumber) {
@@ -1191,11 +1371,17 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(directorName);
 
-        restTemplate.postForObject(
-                notificationEmailBuilderUrl,
-                request,
-                String.class
-        );
+        try{
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                    directorEmail, applicationNumber, ex);
+        }
+
     }
 
     /**
@@ -1218,11 +1404,16 @@ public class NotificationClient {
         request.setBody(body);
         request.setRecipientName(applicantName);
 
+        try{
         restTemplate.postForObject(
                 notificationEmailBuilderUrl,
                 request,
                 String.class
         );
+        }catch (Exception ex) {
+            log.error("Failed to send exploration permit submission notification to {} for application {}",
+                     applicationNumber, ex);
+        }
 
     }
 }
