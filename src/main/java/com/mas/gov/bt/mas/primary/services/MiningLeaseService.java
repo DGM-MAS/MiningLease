@@ -82,6 +82,8 @@ public class MiningLeaseService {
 
     private final HouseholdPermitCapConfigRefRepository capConfigRepository;
 
+    private final com.mas.gov.bt.mas.primary.client.WorkflowAssignmentClient workflowAssignmentClient;
+
     private final HouseholdPermitThresholdEntryRepository thresholdEntryRepository;
 
     private static final int DEFAULT_MAX_APPLICATIONS = 2;
@@ -168,7 +170,7 @@ public class MiningLeaseService {
                             .findById(request.getDzongkhag())
                             .orElseThrow(() -> new RuntimeException("Invalid Dzongkhag ID"));
 
-//                    application.setRegionId(dzongkhag.getRegion().getId());
+                    application.setRegionId(dzongkhag.getRegion().getId());
                     application.setDzongkhag(dzongkhag);
                 }
 
@@ -380,6 +382,13 @@ public class MiningLeaseService {
 
     @Transactional
     private void createTask(ApplicationMaster master, MiningLeaseApplication application, String role, Long userId, Long directorId) {
+        if (directorId == null) {
+            // No eligible candidate — the resolver already recorded this application in the
+            // escalation queue (see WorkflowAssignmentClient), nothing to create locally.
+            log.info("Skipping task creation for role {} on application {} — escalated, no assignee",
+                    role, application.getApplicationNumber());
+            return;
+        }
 
         log.debug("Creating task for director ID: {}", directorId);
         try {
@@ -578,7 +587,8 @@ public class MiningLeaseService {
         // =====================================================
         // 2. ASSIGN DIRECTOR
         // =====================================================
-        UserWorkloadProjection assignedDirector = assignDirector();
+        UserWorkloadProjection assignedDirector = assignDirector(
+                miningLeaseApplication.getRegionId(), miningLeaseApplication.getApplicationNumber());
 
         // =====================================================
         // 3. Application master and create task for director
@@ -589,10 +599,15 @@ public class MiningLeaseService {
 
         createTask(master,miningLeaseApplication,"DIRECTOR",userId, assignedDirector.getUserId());
 
+        // No eligible director — masters already recorded this in the escalation queue, nothing to notify.
+        if (assignedDirector.getUserId() == null) {
+            return mapper.toResponse(miningLeaseApplication);
+        }
+
         log.debug("Sending notifications to director: {}", assignedDirector.getUserId());
 
         try {
-            if (assignedDirector.getEmail() != null || !assignedDirector.getEmail().trim().isEmpty()) {
+            if (assignedDirector.getEmail() != null && !assignedDirector.getEmail().trim().isEmpty()) {
                 try {
                     notificationClient.sendMiningLeaseMailToDirectorAssigned(
                             assignedDirector.getEmail(),
@@ -635,47 +650,27 @@ public class MiningLeaseService {
         return mapper.toResponse(miningLeaseApplication);
     }
 
-    @Transactional(readOnly = true)
-    public UserWorkloadProjection assignDirector() {
+    /**
+     * Resolves the Director to assign a newly-submitted application to, via the
+     * admin-configured mas_db.t_workflow_step rule for (MINING_LEASE, GR SUBMITTED).
+     * When no eligible candidate is found, the returned projection has a null
+     * userId — masters has already recorded it in the escalation queue; callers
+     * must check for that (see createTask()'s null-guard and the notification
+     * blocks below) instead of assuming a real director was always found.
+     */
+    @Transactional
+    public UserWorkloadProjection assignDirector(Long regionId, String applicationNumber) {
+        var resolved = workflowAssignmentClient.resolve(SERVICE_CODE, "GR SUBMITTED", regionId, applicationNumber);
+        return toProjection(resolved);
+    }
 
-        log.debug("Finding director with minimum workload");
-
-        try {
-            UserWorkloadProjection director =
-                    miningLeaseApplicationRepository.findDirectorQuarrying();
-
-            if (director == null) {
-
-                log.error("No eligible director found with required role and permissions");
-
-                throw new BusinessException(
-                        ErrorCodes.RECORD_NOT_FOUND,
-                        "No eligible director available for assignment. All directors are either inactive or lack required permissions.");
-            }
-
-            if (director.getUserId() == null) {
-
-                log.error("Assigned director has null user ID");
-
-                throw new BusinessException(
-                        ErrorCodes.DATA_TYPE_MISMATCH,
-                        "Director assignment failed: invalid director user ID"
-                );
-            }
-
-            log.debug("Director found: ID={}, workload={}", director.getUserId(), director.getWorkload());
-
-            return director;
-
-        } catch (BusinessException ex) {
-            throw ex;
-        } catch (Exception ex) {
-            log.error("Error assigning director", ex);
-            throw new BusinessException(
-                    ErrorCodes.DATABASE_CONNECTION_FAILED,
-                    "Failed to find eligible director",
-                    ex);
-        }
+    private UserWorkloadProjection toProjection(com.mas.gov.bt.mas.primary.dto.workflow.ResolvedAssigneeDto dto) {
+        return new UserWorkloadProjection() {
+            @Override public Long getUserId() { return dto.getUserId(); }
+            @Override public String getEmail() { return dto.getEmail(); }
+            @Override public Long getWorkload() { return dto.getWorkload(); }
+            @Override public String getUsername() { return dto.getUsername(); }
+        };
     }
 
     /**
@@ -1185,15 +1180,11 @@ public class MiningLeaseService {
                 applicationMasterRepository.save(applicationMaster);
                 miningLeaseApplicationRepository.save(miningLeaseApplication);
 
-                UserWorkloadProjection assignedMineEngineer = miningLeaseApplicationRepository.findLeastBusyMineEngineer(20L, miningLeaseApplication.getRegionId());
-
-                if(assignedMineEngineer == null){
-                    assignedMineEngineer = miningLeaseApplicationRepository.findLeastBusyMineEngineer(20L, 9L);
-
-                    if (assignedMineEngineer == null) {
-                        throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Mining Engineer with required premission, role and region not found.");
-                    }
-                }
+                // Region -> HQ region -> escalate is now handled natively by the resolver.
+                var resolvedMineEngineer = workflowAssignmentClient.resolve(
+                        SERVICE_CODE, "FMFS SUBMITTED", miningLeaseApplication.getRegionId(),
+                        miningLeaseApplication.getApplicationNumber());
+                UserWorkloadProjection assignedMineEngineer = toProjection(resolvedMineEngineer);
 
                 createTask(applicationMaster,miningLeaseApplication,"MINE ENGINEER", userId, assignedMineEngineer.getUserId());
 
@@ -1602,16 +1593,12 @@ public class MiningLeaseService {
                     // Geologist and MPCD (see the symmetric check in the MPCD review branch) —
                     // otherwise this is still waiting on the other reviewer.
                     if (fullyApprovedPfs && applicationMaster != null) {
-                        UserWorkloadProjection assignedMineEngineer = miningLeaseApplicationRepository.findLeastBusyMineEngineer(20L, geologistRegionId);
+                        // Region -> HQ region -> escalate is now handled natively by the resolver.
+                        var resolvedMineEngineer = workflowAssignmentClient.resolve(
+                                SERVICE_CODE, "FMFS SUBMITTED", geologistRegionId, miningLeaseApplication.getApplicationNumber());
+                        UserWorkloadProjection assignedMineEngineer = toProjection(resolvedMineEngineer);
 
-                        if(assignedMineEngineer == null){
-                            assignedMineEngineer = miningLeaseApplicationRepository.findLeastBusyMineEngineer(20L, 9L);
-                            if (assignedMineEngineer == null) {
-                                throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Mining Engineer with required permission, role and region not found.");
-                            }
-                        }
-
-                        if (assignedMineEngineer != null) {
+                        {
                             createTask(applicationMaster, miningLeaseApplication, "MINE ENGINEER", userId, assignedMineEngineer.getUserId());
 
                             if (assignedMineEngineer.getUserId() != null) {
@@ -2277,12 +2264,9 @@ public class MiningLeaseService {
                     // =====================================================
                     // 8. ASSIGN DIRECTOR + CREATE TASK
                     // =====================================================
+                    // Region -> HQ region -> escalate is now handled natively by the resolver.
                     UserWorkloadProjection assignedMiningChief =
-                            assignMiningChief(app.getRegionId());
-
-                    if(assignedMiningChief == null){
-                        assignedMiningChief = assignMiningChief(9L);
-                    }
+                            assignMiningChief("APPROVED", app.getRegionId(), app.getApplicationNumber());
 
                     assert master != null;
                     createTask(master, app, "MINING_CHIEF", userId, assignedMiningChief.getUserId());
@@ -2435,12 +2419,9 @@ public class MiningLeaseService {
                     // =====================================================
                     // 8. ASSIGN DIRECTOR + CREATE TASK
                     // =====================================================
+                    // Region -> HQ region -> escalate is now handled natively by the resolver.
                     UserWorkloadProjection assignedMiningChief =
-                            assignMiningChief(app.getRegionId());
-
-                    if(assignedMiningChief == null){
-                        assignedMiningChief = assignMiningChief(9L);
-                    }
+                            assignMiningChief("MINING_CHIEF_REVIEW", app.getRegionId(), app.getApplicationNumber());
 
                     assert master != null;
                     createTask(master, app, "MINING_CHIEF_REVIEW", userId, assignedMiningChief.getUserId());
@@ -2454,21 +2435,17 @@ public class MiningLeaseService {
                                 "Your application has been forwarded to the Mining Chief for review.");
                     }
 
-                    if (assignedMiningChief.getEmail() != null) {
+                    if (assignedMiningChief.getUserId() != null && assignedMiningChief.getEmail() != null) {
                         notificationClient.sendAssignmentNotification(
                                 assignedMiningChief.getEmail(),
                                 assignedMiningChief.getUsername(),
                                 app.getApplicationNumber(),
                                 "Mining Chief Review");
 
-                        if(assignedMiningChief.getUserId()!= null) {
-                            String title = "An new application has been assigned.";
-                            String message = "An application for mining lease has been assigned for review. Application No. "+ app.getApplicationNumber() +" Please login in review the application";
-                            String serviceId = "78";
-                            notificationClient.sendUserNotification(title, message, assignedMiningChief.getUserId(), serviceId, "STAFF");
-                        }else {
-                            throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
-                        }
+                        String title = "An new application has been assigned.";
+                        String message = "An application for mining lease has been assigned for review. Application No. "+ app.getApplicationNumber() +" Please login in review the application";
+                        String serviceId = "78";
+                        notificationClient.sendUserNotification(title, message, assignedMiningChief.getUserId(), serviceId, "STAFF");
                     }
                 }
                 case "Rejected" -> {
@@ -2520,16 +2497,16 @@ public class MiningLeaseService {
         return mapper.toResponse(app);
     }
 
+    /**
+     * Resolves the Mining Chief to forward to, via the admin-configured
+     * mas_db.t_workflow_step rule. When no eligible candidate is found, the
+     * returned projection has a null userId — masters has already recorded it
+     * in the escalation queue.
+     */
     @Transactional
-    public UserWorkloadProjection assignMiningChief(Long regionId) {
-
-        UserWorkloadProjection miningChief =
-                miningLeaseApplicationRepository.findChiefQuarrying(regionId);
-
-        if (miningChief == null && regionId == 9L) {
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Mining chief with required permission, role and region not found.");
-        }
-        return miningChief;
+    public UserWorkloadProjection assignMiningChief(String triggerStatus, Long regionId, String applicationNumber) {
+        var resolved = workflowAssignmentClient.resolve(SERVICE_CODE, triggerStatus, regionId, applicationNumber);
+        return toProjection(resolved);
     }
 
     public SuccessResponse<List<MiningLeaseResponse>> getAssignedToMineEngineer(Long userId, Pageable pageable, String search) {

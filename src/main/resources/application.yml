@@ -1,6 +1,8 @@
 app:
   masters:
-    base-url: http://172.30.3.10:30082
+    # TEMP (local testing only, revert before real deploy): points WorkflowAssignmentClient
+    # (and MastersPaymentClient) at the local masters instance instead of the K8s-deployed one.
+    base-url: http://localhost:8082
   self:
     base-url: http://172.30.3.10:30085
   notification:
@@ -228,7 +230,9 @@ spring:
         format_sql: false
 app:
   masters:
-    base-url: http://172.30.3.10:30082
+    # TEMP (local testing only, revert before real deploy): points WorkflowAssignmentClient
+    # (and MastersPaymentClient) at the local masters instance instead of the K8s-deployed one.
+    base-url: http://localhost:8082
   self:
     base-url: http://172.30.3.10:30085
   notification:

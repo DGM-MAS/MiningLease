@@ -33,26 +33,6 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
 """)
     Integer findMaxDraftSequenceByPrefix(@Param("prefix") String prefix);
 
-    @Query(value = """
-    SELECT
-        u.id AS userId,
-        u.email AS email,
-        u.username AS userName,
-        COUNT(u.id) AS workload
-    FROM mas_db.users u
-    JOIN mas_db.user_roles ur
-        ON u.id = ur.user_id
-    LEFT JOIN mas_db.role_permissions t
-        ON t.role_id = ur.role_id
-    WHERE ur.role_id = 21
-      AND t.permission_id = 78
-      AND u.account_status = 'ACTIVE'
-    GROUP BY u.id, u.email, u.username
-    ORDER BY workload ASC
-    LIMIT 1
-    """, nativeQuery = true)
-    UserWorkloadProjection findDirectorQuarrying();
-
     @Query("""
     SELECT a FROM MiningLeaseApplication a
     JOIN TaskManagement t
@@ -103,28 +83,6 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     LIMIT 1
     """, nativeQuery = true)
     UserWorkloadProjection findUserDetails(Long directorId);
-
-    @Query(value = """
-    SELECT
-        u.id AS userId,
-        u.email AS email,
-        u.username AS userName,
-        COUNT(t.id) AS workload
-    FROM mas_db.users u
-    JOIN mas_db.user_roles ur
-        ON u.id = ur.user_id
-    LEFT JOIN mas_db.t_task_management t
-        ON t.assigned_to_user_id = u.id
-        AND t.task_status IN ('PENDING', 'ASSIGNED')
-    WHERE ur.role_id = :roleId
-      AND u.account_status = 'ACTIVE'
-      AND u.region_id = :regionId
-    GROUP BY u.id, u.email, u.username
-    ORDER BY workload ASC
-    LIMIT 1
-    """, nativeQuery = true)
-    UserWorkloadProjection findLeastBusyMineEngineer(Long roleId, Long regionId);
-
 
     @Query("""
     SELECT q
@@ -379,26 +337,6 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
         """, nativeQuery = true)
     String findLastFmfsId(@Param("prefix") String prefix);
 
-    @Query(value = """
-    SELECT
-        u.id AS userId,
-        u.email AS email,
-        u.username AS userName,
-        COUNT(u.id) AS workload
-    FROM mas_db.users u
-    JOIN mas_db.user_roles ur
-        ON u.id = ur.user_id
-    LEFT JOIN mas_db.role_permissions t
-        ON t.role_id = ur.role_id
-    WHERE ur.role_id = 30
-      AND t.permission_id = 78
-      AND u.account_status = 'ACTIVE'
-      AND u.region_id = :regionId
-    GROUP BY u.id, u.email, u.username
-    ORDER BY workload ASC
-    LIMIT 1
-    """, nativeQuery = true)
-    UserWorkloadProjection findChiefQuarrying(Long regionId);
 
 
     @Query("""
