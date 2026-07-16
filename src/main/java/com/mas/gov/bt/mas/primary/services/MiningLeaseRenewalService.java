@@ -68,10 +68,15 @@ public class MiningLeaseRenewalService {
 
     private final MastersPaymentClient mastersPaymentClient;
 
+    private final com.mas.gov.bt.mas.primary.client.WorkflowAssignmentClient workflowAssignmentClient;
+
     /** payment_master.service_code for Mining Lease fee rows — deliberately the same value
      *  MiningLeaseService.SERVICE_CODE uses, NOT this class's own SERVICE_CODE constant
      *  above (which is a different, task-routing-only string, "MINING LEASE RENEWAL"). */
     private static final String PAYMENT_SERVICE_CODE = "MINING_LEASE";
+
+    /** Reuses the main flow's service code — Director/Chief/Mine-Engineer eligibility is the same pool regardless of application/renewal. */
+    private static final String ASSIGNMENT_POOL_SERVICE_CODE = "MINING_LEASE";
 
     @Value("${app.self.base-url}")
     private String selfBaseUrl;
@@ -168,7 +173,8 @@ public class MiningLeaseRenewalService {
             // =====================================================
             // 2. ASSIGN DIRECTOR
             // =====================================================
-            UserWorkloadProjection assignedDirector = assignDirector();
+            UserWorkloadProjection assignedDirector = assignDirector(
+                    miningLeaseRenewalApplication.getRegionId(), miningLeaseRenewalApplication.getApplicationNumber());
 
             // =====================================================
             // 3. APPLICATION MASTER CREATION
@@ -197,6 +203,13 @@ public class MiningLeaseRenewalService {
 
     @Transactional
     private void createTask(ApplicationMaster master, MiningLeaseRenewalApplication application, String role, Long userId, Long assignedUserId) {
+        if (assignedUserId == null) {
+            // No eligible candidate — the resolver already recorded this application in the
+            // escalation queue (see WorkflowAssignmentClient), nothing to create locally.
+            log.info("Skipping task creation for role {} on application {} — escalated, no assignee",
+                    role, application.getApplicationNumber());
+            return;
+        }
         LocalDateTime now = LocalDateTime.now();
 
         TaskManagement task = new TaskManagement();
@@ -215,16 +228,37 @@ public class MiningLeaseRenewalService {
         log.info("Created task for role {}", role);
     }
 
+    /**
+     * Resolves the Director for this renewal flow via the same t_workflow_step
+     * rule the main application flow uses (MINING_LEASE/GR SUBMITTED) —
+     * Director eligibility doesn't depend on whether the application is fresh
+     * or a renewal. When no eligible candidate is found, the returned
+     * projection has a null userId — masters has already recorded it in the
+     * escalation queue, createTask() skips creating its own task row in that case.
+     */
     @Transactional
-    public UserWorkloadProjection assignDirector() {
+    public UserWorkloadProjection assignDirector(Long regionId, String applicationNumber) {
+        var resolved = workflowAssignmentClient.resolve(ASSIGNMENT_POOL_SERVICE_CODE, "GR SUBMITTED", regionId, applicationNumber);
+        return toProjection(resolved);
+    }
 
-        UserWorkloadProjection director =
-                miningLeaseApplicationRepository.findDirectorQuarrying();
+    /**
+     * Resolves the Mine Engineer for this renewal flow via the same
+     * t_workflow_step rule the main flow uses.
+     */
+    @Transactional
+    public UserWorkloadProjection assignMineEngineer(Long regionId, String applicationNumber) {
+        var resolved = workflowAssignmentClient.resolve(ASSIGNMENT_POOL_SERVICE_CODE, "FMFS SUBMITTED", regionId, applicationNumber);
+        return toProjection(resolved);
+    }
 
-        if (director == null) {
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
-        }
-        return director;
+    private UserWorkloadProjection toProjection(com.mas.gov.bt.mas.primary.dto.workflow.ResolvedAssigneeDto dto) {
+        return new UserWorkloadProjection() {
+            @Override public Long getUserId() { return dto.getUserId(); }
+            @Override public String getEmail() { return dto.getEmail(); }
+            @Override public Long getWorkload() { return dto.getWorkload(); }
+            @Override public String getUsername() { return dto.getUsername(); }
+        };
     }
 
     public SuccessResponse<List<MiningLeaseResponse>> getAssignedToDirector(Long userId, Pageable pageable, String search) {
@@ -477,15 +511,8 @@ public class MiningLeaseRenewalService {
                             applicationMasterRepository.save(master);
                         }
 
-                        UserWorkloadProjection meTasks = miningLeaseApplicationRepository.findLeastBusyMineEngineer(20L, app.getRegionId());
-
-                        if (meTasks == null) {
-                            meTasks = miningLeaseApplicationRepository.findLeastBusyMineEngineer(20L, 9L);
-
-                            if (meTasks == null) {
-                                throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Mining Engineer with required permission, role and region not found.");
-                            }
-                        }
+                        // Region -> HQ region -> escalate is now handled natively by the resolver.
+                        UserWorkloadProjection meTasks = assignMineEngineer(app.getRegionId(), app.getApplicationNumber());
 
                         // Notify ME to upload work order
 //                        List<TaskManagement> meTasks = taskManagementRepository
@@ -734,12 +761,9 @@ public class MiningLeaseRenewalService {
                     // =====================================================
                     // 8. ASSIGN DIRECTOR + CREATE TASK
                     // =====================================================
+                    // Region -> HQ region -> escalate is now handled natively by the resolver.
                     UserWorkloadProjection assignedMiningChief =
-                            assignMiningChief(app.getRegionId());
-
-                    if (assignedMiningChief == null){
-                        assignedMiningChief = assignMiningChief(9L);
-                    }
+                            assignMiningChief("MINING_CHIEF_REVIEW", app.getRegionId(), app.getApplicationNumber());
 
                     assert master != null;
                     createTask(master, app, "MINING_CHIEF_REVIEW", userId, assignedMiningChief.getUserId());
@@ -841,16 +865,14 @@ public class MiningLeaseRenewalService {
         return mapper.toRenewalResponse(app);
     }
 
+    /**
+     * Resolves the Mining Chief for this renewal flow via the same
+     * t_workflow_step rule the main flow uses for its Mining Chief steps.
+     */
     @Transactional
-    public UserWorkloadProjection assignMiningChief(Long regionId) {
-
-        UserWorkloadProjection assignMiningChief =
-                miningLeaseApplicationRepository.findChiefQuarrying(regionId);
-
-        if (assignMiningChief == null || regionId == 9L) {
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Mining chief with required permission, role and region not found.");
-        }
-        return assignMiningChief;
+    public UserWorkloadProjection assignMiningChief(String triggerStatus, Long regionId, String applicationNumber) {
+        var resolved = workflowAssignmentClient.resolve(ASSIGNMENT_POOL_SERVICE_CODE, triggerStatus, regionId, applicationNumber);
+        return toProjection(resolved);
     }
 
     @Transactional
@@ -1336,15 +1358,8 @@ public class MiningLeaseRenewalService {
                         applicationMasterRepository.save(master);
                     }
 
-                    UserWorkloadProjection meTasks = miningLeaseApplicationRepository.findLeastBusyMineEngineer(20L, app.getRegionId());
-
-                    if (meTasks == null) {
-                        meTasks = miningLeaseApplicationRepository.findLeastBusyMineEngineer(20L, 9L);
-
-                        if (meTasks == null) {
-                            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Mining Engineer with required permission, role and region not found.");
-                        }
-                    }
+                    // Region -> HQ region -> escalate is now handled natively by the resolver.
+                    UserWorkloadProjection meTasks = assignMineEngineer(app.getRegionId(), app.getApplicationNumber());
 
 //                    List<TaskManagement> meTasks = taskManagementRepository
 //                            .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
@@ -1517,7 +1532,7 @@ public class MiningLeaseRenewalService {
         }
 
         // Route to Director for final approval
-        UserWorkloadProjection director = assignDirector();
+        UserWorkloadProjection director = assignDirector(app.getRegionId(), app.getApplicationNumber());
         assert master != null;
         createTask(master, app, "DIRECTOR", userId, director.getUserId());
 
@@ -1704,11 +1719,8 @@ public class MiningLeaseRenewalService {
                 applicationMasterRepository.save(master);
             }
 
-            UserWorkloadProjection assignedMiningChief = assignMiningChief(app.getRegionId());
-
-            if(assignedMiningChief == null){
-                assignedMiningChief = assignMiningChief(9L);
-            }
+            // Region -> HQ region -> escalate is now handled natively by the resolver.
+            UserWorkloadProjection assignedMiningChief = assignMiningChief("MINING_CHIEF_REVIEW", app.getRegionId(), app.getApplicationNumber());
 
             if (master != null) {
                 createTask(master, app, "MINING_CHIEF", userId, assignedMiningChief.getUserId());
