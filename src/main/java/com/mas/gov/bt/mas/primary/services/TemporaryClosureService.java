@@ -45,6 +45,8 @@ public class TemporaryClosureService {
 
     private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
 
+    private final SiteProvisioningService siteProvisioningService;
+
     @Transactional
     public TemporaryClosureNotificationResponse submitApplication(@Valid TemporaryClosureNotificationRequest request, Long userId, String email, String applicantType) {
         Optional<MiningLeaseApplication> miningLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationId());
@@ -108,16 +110,10 @@ public class TemporaryClosureService {
         // =====================================================
         // 2. ASSIGN RC
         // =====================================================
-        UserWorkloadProjection assignedRC = null;
-
-        ApplicationMaster master = null;
-        if (applicationType.equalsIgnoreCase("MINING_LEASE")) {
-            assignedRC = assignRC(miningLeaseApplication1.getRegionId());
-            master = miningLeaseApplication1.getApplicationMaster();
-        }else {
-            assignedRC = assignRC(quarryLeaseApplication1.getRegionId());
-            master = quarryLeaseApplication1.getApplicationMaster();
-        }
+        Long regionId = miningLeaseApplication1 != null
+                ? miningLeaseApplication1.getRegionId()
+                : quarryLeaseApplication1.getRegionId();
+        UserWorkloadProjection assignedRC = assignRC(regionId);
 
         if (assignedRC == null) {
             assignedRC = assignRC(9L);
@@ -126,13 +122,17 @@ public class TemporaryClosureService {
         // =====================================================
         // 3. Application master and create task for director
         // =====================================================
-        master.setSubmittedAt(LocalDateTime.now());
-        master.setServiceId(SERVICE_ID);
-        master.setSubmittedOn(LocalDateTime.now());
+        // This t_application_master row belongs to the ORIGINAL mining/quarry
+        // lease (that's how site-tagging, sidebar gating, and "my applications"
+        // identify it) — a temporary closure is a status overlay on that same
+        // lease, not a new service, so only currentStatus/completedAt may move.
+        // serviceCode/applicationNumber/serviceId/applicantUserId must stay
+        // exactly as the lease itself set them, or every downstream reader that
+        // keys off serviceCode permanently loses track of this lease.
+        ApplicationMaster master = miningLeaseApplication1 != null
+                ? miningLeaseApplication1.getApplicationMaster()
+                : quarryLeaseApplication1.getApplicationMaster();
         master.setCurrentStatus("SUBMITTED");
-        master.setApplicantUserId(userId);
-        master.setApplicationNumber(temporaryClosureEntity.getApplicationId());
-        master.setServiceCode(SERVICE_CODE);
         applicationMasterRepository.save(master);
 
         temporaryClosureEntity.setApplicationMaster(master);
@@ -371,7 +371,9 @@ public class TemporaryClosureService {
                         queryLeaseApplicationRepository.save(quarryLeaseApplicationEntity);
                     }
 
-                    Optional<HouseholdPermitThresholdEntity> entity = householdPermitThresholdRepository.findByApplicationNoAndServiceType(app.getApplicationId(), app.getApplicationType());
+                    siteProvisioningService.setSiteActive(serviceType, app.getApplicationId(), false);
+
+                    Optional<HouseholdPermitThresholdEntity> entity = householdPermitThresholdRepository.findByApplicationNoAndServiceType(app.getApplicationId(), serviceType);
 
                     if (entity.isEmpty()) {
                         throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "The application number is not present in household permit table.");

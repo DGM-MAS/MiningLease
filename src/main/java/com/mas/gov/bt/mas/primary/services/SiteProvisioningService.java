@@ -7,6 +7,8 @@ import com.mas.gov.bt.mas.primary.repository.SiteMasterRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 /**
  * Creates the promotor's site in shared mas_db.site_master when a mining
  * lease reaches final approval. The site is what Mine TP / balances key on
@@ -24,10 +26,16 @@ public class SiteProvisioningService {
         this.siteMasterRepository = siteMasterRepository;
     }
 
-    /** Idempotent — safe to call again if the approval step is re-run. */
-    public void provisionSiteForApprovedLease(MiningLeaseApplication app) {
-        if (siteMasterRepository.existsByLeaseTypeAndLeaseApplicationId(LEASE_TYPE, app.getId())) {
-            return;
+    /**
+     * Idempotent — safe to call again if the approval step is re-run. Returns
+     * the site (existing or newly created) so the caller can retroactively
+     * stamp site_id onto the originating lease application's own
+     * t_application_master row.
+     */
+    public SiteMaster provisionSiteForApprovedLease(MiningLeaseApplication app) {
+        Optional<SiteMaster> existing = siteMasterRepository.findByLeaseTypeAndLeaseApplicationNumber(LEASE_TYPE, app.getApplicationNumber());
+        if (existing.isPresent()) {
+            return existing.get();
         }
         SiteMaster site = new SiteMaster();
         site.setSiteName(app.getNameOfMine() != null && !app.getNameOfMine().isBlank()
@@ -46,6 +54,7 @@ public class SiteProvisioningService {
         site.setCreatedBy("system-lease-approval");
         siteMasterRepository.save(site);
         log.info("Provisioned site '{}' for approved mining lease {}", site.getSiteName(), app.getApplicationNumber());
+        return site;
     }
 
     /**
@@ -65,6 +74,26 @@ public class SiteProvisioningService {
                     site.setPlace(app.getPlaceOfMiningActivity() != null ? app.getPlaceOfMiningActivity() : site.getPlace());
                     siteMasterRepository.save(site);
                     log.info("Refreshed site_master location for renewed mining lease {}", app.getApplicationNumber());
+                });
+    }
+
+    /**
+     * Flips the shared site_master row's is_active flag when a lease enters or leaves a
+     * SUSPENDED/TERMINATED/TEMPORARY CLOSURE APPROVED state. ActiveSiteService (mas-royalty-service)
+     * already rejects an inactive site, so this alone blocks Mine TP and every other site-scoped
+     * application (balances, other TP variants) without touching those services directly.
+     * leaseType is passed explicitly (not the class's own LEASE_TYPE constant) since Termination/
+     * ImmediateSuspension/TemporaryClosure cover both Mining Lease and Quarry Lease from one call site.
+     */
+    public void setSiteActive(String leaseType, String applicationNumber, boolean active) {
+        if (leaseType == null || applicationNumber == null) {
+            return;
+        }
+        siteMasterRepository.findByLeaseTypeAndLeaseApplicationNumber(leaseType, applicationNumber)
+                .ifPresent(site -> {
+                    site.setIsActive(active);
+                    siteMasterRepository.save(site);
+                    log.info("Set site_master.is_active={} for {} lease {}", active, leaseType, applicationNumber);
                 });
     }
 }

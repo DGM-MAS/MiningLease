@@ -121,6 +121,13 @@ public class MiningLeaseRenewalService {
         MiningLeaseRenewalApplication miningLeaseRenewalApplication = existingRenewal.orElse(new MiningLeaseRenewalApplication());
         if (miningLeaseApplication.isPresent()) {
             MiningLeaseApplication miningLeaseApplication1 = miningLeaseApplication.get();
+
+            // Renewal only makes sense for a lease that's currently active — a suspended,
+            // terminated, or temporarily closed lease must not be renewable until reinstated.
+            if (!"MINING LEASE APPROVED".equalsIgnoreCase(miningLeaseApplication1.getCurrentStatus())) {
+                throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION,
+                        "Renewal is not allowed while the lease is not in an active (approved) state.");
+            }
             // 1
             // Map all data to renewal application table
             // IF THE DATA IS PRESENT

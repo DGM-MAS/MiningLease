@@ -82,6 +82,9 @@ public class ApplicationMaster {
     @Column(name = "expiry_date")
     private LocalDateTime expiryDate;
 
+    @Column(name = "site_id")
+    private Long siteId;
+
     /** Keeps the _at/_on timestamp pairs in sync regardless of which one this service's code sets. */
     @PrePersist
     @PreUpdate
