@@ -42,7 +42,7 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('SUBMITTED', 'RECTIFICATION BY CMS')
+    AND q.currentStatus NOT IN ('TERMINATED', 'TERMINATION CANCELED')
 """)
     Page<TerminationApplicationEntity> findAssignedToUserMI(Long userId, Pageable pageable);
 
@@ -52,7 +52,7 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('SUBMITTED', 'RECTIFICATION BY CMS')
+    AND q.currentStatus NOT IN ('TERMINATED', 'TERMINATION CANCELED')
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<TerminationApplicationEntity> findAssignedToUserAndSearchMI(Long userId, String search, Pageable pageable);
@@ -61,7 +61,7 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     SELECT q
     FROM TerminationApplicationEntity q
     WHERE q.promoterUserId = :userId
-    AND q.currentStatus IN ('SUBMITTED' , 'RECTIFICATION BY CMS')
+    AND q.currentStatus NOT IN ('TERMINATED', 'TERMINATION CANCELED')
 """)
     Page<TerminationApplicationEntity> findAssignedToUserPromoter(Long userId, Pageable pageable);
 
@@ -69,7 +69,7 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     SELECT q
     FROM TerminationApplicationEntity q
     WHERE q.promoterUserId = :userId
-    AND q.currentStatus IN ('SUBMITTED', 'RECTIFICATION BY CMS')
+    AND q.currentStatus NOT IN ('TERMINATED', 'TERMINATION CANCELED')
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<TerminationApplicationEntity> findAssignedToUserAndSearchPromoter(Long userId, String search, Pageable pageable);
@@ -167,7 +167,7 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.createdBy = :currentUserId
-    AND t.taskStatus IN ('SUBMITTED', 'RECTIFICATION BY CMS')
+    AND q.currentStatus NOT IN ('TERMINATED', 'TERMINATION CANCELED')
 """)
     Page<TerminationApplicationEntity> findAssignedToUserChiefMD(Long currentUserId, Pageable pageable);
 
@@ -177,7 +177,7 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.createdBy = :currentUserId
-    AND t.taskStatus IN ('SUBMITTED', 'RECTIFICATION BY CMS')
+    AND q.currentStatus NOT IN ('TERMINATED', 'TERMINATION CANCELED')
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<TerminationApplicationEntity> findAssignedToUserAndSearchChiefMD(Long currentUserId, String trim, Pageable pageable);
@@ -198,7 +198,7 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN :archivedStatuses
+    AND q.currentStatus IN :archivedStatuses
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<TerminationApplicationEntity> findArchivedAssignedToUserAndSearchCMSHead(Long userId, String search, List<String> archivedStatuses, Pageable pageable);

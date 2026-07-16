@@ -1,5 +1,7 @@
 package com.mas.gov.bt.mas.primary.services;
 
+import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
+import com.mas.gov.bt.mas.primary.mapper.MiningLeaseMapper;
 import com.mas.gov.bt.mas.primary.repository.*;
 import com.mas.gov.bt.mas.primary.utility.CustomRuntimeException;
 
@@ -44,6 +46,8 @@ public class TerminationService {
     private final NotificationClient notificationClient;
 
     private final TerminationMapper terminationMapper;
+
+    private final MiningLeaseMapper mapper;
 
     private final MiningLeaseApplicationRepository miningLeaseApplicationRepository;
 
@@ -127,6 +131,8 @@ public class TerminationService {
         return responseList;
     }
 
+
+
     /** Common fields the rest of submitTerminationApplication needs, regardless of lease type. */
     private record LeaseApplicationRef(String applicantName, String applicantEmail, ApplicationMaster applicationMaster) {}
 
@@ -174,22 +180,28 @@ public class TerminationService {
      * Mining Lease first and falling back to Quarry Lease, mirroring resolveAndMarkUnderReview.
      */
     private void updateLeaseApplicationStatus(String appNo, String miningStatus, String quarryStatus) {
+        String serviceType = "";
+
         Optional<MiningLeaseApplication> miningLeaseApplication =
                 miningLeaseApplicationRepository.findByApplicationNumber(appNo);
 
         if (miningLeaseApplication.isPresent()) {
             MiningLeaseApplication application = miningLeaseApplication.get();
             application.setCurrentStatus(miningStatus);
+            serviceType = "MINING_LEASE";
             miningLeaseApplicationRepository.save(application);
-            return;
         }
 
-        QuarryLeaseApplication application = quarryLeaseApplicationRepository.findByApplicationNumber(appNo)
-                .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
-        application.setCurrentStatus(quarryStatus);
-        quarryLeaseApplicationRepository.save(application);
+        Optional<QuarryLeaseApplication> application = quarryLeaseApplicationRepository.findByApplicationNumber(appNo);
 
-        Optional<HouseholdPermitThresholdEntity> householdPermitThresholdEntity = householdPermitThresholdRepository.findByApplicationNoAndServiceType(appNo, SERVICE_CODE);
+        if (application.isPresent()) {
+            QuarryLeaseApplication quarryLeaseApplication = application.get();
+            quarryLeaseApplication.setCurrentStatus(quarryStatus);
+            serviceType = "QUARRY_LEASE";
+            quarryLeaseApplicationRepository.save(quarryLeaseApplication);
+        }
+
+        Optional<HouseholdPermitThresholdEntity> householdPermitThresholdEntity = householdPermitThresholdRepository.findByApplicationNoAndServiceType(appNo, serviceType);
 
         if (householdPermitThresholdEntity.isPresent()) {
             HouseholdPermitThresholdEntity thresholdEntity = householdPermitThresholdEntity.get();
@@ -309,14 +321,14 @@ public class TerminationService {
 
                 case "Approved" -> {
                     LocalDateTime now = LocalDateTime.now();
-                    app.setCurrentStatus("TERMINATION APPROVED");
+                    app.setCurrentStatus("TERMINATED");
                     app.setRemarksCMSHead(request.getRemarks());
                     app.setCmsHeadReviewedAt(now);
                     app.setCmsHeadFileId(request.getFileId());
                     app.setApprovedAt(now);
 
                     if (master != null) {
-                        master.setCurrentStatus("TERMINATION APPROVED");
+                        master.setCurrentStatus("TERMINATED");
                         master.setApprovedAt(now);
                         master.setCompletedAt(now);
                         applicationMasterRepository.save(master);
@@ -331,7 +343,7 @@ public class TerminationService {
                     assert master != null;
                     createTask( master, app, "DIRECTOR CMS APPROVED", userId, app.getCreatedBy());
 
-                    updateLeaseApplicationStatus(app.getApplicationNumber(), "TERMINATION APPROVED", "TERMINATION APPROVED");
+                    updateLeaseApplicationStatus(app.getApplicationNumber(), "TERMINATED", "TERMINATED");
                 }
                 case "Rectification" -> {
                     LocalDateTime now = LocalDateTime.now();
@@ -504,7 +516,10 @@ public class TerminationService {
 //    }
 
     public Page<TerminationApplicationResponse> getArchivedApplications(Pageable pageable, String search, Long userId) {
-        List<String> archivedStatuses = List.of("CMS HEAD APPROVED", "TERMINATION CANCELED");
+        List<String> archivedStatuses = List.of(
+                "TERMINATED",
+                "TERMINATION CANCELED"
+        );
         Page<TerminationApplicationEntity> applications;
         List<Long> role_id = terminationApplicationRepository.findUserDetails(userId);
         if(role_id !=null && role_id.contains(35)){
@@ -547,7 +562,10 @@ public class TerminationService {
 
     @Transactional(readOnly = true)
     public Page<TerminationApplicationResponse> getMyArchivedApplications(Long userId, Pageable pageable, String search) {
-        List<String> archivedStatuses = List.of("CMS HEAD APPROVED", "TERMINATION CANCELED");
+        List<String> archivedStatuses = List.of(
+                "TERMINATED",
+                "TERMINATION CANCELED"
+        );
         Page<TerminationApplicationEntity> applications ;
 
         if (search == null || search.isBlank()) {
