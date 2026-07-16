@@ -9,6 +9,8 @@ import lombok.Setter;
 @Setter
 public class ReassignTaskRequest {
 
+    private Long id;
+
     @NotNull(message = "New assignee user ID is required")
     private Long newAssigneeUserId;
 
