@@ -319,4 +319,15 @@ public class MiningLeaseController {
         return SuccessResponse.buildSuccessResponse("BG upfront payment confirmed.");
     }
 
+    @GetMapping("/approvedMiningApplication")
+    public ResponseEntity<SuccessResponse<List<MiningLeaseResponse>>> archivedApproved(
+            @RequestParam(required = false) String search,
+            Pageable pageable) {
+
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(
+                miningLeaseService.getArchivedApplicationApproved(userId, pageable, search)
+        );
+    }
+
 }
