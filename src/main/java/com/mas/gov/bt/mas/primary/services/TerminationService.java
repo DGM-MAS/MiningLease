@@ -89,7 +89,7 @@ public class TerminationService {
             ApplicationMaster master = leaseRef.applicationMaster();
             master.setSubmittedAt(LocalDateTime.now());
             master.setCurrentStatus("SUBMITTED");
-            master.setApplicantUserId(userId);
+            master.setApplicantUserId(request.getPromoterUserId());
             master.setServiceCode(SERVICE_CODE);
             applicationMasterRepository.save(master);
 
