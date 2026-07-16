@@ -1021,8 +1021,10 @@ public class NotificationClient {
             );
         }
         catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    email, applicationNumber, ex);
+            log.error("Failed to send task reassignment notification to {} for application {}. Reason: {}",
+                    email,
+                    applicationNumber,
+                    ex.getMessage());
         }
 
     }
@@ -1060,8 +1062,11 @@ public class NotificationClient {
         }
 
         catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    email, applicationNumber, ex);
+            log.error("Failed to send renewal environmental clearance notification to {} for application {}. Reason: {}",
+                    email,
+                    applicationNumber,
+                    ex.getMessage()
+            );
         }
 
     }
@@ -1098,8 +1103,8 @@ public class NotificationClient {
             );
         }
         catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                     applicationNumber, ex);
+            log.error("Failed to send task reassignment termination notification to {} for application {}",
+                     applicationNumber, ex.getMessage());
         }
 
     }
@@ -1134,9 +1139,7 @@ public class NotificationClient {
         );
         }
         catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-
-                      applicationNumber, ex);
+            log.error("Failed to termination notification  to {} . Reason: {}", email, ex.getMessage());
         }
     }
 
@@ -1149,11 +1152,9 @@ public class NotificationClient {
         }
         String subject = "Termination Cancelled  - " + applicationNumber;
         String body = String.format("""
-                The termination of mining lease has been cancelled by CMS Head.
+                The termination of lease has been cancelled by CMS Head.
 
                 Application Number: %s
-
-                Please log in to the system to review the details.
 
                 """, applicationNumber);
 
@@ -1171,7 +1172,12 @@ public class NotificationClient {
             );
         }
         catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",  applicationNumber, ex);
+            log.error(
+                    "Failed to send termination suspension notification for application {}. Reason: {}",
+                    applicationNumber,
+                    ex.getMessage(),
+                    ex
+            );
         }
 
     }
