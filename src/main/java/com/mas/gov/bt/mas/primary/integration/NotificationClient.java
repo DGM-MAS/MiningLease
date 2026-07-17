@@ -165,8 +165,11 @@ public class NotificationClient {
             sendHtmlEmail(to, subject, htmlContent);
         }
         catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                     ex);
+            log.error(
+                    "Failed to send applicant account credentials notification to {}",
+                    to,
+                    ex
+            );
         }
     }
 
@@ -248,8 +251,11 @@ public class NotificationClient {
                     String.class
             );
         }catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    email, applicationNumber, ex);
+            log.error(
+                    "Failed to send Mining Lease Application Submitted notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex);
         }
     }
 
@@ -282,8 +288,11 @@ public class NotificationClient {
                     String.class
             );
         }catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    email, applicationNumber, ex);
+            log.error("Failed to send Manual Entry Application Submitted notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex
+            );
         }
     }
 
@@ -318,8 +327,12 @@ public class NotificationClient {
                     String.class
             );
         }catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    email, applicationNumber, ex);
+            log.error(
+                    "Failed to send Mining Lease Application Status Update notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex
+            );
         }
     }
 
@@ -356,8 +369,12 @@ public class NotificationClient {
                     String.class
             );
         }catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    email, applicationNumber, ex);
+            log.error(
+                    "Failed to send  Mining Lease Application Approved notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex
+            );
         }
 
     }
@@ -394,8 +411,12 @@ public class NotificationClient {
                     String.class
             );
         }catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    email, applicationNumber, ex);
+            log.error(
+                    "Failed to send Manual Entry Application Approved notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex
+            );
         }
 
     }
@@ -433,8 +454,12 @@ public class NotificationClient {
             );
 
         }catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    email, applicationNumber, ex);
+            log.error(
+                    "Failed to send Sample Transport clearance Application Approved notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex
+            );
         }
 
     }
@@ -469,8 +494,12 @@ public class NotificationClient {
             );
 
         }catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    email, applicationNumber, ex);
+            log.error(
+                    "Failed to Mining Lease Application uplifting suspension notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex
+            );
         }
     }
 
@@ -504,8 +533,12 @@ public class NotificationClient {
             );
 
         }catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    email, applicationNumber, ex);
+            log.error(
+                    "Failed to send Mining Lease Rejection notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex
+            );
         }
     }
 
@@ -540,8 +573,12 @@ public class NotificationClient {
         }
 
         catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    email, applicationNumber, ex);
+            log.error(
+                    "Failed to send reject of sample transport clearance notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex
+            );
         }
     }
 
@@ -558,7 +595,6 @@ public class NotificationClient {
                 Application Number: %s
                 Reason: %s
 
-                If you have any questions, please contact our support team.
                 """, applicationNumber, reason);
 
         EmailRequest request = new EmailRequest();
@@ -574,8 +610,12 @@ public class NotificationClient {
                     String.class
             );
         }catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    email, applicationNumber, ex);
+            log.error(
+                    "Failed to send rejection manual entry notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex
+            );
         }
     }
 
@@ -586,8 +626,10 @@ public class NotificationClient {
             String chiefName,
             String applicationNumber) {
         String subject = "Sample Transport clearance Application has been reviewed - " + applicationNumber;
+
         String body = String.format("""
-                GSD Focal has accepted the application. Please log in to the system to review and take action.
+                GSD Focal has accepted the application.
+                Please log in to the system to review and take action.
 
                 Application Number: %s
 
@@ -606,8 +648,12 @@ public class NotificationClient {
                     String.class
             );
         }catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    email, applicationNumber, ex);
+            log.error(
+                    "Failed to send GSD focal accepted notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex
+            );
         }
     }
 
@@ -640,8 +686,12 @@ public class NotificationClient {
                     String.class
             );
         }catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    email, applicationNumber, ex);
+            log.error(
+                    "Failed to send quarry lease assignment notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex
+            );
         }
     }
 
@@ -674,8 +724,12 @@ public class NotificationClient {
                     String.class
             );
         }catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    email, applicationNumber, ex);
+            log.error(
+                    "Failed to send new environmental clearance application assignment notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex
+            );
         }
     }
 
@@ -708,8 +762,12 @@ public class NotificationClient {
                     String.class
             );
         }catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    email, applicationNumber, ex);
+            log.error(
+                    "Failed to send manual entry application assignment notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex
+            );
         }
     }
 
@@ -749,7 +807,7 @@ public class NotificationClient {
                     String.class
             );
         }catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
+            log.error("Failed to send Application Fee Required - Mining Lease Application notification to {} for application {}",
                     email, applicationNumber, ex);
         }
     }
@@ -782,8 +840,12 @@ public class NotificationClient {
             );
 
         }catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    email, applicationNumber, ex);
+            log.error(
+                    "Failed to send Additional Information Required Temporary closure notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex
+            );
         }
 
     }
@@ -816,8 +878,12 @@ public class NotificationClient {
             );
 
         }catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    email, applicationNumber, ex);
+            log.error(
+                    "Failed to send Additional Information Required for termination process notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex
+            );
         }
     }
 
@@ -852,8 +918,12 @@ public class NotificationClient {
             );
         }
         catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    email, applicationNumber, ex);
+            log.error(
+                    "Failed to send Immediate Suspension Revision Request Promoter notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex
+            );
         }
 
     }
@@ -886,8 +956,11 @@ public class NotificationClient {
         }
 
         catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    email, applicationNumber, ex);
+            log.error("Failed to send Geological Report Submission Deadline notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex
+            );
         }
 
     }
@@ -918,8 +991,12 @@ public class NotificationClient {
                     String.class
             );
         }catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    email, applicationNumber, ex);
+            log.error(
+                    "Failed to send FMFS Submission Required notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex
+            );
         }
 
     }
@@ -952,7 +1029,7 @@ public class NotificationClient {
         }
 
         catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
+            log.error("Failed to send MLA Signed - Mining Lease Application notification to {} for application {}",
                     email, applicationNumber, ex);
         }
 
@@ -983,7 +1060,7 @@ public class NotificationClient {
                     String.class
             );
         }catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
+            log.error("Failed to send Work Order Issued - Mining Lease Application notification to {} for application {}",
                     email, applicationNumber, ex);
         }
 
@@ -1062,7 +1139,8 @@ public class NotificationClient {
         }
 
         catch (Exception ex) {
-            log.error("Failed to send renewal environmental clearance notification to {} for application {}. Reason: {}",
+            log.error(
+                    "Failed to send renewal environmental clearance application task has been reassignment notification to {} for application {}. Reason: {}",
                     email,
                     applicationNumber,
                     ex.getMessage()
@@ -1118,7 +1196,7 @@ public class NotificationClient {
         }
         String subject = "Termination Notification - " + applicationNumber;
         String body = String.format("""
-                The termination of mining has been approved by CMS Head.
+                The termination of lease has been approved by CMS Head.
 
                 Application Number: %s
 
@@ -1139,7 +1217,11 @@ public class NotificationClient {
         );
         }
         catch (Exception ex) {
-            log.error("Failed to termination notification  to {} . Reason: {}", email, ex.getMessage());
+            log.error(
+                    "Failed to send termination of mining has been approved notification  to {} . Reason: {}",
+                    email,
+                    ex.getMessage()
+            );
         }
     }
 
@@ -1173,7 +1255,7 @@ public class NotificationClient {
         }
         catch (Exception ex) {
             log.error(
-                    "Failed to send termination suspension notification for application {}. Reason: {}",
+                    "Failed to send termination of lease has been cancelled notification for application {}. Reason: {}",
                     applicationNumber,
                     ex.getMessage(),
                     ex
@@ -1268,10 +1350,14 @@ public class NotificationClient {
                 notificationEmailBuilderUrl,
                 request,
                 String.class
-        );}
-        catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    directorEmail, applicationNumber, ex);
+        );
+        } catch (Exception ex) {
+            log.error(
+                    "Failed to send surface collection auction application assignment notification to {} for application {}",
+                    directorEmail,
+                    applicationNumber,
+                    ex
+            );
         }
     }
 
@@ -1298,8 +1384,11 @@ public class NotificationClient {
                 String.class
         );
         }catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    directorEmail, applicationNumber, ex);
+            log.error("Failed to send Bank guarantor details submission notification to {} for application {}",
+                    directorEmail,
+                    applicationNumber,
+                    ex
+            );
         }
     }
 
@@ -1326,8 +1415,12 @@ public class NotificationClient {
                     String.class
             );
         }catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    directorEmail, applicationNumber, ex);
+            log.error(
+                    "Failed to send Bank guarantor details submission notification to {} for application {}",
+                    directorEmail,
+                    applicationNumber,
+                    ex
+            );
         }
     }
 
@@ -1355,8 +1448,12 @@ public class NotificationClient {
                     String.class
             );
         }catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    directorEmail, applicationNumber, ex);
+            log.error(
+                    "Failed to send Surface collection auction Bid winner notification to {} for application {}",
+                    directorEmail,
+                    applicationNumber,
+                    ex
+            );
         }
     }
 
@@ -1384,8 +1481,12 @@ public class NotificationClient {
                     String.class
             );
         }catch (Exception ex) {
-            log.error("Failed to send exploration permit submission notification to {} for application {}",
-                    directorEmail, applicationNumber, ex);
+            log.error(
+                    "Failed to send termination application notification to {} for application {}",
+                    directorEmail,
+                    applicationNumber,
+                    ex
+            );
         }
 
     }

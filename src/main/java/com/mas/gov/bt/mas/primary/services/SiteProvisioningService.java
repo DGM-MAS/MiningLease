@@ -3,6 +3,7 @@ package com.mas.gov.bt.mas.primary.services;
 import com.mas.gov.bt.mas.primary.entity.MiningLeaseApplication;
 import com.mas.gov.bt.mas.primary.entity.MiningLeaseRenewalApplication;
 import com.mas.gov.bt.mas.primary.entity.SiteMaster;
+import com.mas.gov.bt.mas.primary.entity.SurfaceCollectionAuctionApplication;
 import com.mas.gov.bt.mas.primary.repository.SiteMasterRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,8 @@ import java.util.Optional;
 public class SiteProvisioningService {
 
     private static final String LEASE_TYPE = "MINING_LEASE";
+
+    private static final String SURFACE_COLLECTION_CATEGORY   = "SURFACE_COLLECTION_PERMIT";
 
     private final SiteMasterRepository siteMasterRepository;
 
@@ -54,6 +57,38 @@ public class SiteProvisioningService {
         site.setCreatedBy("system-lease-approval");
         siteMasterRepository.save(site);
         log.info("Provisioned site '{}' for approved mining lease {}", site.getSiteName(), app.getApplicationNumber());
+        return site;
+    }
+
+    public SiteMaster provisionSiteForApprovedLeaseSurfaceAuction(SurfaceCollectionAuctionApplication app) {
+        Optional<SiteMaster> existing = siteMasterRepository.findByLeaseTypeAndLeaseApplicationNumber(SURFACE_COLLECTION_CATEGORY, app.getApplicationNo());
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+        SiteMaster site = new SiteMaster();
+
+        site.setSiteName(app.getSiteName() != null && !app.getSiteName().isBlank()
+                ? app.getSiteName()
+                : "Surface Collection Auction - " + app.getApplicationNo());
+
+        site.setApplicantUserId(app.getBidWinner().getPromoterId() != null ? app.getBidWinner().getPromoterId() : null);
+        site.setLeaseType(SURFACE_COLLECTION_CATEGORY);
+        site.setLeaseApplicationId(app.getId());
+        site.setLeaseApplicationNumber(app.getApplicationNo());
+        site.setDzongkhagId(app.getDzongkhagId() != null ? app.getDzongkhagId().getId() : null);
+        site.setGewogNameId(app.getGewogId() != null ? String.valueOf(app.getGewogId().getGewogSerialNo()) : null);
+        site.setNearestVillageId(app.getVillageId() != null
+                ? String.valueOf(app.getVillageId().getVillageSerialNo()) : null);
+        site.setPlace(app.getDzongkhagId().getDzongkhagName());
+        site.setCreatedBy("system-lease-approval");
+        siteMasterRepository.save(site);
+
+        log.info(
+                "Provisioned site '{}' for approved surface collection auction {}",
+                site.getSiteName(),
+                app.getApplicationNo()
+        );
+
         return site;
     }
 
