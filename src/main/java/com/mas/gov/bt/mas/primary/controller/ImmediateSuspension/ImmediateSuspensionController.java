@@ -52,7 +52,7 @@ public class ImmediateSuspensionController {
         ImmediateSuspensionApplicationResponse response = immediateSuspensionService.submitImmediateSuspensionApplication(request, userId);
 
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new SuccessResponse<>("The immediate suspension application has been submitted successfully.", response));
+                .body(new SuccessResponse<>("Your application " + response.getApplicationNumber() + " for Immediate Suspension has been submitted.", response));
     }
 
     @PostMapping("/assignTask")

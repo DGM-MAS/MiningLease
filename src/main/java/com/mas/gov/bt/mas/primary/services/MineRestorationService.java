@@ -162,7 +162,8 @@ public class MineRestorationService {
                     "A Mine Restoration Plan has been assigned to you for review.",
                     assignedME.getUserId(),
                     SERVICE_CODE,
-                    "STAFF"
+                    "STAFF",
+                    true
             );
         }
 
@@ -197,7 +198,8 @@ public class MineRestorationService {
                             + restoration.getApplicationNumber(),
                     restoration.getAssignedMeUserId(),
                     SERVICE_CODE,
-                    "STAFF"
+                    "STAFF",
+                    true
             );
         }
         return toResponse(restoration);
@@ -255,7 +257,8 @@ public class MineRestorationService {
                             + " has been assigned to you for verification.",
                     assignedRcUserId,
                     SERVICE_CODE,
-                    "STAFF"
+                    "STAFF",
+                    true
             );
 
             // Notify ME
@@ -266,7 +269,8 @@ public class MineRestorationService {
                                 + " submitted for application " + restoration.getApplicationNumber(),
                         restoration.getAssignedMeUserId(),
                         SERVICE_CODE,
-                        "STAFF"
+                        "STAFF",
+                        false
                 );
             }
         }
@@ -332,7 +336,8 @@ public class MineRestorationService {
                                 + restoration.getApplicationNumber(),
                         restoration.getAssignedMeUserId(),
                         SERVICE_CODE,
-                        "STAFF"
+                        "STAFF",
+                        true
                 );
             }
         }
@@ -402,15 +407,16 @@ public class MineRestorationService {
                         restoration.getApplicantName(),
                         restoration.getApplicationNumber(),
                         "MRP Approved — Work Order Issued",
-                        "Your Mining Restoration Plan has been approved. A work order has been issued to begin restoration."
+                        "Your application " + restoration.getApplicationNumber() + " for Mine Restoration has been approved. A work order has been issued to begin restoration."
                 );
                 notificationClient.sendUserNotification(
                         "MRP Approved — Work Order Issued",
-                        "Your MRP for application " + restoration.getApplicationNumber()
-                                + " has been approved. Work order has been issued.",
+                        "Your application " + restoration.getApplicationNumber()
+                                + " for Mine Restoration has been approved. Work order has been issued.",
                         restoration.getApplicantUserId(),
                         SERVICE_CODE,
-                        "CITIZEN"
+                        "CITIZEN",
+                        false
                 );
                 updateLeaseApplicationStatus(restoration.getMiningLeaseApplicationNumber(),STATUS_MRP_APPROVED,STATUS_MRP_APPROVED);
             }
@@ -429,7 +435,8 @@ public class MineRestorationService {
                                 + restoration.getApplicationNumber() + ". Remarks: " + request.getRemarks(),
                         restoration.getApplicantUserId(),
                         SERVICE_CODE,
-                        "CITIZEN"
+                        "CITIZEN",
+                        true
                 );
             }
             case "REJECTED" -> {
@@ -443,11 +450,12 @@ public class MineRestorationService {
                 );
                 notificationClient.sendUserNotification(
                         "MRP Rejected",
-                        "Your MRP for application " + restoration.getApplicationNumber()
-                                + " has been rejected. Reason: " + request.getRemarks(),
+                        "Your application " + restoration.getApplicationNumber()
+                                + " for Mine Restoration has been rejected. Reason: " + request.getRemarks(),
                         restoration.getApplicantUserId(),
                         SERVICE_CODE,
-                        "CITIZEN"
+                        "CITIZEN",
+                        false
                 );
             }
             default -> throw new BusinessException(ErrorCodes.INVALID_INPUT_DATA);
@@ -483,7 +491,8 @@ public class MineRestorationService {
                         + restoration.getApplicationNumber() + ". You may now begin the restoration process.",
                 restoration.getApplicantUserId(),
                 SERVICE_CODE,
-                "CITIZEN"
+                "CITIZEN",
+                false
         );
 
         return toResponse(restoration);
@@ -517,7 +526,8 @@ public class MineRestorationService {
                                 + " has been reviewed. Continue restoration.",
                         restoration.getApplicantUserId(),
                         SERVICE_CODE,
-                        "CITIZEN"
+                        "CITIZEN",
+                        false
                 );
             }
             case "COMPLETION_REQUESTED" -> {
@@ -529,7 +539,8 @@ public class MineRestorationService {
                                 + "Restoration Completion Report for application " + restoration.getApplicationNumber(),
                         restoration.getApplicantUserId(),
                         SERVICE_CODE,
-                        "CITIZEN"
+                        "CITIZEN",
+                        true
                 );
             }
             default -> throw new BusinessException(ErrorCodes.INVALID_INPUT_DATA);
@@ -572,11 +583,12 @@ public class MineRestorationService {
                 restoration.setCurrentStatus(STATUS_ERB_APPROVED);
                 notificationClient.sendUserNotification(
                         "Restoration Approved — ERB Release Letter Pending",
-                        "Your restoration work for application " + restoration.getApplicationNumber()
-                                + " has been approved. The ERB Release Letter will be issued shortly.",
+                        "Your application " + restoration.getApplicationNumber()
+                                + " for Mine Restoration has been approved. The ERB Release Letter will be issued shortly.",
                         restoration.getApplicantUserId(),
                         SERVICE_CODE,
-                        "CITIZEN"
+                        "CITIZEN",
+                        false
                 );
             }
             case "ERB_UTILIZED" -> {
@@ -599,7 +611,8 @@ public class MineRestorationService {
                                 + " was not satisfactory. The ERB will be utilized by DGM. Remarks: " + request.getRemarks(),
                         restoration.getApplicantUserId(),
                         SERVICE_CODE,
-                        "CITIZEN"
+                        "CITIZEN",
+                        false
                 );
             }
             default -> throw new BusinessException(ErrorCodes.INVALID_INPUT_DATA);
@@ -654,7 +667,8 @@ public class MineRestorationService {
                         + restoration.getApplicationNumber() + ". The Environmental Restoration Bond (ERB) will be refunded through BIRMS.",
                 restoration.getApplicantUserId(),
                 SERVICE_CODE,
-                "CITIZEN"
+                "CITIZEN",
+                false
         );
 
         return toResponse(restoration);
@@ -708,7 +722,8 @@ public class MineRestorationService {
                             + " has been assigned to you for review.",
                     request.getMiningEngineerId(),
                     SERVICE_CODE,
-                    "STAFF"
+                    "STAFF",
+                    true
             );
         }
 
@@ -765,7 +780,8 @@ public class MineRestorationService {
                             + restoration.getApplicationNumber(),
                     restoration.getAssignedMeUserId(),
                     SERVICE_CODE,
-                    "STAFF"
+                    "STAFF",
+                    true
             );
         }
 
