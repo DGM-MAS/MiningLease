@@ -54,4 +54,6 @@ public interface TaskManagementRepository extends JpaRepository<TaskManagement, 
 
     /** Most-recent task for an application, regardless of status — used by WorkflowTrackingService. */
     Optional<TaskManagement> findTopByApplicationNumberAndServiceCodeOrderByAssignedAtDesc(String applicationNumber, String serviceCode);
+
+    TaskManagement findByApplicationNumberAndAssignedToRoleAndTaskStatusAndServiceCodeAndId(String applicationNumber, String cmsHead, String submitted, String serviceCode, Long id);
 }

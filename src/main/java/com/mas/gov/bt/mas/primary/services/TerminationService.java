@@ -1,6 +1,5 @@
 package com.mas.gov.bt.mas.primary.services;
 
-import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
 import com.mas.gov.bt.mas.primary.mapper.MiningLeaseMapper;
 import com.mas.gov.bt.mas.primary.repository.*;
 import com.mas.gov.bt.mas.primary.utility.CustomRuntimeException;
@@ -78,6 +77,9 @@ public class TerminationService {
             entity.setApplicationNumber(appNo);
             entity.setPromoterUserId(request.getPromoterUserId());
 
+            entity.setNameOfSite(leaseRef.siteName);
+            entity.setApplicationType(leaseRef.applicationType);
+
             entity.setFileId(request.getFileId());
             entity.setCreatedBy(userId);
             entity.setCreatedAt(LocalDateTime.now());
@@ -116,12 +118,12 @@ public class TerminationService {
                 notificationClient.sendTerminationMailToCMSHeadAssigned(
                         assignedCMSHead.getEmail(),
                         assignedCMSHead.getUsername(),
-                        entity.getApplicationNumber());
+                        entity.getTerminationId());
             }
 
             if (assignedCMSHead.getUserId() != null) {
                 String title = "Termination application has been assigned.";
-                String message = "Application No. " + entity.getApplicationNumber() + " assigned for review.";
+                String message = "Application No. " + entity.getTerminationId() + " assigned for review.";
                 String serviceId = "112";
                 notificationClient.sendUserNotification(title, message, assignedCMSHead.getUserId(), serviceId, "STAFF", true);
             }
@@ -136,7 +138,7 @@ public class TerminationService {
 
 
     /** Common fields the rest of submitTerminationApplication needs, regardless of lease type. */
-    private record LeaseApplicationRef(String applicantName, String applicantEmail, ApplicationMaster applicationMaster) {}
+    private record LeaseApplicationRef(String applicantName, String applicantEmail, ApplicationMaster applicationMaster, String siteName, String applicationType) {}
 
     /**
      * Looks up the application across every lease type that can be terminated (Mining Lease,
@@ -157,7 +159,12 @@ public class TerminationService {
             application.setCurrentStatus("UNDER-REVIEW-TERMINATION");
             miningLeaseApplicationRepository.save(application);
             return new LeaseApplicationRef(
-                    application.getApplicantName(), application.getApplicantEmail(), application.getApplicationMaster());
+                    application.getApplicantName(),
+                    application.getApplicantEmail(),
+                    application.getApplicationMaster(),
+                    application.getNameOfMine(),
+                    "MINING_LEASE"
+            );
         }
 
         Optional<QuarryLeaseApplication> quarryLeaseApplication =
@@ -171,7 +178,12 @@ public class TerminationService {
             application.setCurrentStatus("UNDER-REVIEW-TERMINATION");
             quarryLeaseApplicationRepository.save(application);
             return new LeaseApplicationRef(
-                    application.getApplicantName(), application.getApplicantEmail(), application.getApplicationMaster());
+                    application.getApplicantName(),
+                    application.getApplicantEmail(),
+                    application.getApplicationMaster(),
+                    application.getNameOfQuarry(),
+                    "QUARRY_LEASE"
+            );
         }
 
         throw new CustomRuntimeException("Invalid application number: " + appNo);
@@ -183,6 +195,7 @@ public class TerminationService {
      */
     private void updateLeaseApplicationStatus(String appNo, String miningStatus, String quarryStatus) {
         String serviceType = "";
+        ApplicationMaster master = null;
 
         Optional<MiningLeaseApplication> miningLeaseApplication =
                 miningLeaseApplicationRepository.findByApplicationNumber(appNo);
@@ -190,7 +203,10 @@ public class TerminationService {
         if (miningLeaseApplication.isPresent()) {
             MiningLeaseApplication application = miningLeaseApplication.get();
             application.setCurrentStatus(miningStatus);
+            master = application.getApplicationMaster();
+            master.setCurrentStatus(miningStatus);
             serviceType = "MINING_LEASE";
+            applicationMasterRepository.save(master);
             miningLeaseApplicationRepository.save(application);
         }
 
@@ -199,7 +215,10 @@ public class TerminationService {
         if (application.isPresent()) {
             QuarryLeaseApplication quarryLeaseApplication = application.get();
             quarryLeaseApplication.setCurrentStatus(quarryStatus);
+            master = quarryLeaseApplication.getApplicationMaster();
+            master.setCurrentStatus(quarryStatus);
             serviceType = "QUARRY_LEASE";
+            applicationMasterRepository.save(master);
             quarryLeaseApplicationRepository.save(quarryLeaseApplication);
         }
 
@@ -234,7 +253,7 @@ public class TerminationService {
         LocalDateTime now = LocalDateTime.now();
 
         TaskManagement task = new TaskManagement();
-        task.setApplicationNumber(application.getApplicationNumber());
+        task.setApplicationNumber(application.getTerminationId());
         task.setServiceCode(SERVICE_CODE);
         task.setAssignedToRole(role);
         task.setAssignedByUserId(userId);
@@ -279,8 +298,17 @@ public class TerminationService {
     @Transactional
     public void reassignTaskCMS(@Valid ReassignTaskRequest request, Long userId) {
         List<String> assignedRoles = new ArrayList<>();
+
         assignedRoles.add("CMS HEAD");
-        List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleInAndServiceCode(request.getApplicationNumber(),"SUBMITTED",assignedRoles, SERVICE_CODE);
+
+        TerminationApplicationEntity app = findApplicationById(request.getId());
+
+        List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleInAndServiceCode(
+                app.getTerminationId(),
+                "SUBMITTED",
+                assignedRoles,
+                SERVICE_CODE
+        );
 
         TaskManagement taskManagement = new TaskManagement();
 
@@ -300,12 +328,12 @@ public class TerminationService {
         notificationClient.sendTaskReassignmentNotificationTermination(
                 userDetails.getEmail(),
                 userDetails.getUsername(),
-                taskManagement.getApplicationNumber(),
+                app.getTerminationId() ,
                 taskManagement.getAssignedToRole());
 
         if(userDetails.getUserId()!= null) {
             String title = "An new application has been reassigned.";
-            String message = "An application for termination has been assigned for review. Application No. "+request.getApplicationNumber()+" Please login to review the application";
+            String message = "An application for termination has been assigned for review. Application No. " +app.getTerminationId() +" Please login to review the application";
             String serviceId = "112";
             notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true);
         }else {
@@ -345,7 +373,8 @@ public class TerminationService {
                         notificationClient.sendTerminationNotification(
                                 app.getApplicantEmail(),
                                 app.getApplicantName(),
-                                app.getApplicationNumber());
+                                app.getTerminationId()
+                        );
                     }
                     assert master != null;
                     createTask( master, app, "DIRECTOR CMS APPROVED", userId, app.getCreatedBy());
@@ -369,7 +398,7 @@ public class TerminationService {
                         notificationClient.sendTerminationRevisionRequestNotification(
                                 app.getApplicantEmail(),
                                 app.getApplicantName(),
-                                app.getApplicationNumber(),
+                                app.getTerminationId(),
                                 app.getCurrentStatus(),
                                 app.getRemarksCMSHead());
                     }
@@ -398,7 +427,8 @@ public class TerminationService {
                         notificationClient.sendTerminationCancellationNotification(
                                 app.getApplicantEmail(),
                                 app.getApplicantName(),
-                                app.getApplicationNumber());
+                                app.getTerminationId()
+                        );
                     }
                     assert master != null;
                     createTask( master, app, "TERMINATION CANCELED", userId, app.getCreatedBy());
@@ -451,7 +481,12 @@ public class TerminationService {
         TerminationApplicationEntity app = findApplicationById(request.getId());
         ApplicationMaster master = app.getApplicationMaster();
 
-        TaskManagement taskManagement = taskManagementRepository.findByApplicationNumberAndAssignedToRoleAndTaskStatusAndServiceCode(app.getApplicationNumber(),"CMS HEAD", "SUBMITTED", SERVICE_CODE );
+        TaskManagement taskManagement = taskManagementRepository.findByApplicationNumberAndAssignedToRoleAndTaskStatusAndServiceCode(
+                app.getTerminationId(),
+                "CMS HEAD",
+                "SUBMITTED",
+                SERVICE_CODE
+        );
         if (request.getStatus() != null) {
 
             if (request.getStatus().equals("Rectification")) {
@@ -468,9 +503,10 @@ public class TerminationService {
                     notificationClient.sendTerminationRevisionRequestNotification(
                             app.getApplicantEmail(),
                             app.getApplicantName(),
-                            app.getApplicationNumber(),
+                            app.getTerminationId(),
                             app.getCurrentStatus(),
-                            app.getRemarksCMSHead());
+                            app.getRemarksCMSHead()
+                    );
                 }
 
                 assert master != null;
@@ -529,7 +565,7 @@ public class TerminationService {
         );
         Page<TerminationApplicationEntity> applications;
         List<Long> role_id = terminationApplicationRepository.findUserDetails(userId);
-        if(role_id !=null && role_id.contains(35)){
+        if(role_id !=null && role_id.contains(35L)){
 
             if (search == null || search.isBlank()) {
                 applications = terminationApplicationRepository.findArchivedAssignedToUserCMSHead(
@@ -610,7 +646,7 @@ public class TerminationService {
     }
 
     public TerminationApplicationResponse getApplicationByNumber(String applicationNo) {
-        TerminationApplicationEntity application = terminationApplicationRepository.findByApplicationNumber(applicationNo)
+        TerminationApplicationEntity application = terminationApplicationRepository.findByTerminationId(applicationNo)
                 .orElseThrow(() -> new ResourceNotFoundException("Application not found: " + applicationNo));
 
         return terminationMapper.toResponse(application);

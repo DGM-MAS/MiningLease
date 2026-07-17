@@ -216,4 +216,6 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     GROUP BY ub.role_id
     """, nativeQuery = true)
     List<Long> findUserDetails(Long miFocalId);
+
+    Optional<TerminationApplicationEntity> findByTerminationId(String applicationNo);
 }
