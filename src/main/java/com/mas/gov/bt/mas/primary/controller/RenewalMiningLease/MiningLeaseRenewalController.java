@@ -252,6 +252,6 @@ public class MiningLeaseRenewalController {
     @Operation(summary = "ERB regularization payment callback", description = "Internal callback from payment service — confirms ERB regularization payment and advances the application")
     public ResponseEntity<SuccessResponse<Void>> erbPaymentCallback(@RequestBody PaymentCallbackDTO dto) {
         miningLeaseRenewalService.onErbPaymentConfirmed(dto.getApplicationNo());
-        return SuccessResponse.buildSuccessResponse("ERB regularization payment confirmed.");
+        return SuccessResponse.buildSuccessResponse("Your ERB regularization payment for application " + dto.getApplicationNo() + " has been confirmed.");
     }
 }

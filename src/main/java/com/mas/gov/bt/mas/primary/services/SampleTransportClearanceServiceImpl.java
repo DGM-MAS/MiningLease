@@ -259,7 +259,7 @@ public class SampleTransportClearanceServiceImpl
                 String title = "Application has been status has been updated.";
                 String message = "Application number " + sampleTransportClearanceEntity.getApplicationNo() + "GHD focal has been assigned.";
                 String serviceId = "78";
-                notificationClient.sendUserNotification(title, message, sampleTransportClearanceEntity.getCreatedBy(), serviceId, "CITIZEN");
+                notificationClient.sendUserNotification(title, message, sampleTransportClearanceEntity.getCreatedBy(), serviceId, "CITIZEN", false);
             }
             if (assignedGHDFocal != null) {
 
@@ -272,7 +272,7 @@ public class SampleTransportClearanceServiceImpl
                 String title = "A new geo physics application has been assigned.";
                 String message = "A new geo physics application has been assigned.";
                 String serviceId = "78";
-                notificationClient.sendUserNotification(title, message, assignedGHDFocal.getUserId(), serviceId, "STAFF");
+                notificationClient.sendUserNotification(title, message, assignedGHDFocal.getUserId(), serviceId, "STAFF", true);
             }
         }
 
@@ -314,9 +314,9 @@ public class SampleTransportClearanceServiceImpl
                         );
 
                         String title = "Your sample transport clearance application has been rejected by GSD Chief.";
-                        String message = "Your sample transport clearance application has been rejected by GSD Chief. Application No : " + sampleTransportClearanceEntity.getApplicationNo();
+                        String message = "Your application " + sampleTransportClearanceEntity.getApplicationNo() + " for Sample Transport Clearance has been rejected by GSD Chief.";
                         String serviceId = "78";
-                        notificationClient.sendUserNotification(title, message, applicantDetails.getUserId(), serviceId, "CITIZEN");
+                        notificationClient.sendUserNotification(title, message, applicantDetails.getUserId(), serviceId, "CITIZEN", false);
 
                     } else {
                         throw new BusinessException("Applicant details not found for notification");
@@ -401,7 +401,7 @@ public class SampleTransportClearanceServiceImpl
             String title = "An new application has been reassigned.";
             String message = "An application for sample transport clearance has been assigned for review. Application No. "+request.getApplicationNumber()+" Please login in review the application";
             String serviceId = "78";
-            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF");
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true);
         }else {
             throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
@@ -478,9 +478,9 @@ public class SampleTransportClearanceServiceImpl
                         );
 
                         String title = "Your sample transport clearance application has been rejected by GSD focal.";
-                        String message = " Your sample transport clearance application has been rejected by GSD focal. Application No : " + sampleTransportClearanceEntity.getApplicationNo();
+                        String message = " Your application " + sampleTransportClearanceEntity.getApplicationNo() + " for Sample Transport Clearance has been rejected by GSD focal.";
                         String serviceId = "78";
-                        notificationClient.sendUserNotification(title, message, applicantDetails.getUserId(), serviceId, "CITIZEN");
+                        notificationClient.sendUserNotification(title, message, applicantDetails.getUserId(), serviceId, "CITIZEN", false);
 
                     } else {
                         throw new BusinessException("Applicant details not found for notification");
@@ -521,7 +521,7 @@ public class SampleTransportClearanceServiceImpl
                         String title = "Sample Transport clearance Application has been accepted. Application No. "+ sampleTransportClearanceEntity.getApplicationNo();
                         String message = "GSD Focal has accepted this application. Please review and approve the application to end the process.";
                         String serviceId = "78";
-                        notificationClient.sendUserNotification(title, message, assignedChiefDetails.getUserId(), serviceId, "STAFF");
+                        notificationClient.sendUserNotification(title, message, assignedChiefDetails.getUserId(), serviceId, "STAFF", true);
                     } else {
                         throw new BusinessException("Applicant details not found for notification");
                     }
@@ -614,7 +614,7 @@ public class SampleTransportClearanceServiceImpl
         String message = "An application for sample transport clearance has been assigned for review. Application No. "
                 + request.getApplicationNumber() + " Please login to review the application";
         String serviceId = "78";
-        notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF");
+        notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true);
 
         log.info("Task reassigned by focal to user {}", request.getNewAssigneeUserId());
     }

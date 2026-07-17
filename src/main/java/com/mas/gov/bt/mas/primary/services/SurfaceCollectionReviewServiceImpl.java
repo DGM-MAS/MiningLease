@@ -157,7 +157,7 @@ public class SurfaceCollectionReviewServiceImpl
             String title = "Bank guarantor details has been reviewed.";
             String message = "Bank guarantor details has been reviewed for surface collection auction. Application No. "+ surfaceCollectionAuctionApplication1.getApplicationNo();
             String serviceId = "71";
-            notificationClient.sendUserNotification(title, message, userPromoterDetails.getUserId(), serviceId, "STAFF");
+            notificationClient.sendUserNotification(title, message, userPromoterDetails.getUserId(), serviceId, "STAFF", true);
         }else {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Promoter Email Address not found.");
         }

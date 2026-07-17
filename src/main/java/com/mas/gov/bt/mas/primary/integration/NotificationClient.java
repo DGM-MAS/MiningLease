@@ -227,7 +227,7 @@ public class NotificationClient {
                                                       String applicationNumber) {
         String subject = "Mining Lease Application Submitted - " + applicationNumber;
         String body = String.format("""
-                Your Mining lease application has been submitted successfully.
+                Your application %1$s for Mining Lease has been submitted.
 
                 Application Number: %s
 
@@ -261,7 +261,7 @@ public class NotificationClient {
                                                      String applicationNumber) {
         String subject = "Manual Entry Application Submitted - " + applicationNumber;
         String body = String.format("""
-                Your Manual entry application has been submitted successfully.
+                Your application %1$s for Manual Entry has been submitted.
 
                 Application Number: %s
 
@@ -331,7 +331,7 @@ public class NotificationClient {
                                           String applicationNumber) {
         String subject = "Congratulations! Mining Lease Application Approved - " + applicationNumber;
         String body = String.format("""
-                We are pleased to inform you that your mining lease application has been approved.
+                Your application %1$s for Mining Lease has been approved.
 
                 Application Number: %s
 
@@ -371,7 +371,7 @@ public class NotificationClient {
                                          String applicationNumber) {
         String subject = "Congratulations! Manual Entry Application Approved - " + applicationNumber;
         String body = String.format("""
-                We are pleased to inform you that your manual entry application has been approved.
+                Your application %1$s for Manual Entry has been approved.
 
                 Application Number: %s
 
@@ -408,7 +408,7 @@ public class NotificationClient {
                                          String applicationNumber) {
         String subject = "Congratulations! Sample Transport clearance Application Approved - " + applicationNumber;
         String body = String.format("""
-                We are pleased to inform you that your sample transport clearance application has been approved.
+                Your application %1$s for Sample Transport Clearance has been approved.
 
                 Application Number: %s
 
@@ -963,7 +963,7 @@ public class NotificationClient {
                                            String applicationNumber) {
         String subject = "Work Order Issued - Mining Lease Application " + applicationNumber;
         String body = String.format("""
-                A work order has been issued for your mining lease application.
+                A work order has been issued for your mining lease application %1$s.
 
                 Application Number: %s
 
@@ -1118,7 +1118,7 @@ public class NotificationClient {
         }
         String subject = "Termination Notification - " + applicationNumber;
         String body = String.format("""
-                The termination of mining has been approved by CMS Head.
+                The termination of mining application %1$s has been approved by CMS Head.
 
                 Application Number: %s
 
@@ -1182,7 +1182,7 @@ public class NotificationClient {
 
     }
 
-    public void sendUserNotification(String title, String message, Long userId, String serviceId, String recipientType) {
+    public void sendUserNotification(String title, String message, Long userId, String serviceId, String recipientType, boolean actionRequired) {
 
         String url = UriComponentsBuilder
                 .fromHttpUrl(notificationApiUrl + "/user/{userId}")
@@ -1190,6 +1190,7 @@ public class NotificationClient {
                 .queryParam("message", message)
                 .queryParam("serviceId", serviceId)
                 .queryParam("recipientType", recipientType)
+                .queryParam("actionRequired", actionRequired)
                 .buildAndExpand(userId)
                 .toUriString();
 
@@ -1278,7 +1279,7 @@ public class NotificationClient {
     public void sendSurfaceCollectionAuctionMailToMDBGSubmitted(String directorEmail, String directorName, String applicationNumber) {
         String subject = "BG Submitted  - " + applicationNumber;
         String body = String.format("""
-                Bank guarantor details has been submitted for surface collection auction application.
+                Bank guarantor details has been submitted for surface collection auction application %1$s.
 
                 Application Number: %s
 
@@ -1306,7 +1307,7 @@ public class NotificationClient {
     public void sendSurfaceCollectionAuctionMailToPromoterBGResubmit(String directorEmail, String directorName, String applicationNumber) {
         String subject = "BG Resubmit requested  - " + applicationNumber;
         String body = String.format("""
-                Bank guarantor details has been reviewed for surface collection auction application. Please resubmit the bank guarantor details.
+                Bank guarantor details has been reviewed for surface collection auction application %1$s. Please resubmit the bank guarantor details.
 
                 Application Number: %s
 
