@@ -13,7 +13,17 @@ public class BidWinnerResponseDTO {
     private String bidWinnerName;
     private String contactNumber;
     private String emailAddress;
-    private String agencyName;
+
+    private String licenseNumber;
+
+    private String companyRegistrationNumber;
+    private String companyType;
     private String cidNumber;
     private String bidAmount;
+
+    private String dzongkhagId;
+    private String gewogId;
+    private String villageId;
+
+    private String regionId;
 }

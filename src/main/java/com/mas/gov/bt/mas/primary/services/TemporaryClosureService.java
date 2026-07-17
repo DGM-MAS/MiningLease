@@ -348,7 +348,7 @@ public class TemporaryClosureService {
                                 app.getApplicationId());
                     }
 
-                    if(app.getApplicationType().equalsIgnoreCase("MINING LEASE")){
+                    if(app.getApplicationType().equalsIgnoreCase("MINING_LEASE")){
                         Optional<MiningLeaseApplication> miningLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(app.getApplicationId());
                         MiningLeaseApplication miningLeaseApplicationEntity = null;
                         if (miningLeaseApplication.isPresent()) {
@@ -360,7 +360,7 @@ public class TemporaryClosureService {
                         miningLeaseApplicationEntity.setUpdatedBy(userId);
                         miningLeaseApplicationRepository.save(miningLeaseApplicationEntity);
                     }
-                    if(app.getApplicationType().equalsIgnoreCase("QUARRY LEASE")){
+                    if(app.getApplicationType().equalsIgnoreCase("QUARRY_LEASE")){
                         Optional<QuarryLeaseApplication> quarryLeaseApplication = queryLeaseApplicationRepository.findByApplicationNumber(app.getApplicationId());
                         QuarryLeaseApplication quarryLeaseApplicationEntity = null;
                         if (quarryLeaseApplication.isPresent()) {

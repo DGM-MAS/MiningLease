@@ -2,10 +2,7 @@ package com.mas.gov.bt.mas.primary.services;
 
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
 import com.mas.gov.bt.mas.primary.dto.request.*;
-import com.mas.gov.bt.mas.primary.dto.response.BGResponseDTO;
-import com.mas.gov.bt.mas.primary.dto.response.BidWinnerResponseDTO;
-import com.mas.gov.bt.mas.primary.dto.response.SurfaceCollectionAttachmentResponseDTO;
-import com.mas.gov.bt.mas.primary.dto.response.SurfaceCollectionAuctionResponseDTO;
+import com.mas.gov.bt.mas.primary.dto.response.*;
 import com.mas.gov.bt.mas.primary.entity.*;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
@@ -52,16 +49,24 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
 
     private final LookupHelper lookupHelper;
 
+    private final MiningLeaseApplicationRepository miningLeaseApplicationRepository;
+
+    private final HouseholdPermitCapConfigRefRepository capConfigRepository;
+
     private static final String SERVICE_CODE = "SURFACE_COLLECTION_AUCTION";
 
     private static final int DEFAULT_TAT_DAYS = 2;
+
+    private static final int DEFAULT_MAX_APPLICATIONS = 2;
 
     @Override
     @Transactional
     public SurfaceCollectionAuctionResponseDTO createAuction(
             SurfaceCollectionAuctionRequestDTO dto,
             Long userId
-    ) {
+    )
+    {
+
         Long regionId;
 
         DzongkhagLookup dzongkhagLookup =
@@ -171,6 +176,52 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                     "Failed to create auction application."
             );
         }
+    }
+
+    /**
+     * Pre-flight cap check — called when the applicant clicks to open the
+     * application form, before they fill anything in. Also reused by
+     * submitGR as the authoritative server-side guard.
+     */
+    public CapCheckResponse checkCap(Long userId) {
+        String[] grouping = resolveGroupingKey(userId);
+        int maxAllowed = getMaxAllowedForService(SERVICE_CODE, grouping[2]);
+        Integer total = auctionRepository.countMiningLeasesForGrouping(grouping[0], grouping[1]);
+        int current = total != null ? total : 0;
+        boolean allowed = current < maxAllowed;
+        String message = allowed ? null
+                : "Only " + maxAllowed + " Surface collection auction application(s) are permitted per " +
+                  ("CID".equals(grouping[0]) ? "applicant" : "household/entity") + ".";
+        return new CapCheckResponse(allowed, current, maxAllowed, message);
+    }
+
+    private int getMaxAllowedForService(String serviceType, String registrationType) {
+        String rt = isNotBlank(registrationType) ? registrationType : "INDIVIDUAL";
+        return capConfigRepository.findByServiceTypeAndRegistrationType(serviceType, rt)
+                .map(c -> c.getMaxAllowed() != null ? c.getMaxAllowed() : DEFAULT_MAX_APPLICATIONS)
+                .orElse(DEFAULT_MAX_APPLICATIONS);
+    }
+
+    private String[] resolveGroupingKey(Long userId) {
+        return miningLeaseApplicationRepository.findGroupingInfoByUserId(userId)
+                .map(info -> {
+                    String rt = info.getRegistrationType();
+                    if ("INDIVIDUAL".equals(rt) && isNotBlank(info.getHouseholdNumber())) {
+                        return new String[]{"INDIVIDUAL", info.getHouseholdNumber(), rt};
+                    }
+                    if ("BUSINESS_LICENSE".equals(rt) && isNotBlank(info.getLicenseNo())) {
+                        return new String[]{"BUSINESS_LICENSE", info.getLicenseNo(), rt};
+                    }
+                    if ("REGISTERED_COMPANY".equals(rt) && isNotBlank(info.getCompanyRegistrationNumber())) {
+                        return new String[]{"REGISTERED_COMPANY", info.getCompanyRegistrationNumber(), rt};
+                    }
+                    return new String[]{"CID", info.getCid(), rt};
+                })
+                .orElse(new String[]{"CID", null, "INDIVIDUAL"});
+    }
+
+    private boolean isNotBlank(String value) {
+        return value != null && !value.isBlank();
     }
 
     private void createTask(ApplicationMaster master, SurfaceCollectionAuctionApplication application, String role, Long userId, Long directorId) {
@@ -297,14 +348,42 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
 
         SurfaceCollectionAuctionApplication entity = getAuction(auctionId);
 
+        Long regionId;
+
+        DzongkhagLookup dzongkhagLookup =
+                lookupHelper.fetchLookup(dto.getDzongkhagId(), dzongkhagLookupRepository, "Dzongkhag");
+
+        regionId = dzongkhagLookup.getRegion().getId();
+
+        GewogLookup gewogLookup =
+                lookupHelper.fetchLookup(dto.getGewogId(), gewogLookupRepository, "Gewog");
+
+        VillageLookup villageLookup =
+                lookupHelper.fetchLookup(dto.getVillageId(), villageLookupRepository, "Village");
+
+        RegionMaster regionMaster =
+                lookupHelper.fetchLookup(dzongkhagLookup.getRegion().getId(), regionMasterRepository, "RegionMaster");
+        //         ============================================================
+        //         0. Checking the applicant hasn't exceeded the configured cap
+        //         ============================================================
+//        CapCheckResponse cap = checkCap(userId);
+//        if (!cap.isAllowed()) {
+//            throw new BusinessException(ErrorCodes.DATA_INTEGRITY_VIOLATION, cap.getMessage());
+//        }
 
         SurfaceCollectionBidWinner winner =
                 SurfaceCollectionBidWinner.builder()
                         .bidWinnerName(dto.getBidWinnerName())
                         .contactNumber(dto.getContactNumber())
                         .emailAddress(dto.getEmailAddress())
+                        .licenseNumber(dto.getLicenseNumber())
+                        .companyType(dto.getCompanyType())
+                        .companyRegistrationNumber(dto.getCompanyRegistrationNumber())
+                        .dzongkhagId(dzongkhagLookup)
+                        .gewogId(gewogLookup)
+                        .villageId(villageLookup)
+                        .regionId(regionMaster)
                         .promoterId(dto.getPromoterId())
-                        .agencyName(dto.getAgencyName())
                         .cidNumber(dto.getCidNumber())
                         .bidAmount(dto.getBidAmount())
                         .auctionApplication(entity)
@@ -410,6 +489,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
     ) {
         return SurfaceCollectionAuctionResponseDTO.builder()
                 .id(entity.getId())
+                .siteName(entity.getSiteName())
                 .applicationNo(entity.getApplicationNo())
                 .location(entity.getLocation())
                 .area(entity.getArea())
@@ -436,10 +516,16 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
         return BidWinnerResponseDTO.builder()
                 .id(bidWinner.getId())
                 .bidWinnerName(bidWinner.getBidWinnerName())
-                .agencyName(bidWinner.getAgencyName())
                 .emailAddress(bidWinner.getEmailAddress())
                 .contactNumber(bidWinner.getContactNumber())
                 .cidNumber(bidWinner.getCidNumber())
+                .licenseNumber(bidWinner.getLicenseNumber())
+                .companyType(bidWinner.getCompanyType())
+                .companyRegistrationNumber(bidWinner.getCompanyRegistrationNumber())
+                .dzongkhagId(bidWinner.getDzongkhagId().getDzongkhagName())
+                .gewogId(bidWinner.getGewogId().getGewogName())
+                .villageId(bidWinner.getVillageId().getVillageName())
+                .regionId(bidWinner.getRegionId().getRegionName())
                 .bidAmount(bidWinner.getBidAmount())
                 .build();
     }
@@ -488,7 +574,11 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
 
         if (search == null || search.isBlank()) {
 
-            page = auctionRepository.findByCreatedByAndAuctionStatusIn(userId,archivedStatuses,pageable);
+            page = auctionRepository.findByCreatedByAndAuctionStatusIn(
+                    userId,
+                    archivedStatuses,
+                    pageable
+            );
 
         } else {
 
@@ -567,6 +657,9 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                 .location(entity.getLocation())
                 .area(entity.getArea())
                 .material(entity.getMaterial())
+                .dzongkhagName(entity.getDzongkhagId().getDzongkhagName())
+                .gewogName(entity.getGewogId().getGewogName())
+                .villageName(entity.getVillageId().getVillageName())
                 .ecStatus(entity.getEcStatus())
                 .fcStatus(entity.getFcStatus())
                 .auctionStatus(entity.getAuctionStatus())
