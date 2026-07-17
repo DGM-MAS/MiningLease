@@ -28,7 +28,7 @@ public class TemporaryClosureEntity {
     private String applicationType;
 
     // Reference to master application
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "application_master_id")
     private ApplicationMaster applicationMaster;
 

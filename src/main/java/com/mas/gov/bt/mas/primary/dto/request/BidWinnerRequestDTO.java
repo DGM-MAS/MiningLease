@@ -9,11 +9,25 @@ import lombok.*;
 public class BidWinnerRequestDTO {
 
     private String siteName;
+
     private String bidWinnerName;
+
     private String contactNumber;
     private String emailAddress;
-    private String agencyName;
+
     private String cidNumber;
+
+    private String licenseNumber;
+
+    private String companyRegistrationNumber;
+    private String companyType;
+
     private Long promoterId;
     private String bidAmount;
+
+    private String dzongkhagId;
+    private String gewogId;
+    private String villageId;
+
+
 }

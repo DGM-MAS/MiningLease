@@ -19,6 +19,12 @@ public class SurfaceCollectionAuctionListResponseDTO {
 
     private String applicationNo;
 
+    // Location details
+    private String dzongkhagName;
+    private String gewogName;
+    private String villageName;
+    private String regionName;
+
     private String location;
 
     private BigDecimal area;

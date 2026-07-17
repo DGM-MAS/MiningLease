@@ -25,11 +25,34 @@ public class SurfaceCollectionBidWinner {
     @Column(name = "email_address")
     private String emailAddress;
 
-    @Column(name = "agency_name")
-    private String agencyName;
+    @Column(name = "license_number")
+    private String licenseNumber;
+
+    @Column(name = "company_registration_number")
+    private String companyRegistrationNumber;
+
+    @Column(name = "company_type")
+    private String companyType;
 
     @Column(name = "cid_number")
     private String cidNumber;
+
+    // Dzongkhag, gewog and village details have been saved
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "dzongkhag_id")
+    private DzongkhagLookup dzongkhagId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "gewog_id")
+    private GewogLookup gewogId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "village_id")
+    private VillageLookup villageId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "region_id")
+    private RegionMaster regionId;
 
 
     /**
