@@ -24,7 +24,7 @@ public class AppConfig {
         // Masters guards its service-to-service notification endpoints with this
         // key (InternalApiKeyFilter); scoped by path so it never leaks to BIRMS/DataHub
         restTemplate.getInterceptors().add((request, body, execution) -> {
-            if (request.getURI().getPath().startsWith("/api/notifications")) {
+            if (request.getURI().getPath().contains("/api/notifications")) {
                 request.getHeaders().set("X-Internal-Key", internalApiKey);
             }
             return execution.execute(request, body);

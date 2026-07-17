@@ -56,15 +56,19 @@ public class TemporaryClosureService {
         QuarryLeaseApplication quarryLeaseApplication1 = null;
 
         String applicationType = null;
+        String siteName = null;
 
 
         if (miningLeaseApplication.isPresent()) {
             miningLeaseApplication1 = miningLeaseApplication.get();
-            applicationType = "MINING LEASE";
+            applicationType = "MINING_LEASE";
+            siteName = miningLeaseApplication1.getNameOfMine();
+
         }
         if (quarryLeaseApplication.isPresent()) {
             quarryLeaseApplication1 = quarryLeaseApplication.get();
-            applicationType = "QUARRY LEASE";
+            applicationType = "QUARRY_LEASE";
+            siteName = quarryLeaseApplication1.getNameOfQuarry();
         }
         if (miningLeaseApplication1 == null && quarryLeaseApplication1 == null){
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Application Detail not found for the given Id.");
@@ -75,15 +79,18 @@ public class TemporaryClosureService {
         temporaryClosureEntity.setCurrentStatus("SUBMITTED");
         temporaryClosureEntity.setApplicantUserId(userId);
         temporaryClosureEntity.setApplicationType(applicationType);
+        temporaryClosureEntity.setNameOfSite(siteName);
 
-        if(applicationType.equalsIgnoreCase("MINING LEASE")){
+        assert miningLeaseApplication1 != null;
+
+        if(applicationType.equalsIgnoreCase("MINING_LEASE")){
             temporaryClosureEntity.setApplicantName(miningLeaseApplication1.getApplicantName());
             temporaryClosureEntity.setApplicantCid(miningLeaseApplication1.getApplicantCid());
             temporaryClosureEntity.setApplicantContact(miningLeaseApplication1.getApplicantContact());
             temporaryClosureEntity.setApplicationId(miningLeaseApplication1.getApplicationNumber());
 
         }
-        if(applicationType.equalsIgnoreCase("QUARRY LEASE")){
+        if(applicationType.equalsIgnoreCase("QUARRY_LEASE")){
             temporaryClosureEntity.setApplicantName(quarryLeaseApplication1.getApplicantName());
             temporaryClosureEntity.setApplicantCid(quarryLeaseApplication1.getApplicantCid());
             temporaryClosureEntity.setApplicantContact(quarryLeaseApplication1.getApplicantContact());
@@ -127,7 +134,9 @@ public class TemporaryClosureService {
                 : quarryLeaseApplication1.getApplicationMaster();
         master.setCurrentStatus("SUBMITTED");
         applicationMasterRepository.save(master);
+
         temporaryClosureEntity.setApplicationMaster(master);
+
         createTask(master,temporaryClosureEntity,"RC", userId, assignedRC.getUserId());
 
         if (assignedRC.getEmail() != null) {
@@ -155,9 +164,6 @@ public class TemporaryClosureService {
         UserWorkloadProjection rc =
                 temporaryClosureRepository.findRCTemporaryClosure(regionId);
 
-        if (rc == null && regionId == 9L) {
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "RC with the required permission, role and region not found.");
-        }
         return rc;
     }
 
@@ -338,7 +344,7 @@ public class TemporaryClosureService {
                                 app.getApplicationId());
                     }
 
-                    if(app.getApplicationType().equalsIgnoreCase("MINING LEASE")){
+                    if(app.getApplicationType().equalsIgnoreCase("MINING_LEASE")){
                         Optional<MiningLeaseApplication> miningLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(app.getApplicationId());
                         MiningLeaseApplication miningLeaseApplicationEntity = null;
                         if (miningLeaseApplication.isPresent()) {
@@ -350,7 +356,7 @@ public class TemporaryClosureService {
                         miningLeaseApplicationEntity.setUpdatedBy(userId);
                         miningLeaseApplicationRepository.save(miningLeaseApplicationEntity);
                     }
-                    if(app.getApplicationType().equalsIgnoreCase("QUARRY LEASE")){
+                    if(app.getApplicationType().equalsIgnoreCase("QUARRY_LEASE")){
                         Optional<QuarryLeaseApplication> quarryLeaseApplication = queryLeaseApplicationRepository.findByApplicationNumber(app.getApplicationId());
                         QuarryLeaseApplication quarryLeaseApplicationEntity = null;
                         if (quarryLeaseApplication.isPresent()) {
@@ -644,6 +650,7 @@ public class TemporaryClosureService {
 
             applications = temporaryClosureRepository.findArchivedAssignedToUserAndSearch(
                     userId,
+                    archivedStatuses,
                     search.trim(),
                     pageable
             );

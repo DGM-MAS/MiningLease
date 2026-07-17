@@ -21,11 +21,14 @@ public class TemporaryClosureEntity {
     @Column(name = "application_id", nullable = false, length = 30)
     private String applicationId;
 
+    @Column(name = "name_of_site")
+    private String nameOfSite;
+
     @Column(name = "application_type")
     private String applicationType;
 
     // Reference to master application
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "application_master_id")
     private ApplicationMaster applicationMaster;
 

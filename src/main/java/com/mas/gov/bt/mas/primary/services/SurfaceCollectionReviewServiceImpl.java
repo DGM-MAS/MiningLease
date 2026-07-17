@@ -44,6 +44,10 @@ public class SurfaceCollectionReviewServiceImpl
     private final TaskManagementRepository taskManagementRepository;
     private final NotificationClient notificationClient;
 
+    private final SiteProvisioningService siteProvisioningService;
+
+    private final HouseholdPermitThresholdEntryRepository thresholdEntryRepository;
+
     private static final String SERVICE_CODE = "SURFACE_COLLECTION_AUCTION";
 
     private static final int DEFAULT_TAT_DAYS = 2;
@@ -193,6 +197,8 @@ public class SurfaceCollectionReviewServiceImpl
 
         SurfaceCollectionAuctionApplication entity = getAuction(reviewId);
 
+        ApplicationMaster master = entity.getApplicationMaster();
+
         entity.setApprovedDate(LocalDate.now());
         entity.setPermitGenerated(true);
         entity.setAuctionStatus("APPROVED");
@@ -230,6 +236,12 @@ public class SurfaceCollectionReviewServiceImpl
 
         repository.save(surfaceCollectionPermitEntity);
 
+        SiteMaster provisionedSite = siteProvisioningService.provisionSiteForApprovedLeaseSurfaceAuction(entity);
+        master.setSiteId(provisionedSite.getId());
+
+        applicationMasterRepository.save(master);
+
+//        recordApprovedForThreshold(entity);
 
         return mapToResponse(entity);
     }
@@ -376,10 +388,30 @@ public class SurfaceCollectionReviewServiceImpl
         return BidWinnerResponseDTO.builder()
                 .id(bidWinner.getId())
                 .bidWinnerName(bidWinner.getBidWinnerName())
-                .agencyName(bidWinner.getAgencyName())
                 .emailAddress(bidWinner.getEmailAddress())
                 .contactNumber(bidWinner.getContactNumber())
+                .licenseNumber(bidWinner.getLicenseNumber())
+                .companyType(bidWinner.getCompanyType())
+                .companyRegistrationNumber(bidWinner.getCompanyRegistrationNumber())
+                .dzongkhagId(bidWinner.getDzongkhagId().getDzongkhagName())
+                .gewogId(bidWinner.getGewogId().getGewogName())
+                .villageId(bidWinner.getVillageId().getVillageName())
+                .regionId(bidWinner.getRegionId().getRegionName())
                 .cidNumber(bidWinner.getCidNumber())
                 .build();
     }
+
+    /** Records an ACTIVE entry in the shared threshold table when a lease is finally approved. */
+//    private void recordApprovedForThreshold(SurfaceCollectionAuctionApplication app) {
+//        if (app. == null || app.getApplicantCid().isBlank()) return;
+//        if (thresholdEntryRepository.existsByServiceTypeAndApplicationNo(SERVICE_CODE, app.getApplicationNumber())) {
+//            return;
+//        }
+//        HouseholdPermitThresholdEntry entry = new HouseholdPermitThresholdEntry();
+//        entry.setApplicantCid(app.getApplicantCid());
+//        entry.setServiceType(SERVICE_CODE);
+//        entry.setApplicationNo(app.getApplicationNumber());
+//        entry.setStatus("ACTIVE");
+//        thresholdEntryRepository.save(entry);
+//    }
 }
