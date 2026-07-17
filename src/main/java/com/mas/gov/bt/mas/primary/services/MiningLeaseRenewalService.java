@@ -345,7 +345,7 @@ public class MiningLeaseRenewalService {
                 String title = "A new mining application has been assigned.";
                 String message = "A new mining application has been assigned.";
                 String serviceId = "85";
-                notificationClient.sendUserNotification(title, message, userGeologist.getUserId(), serviceId, "STAFF");
+                notificationClient.sendUserNotification(title, message, userGeologist.getUserId(), serviceId, "STAFF", true);
             }
         }
 
@@ -379,7 +379,7 @@ public class MiningLeaseRenewalService {
                 String title = "A new mining application has been assigned.";
                 String message = "A new mining application has been assigned.";
                 String serviceId = "85";
-                notificationClient.sendUserNotification(title, message, userMineEngineer.getUserId(), serviceId, "STAFF");
+                notificationClient.sendUserNotification(title, message, userMineEngineer.getUserId(), serviceId, "STAFF", true);
             }
         }
         return mapper.toRenewalResponse(miningLeaseRenewalApplication);
@@ -536,7 +536,7 @@ public class MiningLeaseRenewalService {
                             notificationClient.sendUserNotification(
                                     "Director has given final approval.",
                                     "Please upload the work order for application " + app.getApplicationNumber() + ".",
-                                    me.getUserId(), "85", "STAFF");
+                                    me.getUserId(), "85", "STAFF", true);
                         }
 
                         if (app.getApplicantEmail() != null) {
@@ -654,7 +654,7 @@ public class MiningLeaseRenewalService {
                 notificationClient.sendUserNotification(
                         "ERB regularization payment confirmed.",
                         "Please upload the work order for application " + app.getApplicationNumber() + ".",
-                        me.getUserId(), "85", "STAFF");
+                        me.getUserId(), "85", "STAFF", true);
             }
         }
 
@@ -718,7 +718,7 @@ public class MiningLeaseRenewalService {
                                 app.getApplicantName(),
                                 app.getApplicationNumber(),
                                 "FMFS Required",
-                                "Your renewal application has been approved. Please submit the updated FMFS to proceed.");
+                                "Your application " + app.getApplicationNumber() + " for Mining Lease Renewal has been approved. Please submit the updated FMFS to proceed.");
                     }
                 }
                 case "ACCEPTED APP" -> {
@@ -746,13 +746,13 @@ public class MiningLeaseRenewalService {
                                 app.getApplicantName(),
                                 app.getApplicationNumber(),
                                 "Geologist Review",
-                                "Your application has been forwarded to the Geologist for review.");
+                                "Your application " + app.getApplicationNumber() + " has been forwarded to the Geologist for review.");
                     }
 
                     String title = "Application status updated.";
-                    String message = "Your application has been forwarded to geologist to review.";
+                    String message = "Your application " + app.getApplicationNumber() + " has been forwarded to geologist to review.";
                     String serviceId = "85";
-                    notificationClient.sendUserNotification(title, message, app.getCreatedBy(), serviceId, "CITIZEN");
+                    notificationClient.sendUserNotification(title, message, app.getCreatedBy(), serviceId, "CITIZEN", false);
                 }
                 case "Forwarded FMFS" -> {
                     app.setCurrentStatus("MINING_CHIEF_REVIEW");
@@ -781,7 +781,7 @@ public class MiningLeaseRenewalService {
                                 app.getApplicantName(),
                                 app.getApplicationNumber(),
                                 "Mining Chief Review",
-                                "Your application has been forwarded to the Mining Chief for review.");
+                                "Your application " + app.getApplicationNumber() + " has been forwarded to the Mining Chief for review.");
                     }
 
                     if (assignedMiningChief.getEmail() != null) {
@@ -795,7 +795,7 @@ public class MiningLeaseRenewalService {
                             String title = "An new application has been assigned.";
                             String message = "An application for mining lease has been assigned for review. Application No. "+ app.getApplicationNumber() +" Please login in review the application";
                             String serviceId = "78";
-                            notificationClient.sendUserNotification(title, message, assignedMiningChief.getUserId(), serviceId, "STAFF");
+                            notificationClient.sendUserNotification(title, message, assignedMiningChief.getUserId(), serviceId, "STAFF", true);
                         }else {
                             throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
                         }
@@ -998,13 +998,13 @@ public class MiningLeaseRenewalService {
                                 miningLeaseRenewalApplication.getApplicantName(),
                                 miningLeaseRenewalApplication.getApplicationNumber(),
                                 "Mining Engineer Review",
-                                "Your application has been forwarded to the Mining Engineer for review.");
+                                "Your application " + miningLeaseRenewalApplication.getApplicationNumber() + " has been forwarded to the Mining Engineer for review.");
                     }
 
                     String title = "Application status updated.";
-                    String message = "Your application has been forwarded to geologist to review.";
+                    String message = "Your application " + miningLeaseRenewalApplication.getApplicationNumber() + " has been forwarded to geologist to review.";
                     String serviceId = "78";
-                    notificationClient.sendUserNotification(title, message, miningLeaseRenewalApplication.getCreatedBy(), serviceId, "CITIZEN");
+                    notificationClient.sendUserNotification(title, message, miningLeaseRenewalApplication.getCreatedBy(), serviceId, "CITIZEN", false);
                 }
                 case "ACCEPTED GR" -> {
                     miningLeaseRenewalApplication.setCurrentStatus("APPROVED GR");
@@ -1025,14 +1025,14 @@ public class MiningLeaseRenewalService {
                                 miningLeaseRenewalApplication.getApplicantName(),
                                 miningLeaseRenewalApplication.getApplicationNumber(),
                                 "GR APPROVED",
-                                "Geological Report has been accepted. Please upload mining lease application and PFS to proceed further.");
+                                "Geological Report for application " + miningLeaseRenewalApplication.getApplicationNumber() + " has been accepted. Please upload mining lease application and PFS to proceed further.");
                     }
 
                     if(miningLeaseRenewalApplication.getCreatedBy() != null) {
-                        String title = "Geological report has been approved successfully.";
-                        String message = "Geological Report has been accepted. Please upload mining lease application and PFS to proceed further.";
+                        String title = "Geological report has been approved.";
+                        String message = "Geological Report for application " + miningLeaseRenewalApplication.getApplicationNumber() + " has been accepted. Please upload mining lease application and PFS to proceed further.";
                         String serviceId = "78";
-                        notificationClient.sendUserNotification(title, message, miningLeaseRenewalApplication.getCreatedBy(), serviceId, "CITIZEN");
+                        notificationClient.sendUserNotification(title, message, miningLeaseRenewalApplication.getCreatedBy(), serviceId, "CITIZEN", true);
                     }else {
                         throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
                     }
@@ -1056,7 +1056,7 @@ public class MiningLeaseRenewalService {
                                 miningLeaseRenewalApplication.getApplicantName(),
                                 miningLeaseRenewalApplication.getApplicationNumber(),
                                 "Mining Engineer Review",
-                                "Your application has been forwarded to the Mining Engineer for review.");
+                                "Your application " + miningLeaseRenewalApplication.getApplicationNumber() + " has been forwarded to the Mining Engineer for review.");
                     }
                 }
                 case "Rejected" -> {
@@ -1193,7 +1193,7 @@ public class MiningLeaseRenewalService {
                                 miningLeaseRenewalApplication.getApplicantName(),
                                 miningLeaseRenewalApplication.getApplicationNumber(),
                                 "Mining Engineer Review",
-                                "Your application has been forwarded to the Mining Engineer for review.");
+                                "Your application " + miningLeaseRenewalApplication.getApplicationNumber() + " has been forwarded to the Mining Engineer for review.");
                     }
 
                     if (meId != null) {
@@ -1232,7 +1232,7 @@ public class MiningLeaseRenewalService {
                     String title = "LLC has been uploaded by mine engineer.";
                     String message = "LLC for you application has been uploaded by mine engineer.";
                     String serviceId = "85";
-                    notificationClient.sendUserNotification(title, message, miningLeaseRenewalApplication.getCreatedBy(), serviceId, "CITIZEN");
+                    notificationClient.sendUserNotification(title, message, miningLeaseRenewalApplication.getCreatedBy(), serviceId, "CITIZEN", false);
                 }
 
             }else {
@@ -1270,14 +1270,14 @@ public class MiningLeaseRenewalService {
                                 miningLeaseRenewalApplication.getApplicantCid(),
                                 miningLeaseRenewalApplication.getApplicationNumber(),
                                 "FMFS SUBMITTED",
-                                "FMFS has been submitted by the client.");
+                                "FMFS for application " + miningLeaseRenewalApplication.getApplicationNumber() + " has been submitted by the client.");
                     }
 
                     if (userWorkloadProjection.getUserId() != null) {
                         String title = "Mining lease application has been assigned for FMFS review.";
                         String message = "Mining lease application has been  assigned for FMFS review.";
                         String serviceId = "85";
-                        notificationClient.sendUserNotification(title, message, userWorkloadProjection.getUserId(), serviceId, "STAFF");
+                        notificationClient.sendUserNotification(title, message, userWorkloadProjection.getUserId(), serviceId, "STAFF", true);
                     }
                 }
 
@@ -1383,7 +1383,7 @@ public class MiningLeaseRenewalService {
                             notificationClient.sendUserNotification(
                                     "Application returned for review.",
                                     "The Mining Chief has returned application " + app.getApplicationNumber() + " for additional review.",
-                                    me.getUserId(), "85", "STAFF");
+                                    me.getUserId(), "85", "STAFF", true);
                         }
                     }
                 }
@@ -1457,9 +1457,9 @@ public class MiningLeaseRenewalService {
 
                 if(miningLeaseRenewalApplication.getCreatedBy() != null) {
                     String title = "Work order has been uploaded by mine engineer.";
-                    String message = "Work order for your application has been uploaded by mine engineer. Your application for mining lease renewal has been approved.";
+                    String message = "Work order for your application has been uploaded by mine engineer. Your application " + miningLeaseRenewalApplication.getApplicationNumber() + " for Mining Lease Renewal has been approved.";
                     String serviceId = "78";
-                    notificationClient.sendUserNotification(title, message, miningLeaseRenewalApplication.getCreatedBy(), serviceId, "CITIZEN");
+                    notificationClient.sendUserNotification(title, message, miningLeaseRenewalApplication.getCreatedBy(), serviceId, "CITIZEN", false);
                 }
 
             }else {
@@ -1503,7 +1503,7 @@ public class MiningLeaseRenewalService {
                     String title = "Mining lease application has been assigned for MLA review.";
                     String message = "Mining lease application has been  assigned for MLA review.";
                     String serviceId = "85";
-                    notificationClient.sendUserNotification(title, message, assignedDirectorDetails.getUserId(), serviceId, "STAFF");
+                    notificationClient.sendUserNotification(title, message, assignedDirectorDetails.getUserId(), serviceId, "STAFF", true);
                 }
 
             }else {
@@ -1574,7 +1574,7 @@ public class MiningLeaseRenewalService {
             notificationClient.sendUserNotification(
                     "Note sheet has been uploaded.",
                     "The note sheet for your application " + app.getApplicationNumber() + " has been uploaded by the Mine Engineer.",
-                    app.getCreatedBy(), "78", "CITIZEN");
+                    app.getCreatedBy(), "78", "CITIZEN", false);
         }
 
         miningLeaseRenewalApplicationRepository.save(app);
@@ -1677,7 +1677,7 @@ public class MiningLeaseRenewalService {
                     notificationClient.sendUserNotification(
                             "Renewal application resubmitted.",
                             "The applicant has resubmitted the renewal application " + app.getApplicationNumber() + " for your review.",
-                            geologist.getUserId(), "85", "STAFF");
+                            geologist.getUserId(), "85", "STAFF", true);
                 }
             }
         } else {
@@ -1700,7 +1700,7 @@ public class MiningLeaseRenewalService {
                     notificationClient.sendUserNotification(
                             "Renewal application resubmitted.",
                             "The applicant has resubmitted the renewal application " + app.getApplicationNumber() + " for your review.",
-                            me.getUserId(), "85", "STAFF");
+                            me.getUserId(), "85", "STAFF", true);
                 }
             }
         }
@@ -1735,7 +1735,7 @@ public class MiningLeaseRenewalService {
                     notificationClient.sendUserNotification(
                             "FMFS resubmitted.",
                             "The applicant has resubmitted the FMFS for application " + app.getApplicationNumber() + ".",
-                            assignedMiningChief.getUserId(), "85", "STAFF");
+                            assignedMiningChief.getUserId(), "85", "STAFF", true);
                 }
             }
         } else {
@@ -1758,7 +1758,7 @@ public class MiningLeaseRenewalService {
                     notificationClient.sendUserNotification(
                             "FMFS resubmitted.",
                             "The applicant has resubmitted the FMFS for application " + app.getApplicationNumber() + ".",
-                            me.getUserId(), "85", "STAFF");
+                            me.getUserId(), "85", "STAFF", true);
                 }
             }
         }
@@ -1795,7 +1795,7 @@ public class MiningLeaseRenewalService {
             notificationClient.sendUserNotification(
                     "Applicant has signed the MLA.",
                     "The applicant has signed the MLA for application " + app.getApplicationNumber() + ". Please proceed with work order issuance.",
-                    meId, "85", "STAFF");
+                    meId, "85", "STAFF", true);
         }
 
         miningLeaseRenewalApplicationRepository.save(app);
@@ -1960,7 +1960,7 @@ public class MiningLeaseRenewalService {
             String title = "An new application has been reassigned.";
             String message = "An application for mining lease renewal has been assigned for review. Application No. "+request.getApplicationNumber()+" Please login in review the application";
             String serviceId = "85";
-            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF");
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true);
         }else {
             throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
@@ -2002,7 +2002,7 @@ public class MiningLeaseRenewalService {
             String title = "An new application has been reassigned.";
             String message = "An application for mining lease renewal has been assigned for review. Application No. "+request.getApplicationNumber()+" Please login in review the application";
             String serviceId = "85";
-            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF");
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true);
         }else {
             throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
@@ -2046,7 +2046,7 @@ public class MiningLeaseRenewalService {
             String title = "An new application has been reassigned.";
             String message = "An application for mining lease renewal has been assigned for review. Application No. "+request.getApplicationNumber()+" Please login in review the application";
             String serviceId = "85";
-            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF");
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true);
         }else {
             throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }

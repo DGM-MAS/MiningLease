@@ -116,7 +116,7 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
             String title = "Bank guarantor details has been submitted Surface Collection Auction.";
             String message = "Bank guarantor details has been submitted for surface collection auction. Application No. "+ surfaceCollectionAuctionApplication1.getApplicationNo();
             String serviceId = "71";
-            notificationClient.sendUserNotification(title, message, userMDDetails.getUserId(), serviceId, "STAFF");
+            notificationClient.sendUserNotification(title, message, userMDDetails.getUserId(), serviceId, "STAFF", true);
         }else {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "User ID not found.");
         }
@@ -204,7 +204,7 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
             String title = "Bank guarantor details has been resubmitted Surface Collection Auction.";
             String message = "Bank guarantor details has been resubmitted for surface collection auction. Application No. "+ surfaceCollectionAuctionApplication1.getApplicationNo();
             String serviceId = "71";
-            notificationClient.sendUserNotification(title, message, userMDDetails.getUserId(), serviceId, "STAFF");
+            notificationClient.sendUserNotification(title, message, userMDDetails.getUserId(), serviceId, "STAFF", true);
         }else {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "MD User ID not found.");
         }
