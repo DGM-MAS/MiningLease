@@ -1,6 +1,5 @@
 package com.mas.gov.bt.mas.primary.services;
 
-import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
 import com.mas.gov.bt.mas.primary.mapper.MiningLeaseMapper;
 import com.mas.gov.bt.mas.primary.repository.*;
 import com.mas.gov.bt.mas.primary.utility.CustomRuntimeException;
@@ -566,7 +565,7 @@ public class TerminationService {
         );
         Page<TerminationApplicationEntity> applications;
         List<Long> role_id = terminationApplicationRepository.findUserDetails(userId);
-        if(role_id !=null && role_id.contains(35)){
+        if(role_id !=null && role_id.contains(35L)){
 
             if (search == null || search.isBlank()) {
                 applications = terminationApplicationRepository.findArchivedAssignedToUserCMSHead(
