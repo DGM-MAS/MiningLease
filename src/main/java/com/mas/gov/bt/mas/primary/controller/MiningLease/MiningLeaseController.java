@@ -305,7 +305,7 @@ public class MiningLeaseController {
     @Operation(summary = "Payment callback", description = "Internal callback from payment service — sets application to SUBMITTED after successful payment")
     public ResponseEntity<SuccessResponse<Void>> paymentCallback(@RequestBody PaymentCallbackDTO dto) {
         miningLeaseService.onPaymentConfirmed(dto.getApplicationNo());
-        return SuccessResponse.buildSuccessResponse("Payment confirmed and application submitted successfully.");
+        return SuccessResponse.buildSuccessResponse("Your payment for application " + dto.getApplicationNo() + " has been confirmed.");
     }
 
     /**
@@ -316,7 +316,7 @@ public class MiningLeaseController {
     @Operation(summary = "BG upfront payment callback", description = "Internal callback from payment service — confirms BG upfront payment and sets application to BG SUBMITTED")
     public ResponseEntity<SuccessResponse<Void>> bgPaymentCallback(@RequestBody PaymentCallbackDTO dto) {
         miningLeaseService.onBgPaymentConfirmed(dto.getApplicationNo());
-        return SuccessResponse.buildSuccessResponse("BG upfront payment confirmed.");
+        return SuccessResponse.buildSuccessResponse("Your bank guarantee payment for application " + dto.getApplicationNo() + " has been confirmed.");
     }
 
     @GetMapping("/approvedMiningApplication")
