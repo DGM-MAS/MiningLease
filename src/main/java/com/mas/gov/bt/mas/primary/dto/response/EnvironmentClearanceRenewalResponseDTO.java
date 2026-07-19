@@ -91,4 +91,7 @@ public class EnvironmentClearanceRenewalResponseDTO {
     private LocalDateTime updatedOn;
 
     private String updatedBy;
+
+    // Not entity-backed — set manually by payEcFee() when a payment redirect is needed
+    private String redirectUrl;
 }

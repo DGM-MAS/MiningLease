@@ -72,4 +72,8 @@ public interface RenewalEnvironmentalClearanceService {
     EnvironmentClearanceRenewalResponseDTO requestResubmissionMI(@Valid RequestResubmissionDTO request, Long userId);
 
     EnvironmentClearanceRenewalResponseDTO requestResubmissionMD(@Valid RequestResubmissionDTO request, Long userId);
+
+    EnvironmentClearanceRenewalResponseDTO payEcFee(Long renewalId, Long userId);
+
+    void onEcPaymentConfirmed(String applicationNo);
 }
