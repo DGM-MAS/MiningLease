@@ -1,6 +1,7 @@
 package com.mas.gov.bt.mas.primary.controller.RenewalEnviromentalClearance;
 
 import com.mas.gov.bt.mas.primary.config.UserContext;
+import com.mas.gov.bt.mas.primary.dto.payment.PaymentCallbackDTO;
 import com.mas.gov.bt.mas.primary.dto.request.EnvironmentClearanceRenewalRequestDTO;
 import com.mas.gov.bt.mas.primary.dto.response.EnvironmentClearanceRenewalResponseDTO;
 import com.mas.gov.bt.mas.primary.services.RenewalEnvironmentalClearanceService;
@@ -252,6 +253,49 @@ public class RenewalEnvironmentalClearanceController {
                         "Archived applications retrieved successfully",
                         applications
                 )
+        );
+    }
+
+    @PostMapping("/{id}/pay-ec-fee")
+    @Operation(
+            summary = "Pay EC renewal fee",
+            description = "Citizen pays the environmental clearance renewal fee through BIRMS, once MPCD has submitted the IOM"
+    )
+    public ResponseEntity<SuccessResponse<EnvironmentClearanceRenewalResponseDTO>> payEcFee(
+            @PathVariable Long id
+    ) {
+
+        Long userId = userContext.getCurrentUserId();
+
+        EnvironmentClearanceRenewalResponseDTO response =
+                renewalEnvironmentalClearanceService.payEcFee(id, userId);
+
+        return ResponseEntity.ok(
+                new SuccessResponse<>(
+                        "EC renewal fee payment initiated",
+                        response
+                )
+        );
+    }
+
+    /**
+     * Called by the masters payment service once the EC renewal fee payment is confirmed as
+     * PAID. No JWT required — internal service call from mas-backend-masters (whitelisted in
+     * SecurityConfig).
+     */
+    @PostMapping("/ec-payment-callback")
+    @Operation(
+            summary = "EC renewal fee payment callback",
+            description = "Internal callback from payment service — confirms EC renewal fee payment and forwards the application to MD"
+    )
+    public ResponseEntity<SuccessResponse<Void>> ecPaymentCallback(
+            @RequestBody PaymentCallbackDTO dto
+    ) {
+
+        renewalEnvironmentalClearanceService.onEcPaymentConfirmed(dto.getApplicationNo());
+
+        return SuccessResponse.buildSuccessResponse(
+                "EC renewal fee payment for application " + dto.getApplicationNo() + " has been confirmed."
         );
     }
 }

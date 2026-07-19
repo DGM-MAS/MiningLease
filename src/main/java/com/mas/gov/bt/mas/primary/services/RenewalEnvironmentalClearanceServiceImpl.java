@@ -1,10 +1,14 @@
 package com.mas.gov.bt.mas.primary.services;
 
+import com.mas.gov.bt.mas.primary.client.MastersPaymentClient;
 import com.mas.gov.bt.mas.primary.entity.*;
 import com.mas.gov.bt.mas.primary.repository.*;
 import com.mas.gov.bt.mas.primary.utility.CustomRuntimeException;
 
+import com.mas.gov.bt.mas.primary.dto.CitizenApplicantProjection;
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
+import com.mas.gov.bt.mas.primary.dto.payment.PaymentInitiationRequest;
+import com.mas.gov.bt.mas.primary.dto.payment.PaymentInitiationResponse;
 import com.mas.gov.bt.mas.primary.dto.request.*;
 import com.mas.gov.bt.mas.primary.dto.response.EnvironmentClearanceRenewalResponseDTO;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
@@ -15,6 +19,7 @@ import com.mas.gov.bt.mas.primary.utility.SuccessResponse;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -40,6 +45,12 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
     // NOT the same thing as SERVICE_CODE above, which is an unrelated t_application_master.service_code value.
     private static final String MENU_ID_MPCD            = "94"; // "MPCD" — RENEWAL_ENV_CLEARANCE
     private static final String MENU_ID_MINING_ENGINEER  = "95"; // "MINING ENGINEER"
+    private static final String MENU_ID_APPLICANT        = "92"; // "Promoter Application List" (citizen-facing /renewalapplicationlist)
+
+    // payment_master lookup keys for the EC renewal fee — matches the existing
+    // (currently disabled, pending a real BIRMS wire code) payment_master row.
+    private static final String PAYMENT_SERVICE_CODE = "SC_RENEWAL_EC";
+    private static final String EC_FEE_TYPE = "EC_FEE";
 
     private final EnvironmentClearanceRenewalMapper environmentClearanceRenewalMapper;
 
@@ -56,6 +67,16 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
     private final QuarryLeaseApplicationRepository queryLeaseApplicationRepository;
 
     private final SurfaceCollectionPermitRepository surfaceCollectionPermitRepository;
+
+    private final PaymentMasterRepository paymentMasterRepository;
+
+    private final MastersPaymentClient mastersPaymentClient;
+
+    @Value("${app.self.base-url}")
+    private String selfBaseUrl;
+
+    @Value("${payment.enabled:true}")
+    private boolean paymentEnabled;
 
     @Override
     public EnvironmentClearanceRenewalResponseDTO saveDraft(
@@ -323,8 +344,6 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             Long userId
     ) {
 
-        Long regionId = 0L;
-
         EnvironmentClearanceRenewal entity =
                 renewalEnvironmentalClearanceRepository
                         .findById(request.getRenewalId())
@@ -333,35 +352,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                                         "Application not found"
                                 ));
 
-        if (entity.getServiceType().equals("MINING LEASE") || entity.getServiceType().equals("QUARRY LEASE")) {
-
-            if (entity.getServiceType().equals("MINING LEASE")) {
-                Optional<MiningLeaseApplication> application =
-                        miningLeaseApplicationRepository.findByApplicationNumber(entity.getSiteApplicationNo());
-
-                if (application.isPresent()) {
-                    regionId = application.get().getRegionId();
-                }
-            }
-
-            if (entity.getServiceType().equals("QUARRY LEASE")) {
-                Optional<QuarryLeaseApplication> application =
-                        queryLeaseApplicationRepository.findByApplicationNumber(entity.getSiteApplicationNo());
-
-                if (application.isPresent()) {
-                    regionId = application.get().getRegionId();
-                }
-            }
-        }else {
-            Optional<SurfaceCollectionPermitEntity> surfaceCollectionPermitEntity =
-                    surfaceCollectionPermitRepository.findByApplicationNo(
-                            entity.getSiteApplicationNo()
-                    );
-
-            if (surfaceCollectionPermitEntity.isPresent()) {
-                regionId = surfaceCollectionPermitEntity.get().getRegionId();
-            }
-        }
+        Long regionId = resolveRegionId(entity);
 
         ApplicationMaster applicationMaster = entity.getApplicationMaster();
 
@@ -388,34 +379,37 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
 
             entity.setIomFileId(request.getIomFileId());
             entity.setIomSubmittedOn(LocalDateTime.now());
-            entity.setStatus("IOM_SUBMITTED_TO_MD");
 
-            UserWorkloadProjection assignedMD = assignMD(regionId);
+            // Only actually route through a payment step if the EC fee is enabled —
+            // otherwise this behaves exactly like "no payment required at all" and
+            // goes straight to MD assignment, matching current/legacy behavior.
+            PaymentMaster ecFeeRow = paymentMasterRepository
+                    .resolveApplicable(PAYMENT_SERVICE_CODE, EC_FEE_TYPE, "PAYMENT_PENDING")
+                    .orElse(null);
+            boolean ecFeeEnabled = ecFeeRow != null && Boolean.TRUE.equals(ecFeeRow.getIsEnabled());
 
-            if (assignedMD == null) {
-                assignedMD = assignMD(9L);
+            if (ecFeeEnabled && paymentEnabled) {
+
+                entity.setStatus("PAYMENT_PENDING");
+
+                applicationMaster.setCurrentStatus(entity.getStatus());
+                applicationMasterRepository.save(applicationMaster);
+
+                EnvironmentClearanceRenewal saved =
+                        renewalEnvironmentalClearanceRepository.save(entity);
+
+                notificationClient.sendUserNotification(
+                        "Renewal environmental clearance fee payment required.",
+                        "Your environmental clearance renewal application " + entity.getApplicationNo()
+                                + " has been reviewed. Please pay the EC fee to proceed.",
+                        entity.getCreatedBy(),
+                        MENU_ID_APPLICANT, "CITIZEN", true, entity.getApplicationNo());
+
+                return environmentClearanceRenewalMapper.toResponseDTO(saved);
             }
-            entity.setAssignedMDId(assignedMD.getUserId());
-
-            applicationMaster.setCurrentStatus(entity.getStatus());
-            applicationMasterRepository.save(applicationMaster);
 
             EnvironmentClearanceRenewal saved =
-                    renewalEnvironmentalClearanceRepository.save(entity);
-
-            createTask(applicationMaster, saved, "MINING ENGINEER", userId, assignedMD.getUserId());
-
-            notificationClient.sendEnvironmentalClearanceAssignmentNotification(
-                    assignedMD.getEmail(),
-                    assignedMD.getUsername(),
-                    entity.getApplicationNo(),
-                    "REVIEW IOM");
-
-            notificationClient.sendUserNotification(
-                    "Renewal environmental clearance IOM has been assigned.",
-                    "An IOM for environmental clearance renewal has been forwarded for your review. Application No. " + entity.getApplicationNo(),
-                    assignedMD.getUserId(),
-                    MENU_ID_MINING_ENGINEER, "STAFF", true, entity.getApplicationNo());
+                    assignMDAfterIOM(entity, applicationMaster, regionId, userId);
 
             return environmentClearanceRenewalMapper.toResponseDTO(saved);
 
@@ -449,6 +443,177 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                     "IOM file is required"
             );
         }
+    }
+
+    private Long resolveRegionId(EnvironmentClearanceRenewal entity) {
+
+        Long regionId = 0L;
+
+        if (entity.getServiceType().equals("MINING LEASE") || entity.getServiceType().equals("QUARRY LEASE")) {
+
+            if (entity.getServiceType().equals("MINING LEASE")) {
+                Optional<MiningLeaseApplication> application =
+                        miningLeaseApplicationRepository.findByApplicationNumber(entity.getSiteApplicationNo());
+
+                if (application.isPresent()) {
+                    regionId = application.get().getRegionId();
+                }
+            }
+
+            if (entity.getServiceType().equals("QUARRY LEASE")) {
+                Optional<QuarryLeaseApplication> application =
+                        queryLeaseApplicationRepository.findByApplicationNumber(entity.getSiteApplicationNo());
+
+                if (application.isPresent()) {
+                    regionId = application.get().getRegionId();
+                }
+            }
+        } else {
+            Optional<SurfaceCollectionPermitEntity> surfaceCollectionPermitEntity =
+                    surfaceCollectionPermitRepository.findByApplicationNo(
+                            entity.getSiteApplicationNo()
+                    );
+
+            if (surfaceCollectionPermitEntity.isPresent()) {
+                regionId = surfaceCollectionPermitEntity.get().getRegionId();
+            }
+        }
+
+        return regionId;
+    }
+
+    /**
+     * Assigns the IOM to a Mining Engineer/MD and notifies both sides. Used both when no
+     * EC-fee payment gate applies (IOM submission goes straight through) and when a payment
+     * gate applies (called from {@link #onEcPaymentConfirmed} once the fee is paid).
+     */
+    private EnvironmentClearanceRenewal assignMDAfterIOM(
+            EnvironmentClearanceRenewal entity,
+            ApplicationMaster applicationMaster,
+            Long regionId,
+            Long assignerUserId
+    ) {
+
+        entity.setStatus("IOM_SUBMITTED_TO_MD");
+
+        UserWorkloadProjection assignedMD = assignMD(regionId);
+
+        if (assignedMD == null) {
+            assignedMD = assignMD(9L);
+        }
+        entity.setAssignedMDId(assignedMD.getUserId());
+
+        applicationMaster.setCurrentStatus(entity.getStatus());
+        applicationMasterRepository.save(applicationMaster);
+
+        EnvironmentClearanceRenewal saved =
+                renewalEnvironmentalClearanceRepository.save(entity);
+
+        createTask(applicationMaster, saved, "MINING ENGINEER", assignerUserId, assignedMD.getUserId());
+
+        notificationClient.sendEnvironmentalClearanceAssignmentNotification(
+                assignedMD.getEmail(),
+                assignedMD.getUsername(),
+                entity.getApplicationNo(),
+                "REVIEW IOM");
+
+        notificationClient.sendUserNotification(
+                "Renewal environmental clearance IOM has been assigned.",
+                "An IOM for environmental clearance renewal has been forwarded for your review. Application No. " + entity.getApplicationNo(),
+                assignedMD.getUserId(),
+                MENU_ID_MINING_ENGINEER, "STAFF", true, entity.getApplicationNo());
+
+        return saved;
+    }
+
+    @Override
+    @Transactional
+    public EnvironmentClearanceRenewalResponseDTO payEcFee(Long renewalId, Long userId) {
+
+        EnvironmentClearanceRenewal entity =
+                renewalEnvironmentalClearanceRepository
+                        .findById(renewalId)
+                        .orElseThrow(() -> new RuntimeException("Application not found"));
+
+        if (!entity.getCreatedBy().equals(userId)) {
+            throw new CustomRuntimeException("You are not authorized to pay for this application");
+        }
+
+        if (!"PAYMENT_PENDING".equals(entity.getStatus())) {
+            throw new CustomRuntimeException("EC fee can only be paid while the application is awaiting payment");
+        }
+
+        PaymentMaster ecFeeRow = paymentMasterRepository
+                .resolveApplicable(PAYMENT_SERVICE_CODE, EC_FEE_TYPE, "PAYMENT_PENDING")
+                .orElse(null);
+        boolean ecFeeEnabled = ecFeeRow != null && Boolean.TRUE.equals(ecFeeRow.getIsEnabled());
+
+        if (!ecFeeEnabled || !paymentEnabled) {
+            onEcPaymentConfirmed(entity.getApplicationNo());
+            EnvironmentClearanceRenewal refreshed =
+                    renewalEnvironmentalClearanceRepository.findById(renewalId).orElseThrow();
+            return environmentClearanceRenewalMapper.toResponseDTO(refreshed);
+        }
+
+        CitizenApplicantProjection applicant =
+                renewalEnvironmentalClearanceRepository.findApplicantDetails(entity.getCreatedBy());
+
+        PaymentInitiationRequest.PaymentItemRequest item = new PaymentInitiationRequest.PaymentItemRequest();
+        item.setFeeType(EC_FEE_TYPE);
+        item.setServiceCode(PAYMENT_SERVICE_CODE);
+        item.setDescription("Environmental Clearance Renewal Fee");
+        item.setQuantity(1);
+        // amount intentionally left unset — resolved server-side from payment_master.amount
+
+        PaymentInitiationRequest req = new PaymentInitiationRequest();
+        req.setApplicationId(entity.getApplicationNo());
+        req.setApplicationType(SERVICE_CODE);
+        req.setTaxPayerName(applicant != null ? applicant.getFullName() : null);
+        req.setTaxPayerDocumentNo(applicant != null ? applicant.getUsername() : null);
+        req.setTaxPayerNo(applicant != null ? applicant.getUsername() : null);
+        req.setPlatform("MAS");
+        req.setOnPaidStatus("IOM_SUBMITTED_TO_MD");
+        req.setCallbackUrl(selfBaseUrl + "/api/renewal-environmental-clearance/ec-payment-callback");
+        req.setPaymentItems(List.of(item));
+
+        PaymentInitiationResponse paymentResp = mastersPaymentClient.initiate(req);
+
+        EnvironmentClearanceRenewalResponseDTO response =
+                environmentClearanceRenewalMapper.toResponseDTO(entity);
+        response.setRedirectUrl(paymentResp.getRedirectUrl());
+
+        log.info("EC renewal fee payment initiated for application {}", entity.getApplicationNo());
+
+        return response;
+    }
+
+    /**
+     * Called by the masters payment service once the EC renewal fee payment is confirmed as
+     * PAID. No JWT required — internal service call from mas-backend-masters.
+     */
+    @Override
+    @Transactional
+    public void onEcPaymentConfirmed(String applicationNo) {
+
+        EnvironmentClearanceRenewal entity =
+                renewalEnvironmentalClearanceRepository
+                        .findByApplicationNo(applicationNo)
+                        .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Application not found: " + applicationNo));
+
+        if (!"PAYMENT_PENDING".equals(entity.getStatus())) {
+            log.warn("EC payment callback received for application {} not in PAYMENT_PENDING (status={}), ignoring",
+                    applicationNo, entity.getStatus());
+            return;
+        }
+
+        entity.setPaymentCompletedOn(LocalDateTime.now());
+
+        ApplicationMaster applicationMaster = entity.getApplicationMaster();
+        Long regionId = resolveRegionId(entity);
+
+        assignMDAfterIOM(entity, applicationMaster, regionId, entity.getAssignedMPCDId());
+
+        log.info("EC renewal fee payment confirmed — application {} forwarded to MD", applicationNo);
     }
 
     private void validateMPCDAssignment(
@@ -631,6 +796,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                 "ASSIGNED TO MPCD",
                 "UNDER_MPCD_REVIEW",
                 "APPROVED_BY_MPCD",
+                "PAYMENT_PENDING",
                 "IOM_SUBMITTED_TO_MD",
                 "RESUBMISSION_REQUIRED",
                 "ASSIGNED_TO_RC",
