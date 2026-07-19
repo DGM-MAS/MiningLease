@@ -642,7 +642,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
     public Page<SurfaceCollectionAuctionListResponseDTO> getMyArchive(String search, Pageable pageable, Long userId) {
         Page<SurfaceCollectionAuctionApplication> page;
 
-        List<String> archivedStatuses = List.of("APPROVED");
+        List<String> archivedStatuses = List.of("PERMIT_ISSUED");
 
         if (search == null || search.isBlank()) {
 
@@ -698,6 +698,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                 .bgInstruction(entity.getBgInstruction())
                 .permitGenerated(entity.getPermitGenerated())
                 .createdOn(entity.getCreatedOn())
+                .issuePermitFileId(entity.getIssuePermitFileId())
                 .build();
     }
 

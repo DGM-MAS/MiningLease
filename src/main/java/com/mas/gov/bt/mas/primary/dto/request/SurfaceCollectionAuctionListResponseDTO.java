@@ -55,4 +55,6 @@ public class SurfaceCollectionAuctionListResponseDTO {
     private Long assignedMdUserId;
 
     private String assignedMdUserName;
+
+    private String issuePermitFileId;
 }
