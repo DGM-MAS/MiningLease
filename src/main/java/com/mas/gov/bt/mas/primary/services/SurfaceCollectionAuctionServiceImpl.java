@@ -728,6 +728,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
             request.setCid(dto.getCidNumber());
             request.setName(dto.getBidWinnerName());
             request.setMobileNumber(dto.getContactNumber());
+            request.setHouseholdNumber(dto.getHouseHoldNumber());
         }
         return request;
     }
