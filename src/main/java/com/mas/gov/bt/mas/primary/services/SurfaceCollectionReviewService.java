@@ -17,7 +17,7 @@ public interface SurfaceCollectionReviewService {
 
     ReviewResponseDTO requestResubmission(Long reviewId, ResubmitRequestDTO dto, Long userId);
 
-    SurfaceCollectionAuctionResponseDTO issuePermit(Long reviewId, Long mdUserId);
+    SurfaceCollectionAuctionResponseDTO issuePermit(Long reviewId, Long mdUserId, String issuePermitFileId);
 
     Page<SurfaceCollectionAuctionListResponseDTO> getMyApplicationsMD(String search, Pageable pageable, Long userId);
 

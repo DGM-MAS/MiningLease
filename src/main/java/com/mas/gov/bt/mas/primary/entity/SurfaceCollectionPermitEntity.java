@@ -165,6 +165,10 @@ public class SurfaceCollectionPermitEntity {
     @Column(name = "ec_valid_upto")
     private LocalDate ecValidUpto;
 
+    /** The issued Surface Collection Permit PDF — separate from ecFileId so issuing the permit never overwrites the original EC document. */
+    @Column(name = "permit_file_id")
+    private String permitFileId;
+
     // ── MD (Mine Director) ────────────────────────────────────────────────────
     @Column(name = "assigned_md_id")
     private Long assignedMdId;
@@ -245,5 +249,4 @@ public class SurfaceCollectionPermitEntity {
     public void onUpdate() {
         this.updatedOn = LocalDateTime.now();
     }
-
 }

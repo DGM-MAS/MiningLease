@@ -204,7 +204,8 @@ public class SurfaceCollectionReviewServiceImpl
     @Transactional
     public SurfaceCollectionAuctionResponseDTO issuePermit(
             Long reviewId,
-            Long mdUserId
+            Long mdUserId,
+            String issuePermitFileId
     ) {
 
         SurfaceCollectionAuctionApplication entity = getAuction(reviewId);
@@ -214,6 +215,8 @@ public class SurfaceCollectionReviewServiceImpl
 
         entity.setApprovedDate(LocalDate.now());
         entity.setPermitGenerated(true);
+        entity.setIssuePermitFileId(issuePermitFileId);
+
         entity.setAuctionStatus("APPROVED");
 
         auctionRepository.save(entity);
@@ -234,6 +237,7 @@ public class SurfaceCollectionReviewServiceImpl
         surfaceCollectionAuctionPermit.setAuctionApplication(entity);
         surfaceCollectionAuctionPermit.setValidFrom(LocalDate.now());
         surfaceCollectionAuctionPermit.setPermitNo(generatePermitNo());
+        surfaceCollectionAuctionPermit.setIssuePermitFileId(issuePermitFileId);
         surfaceCollectionAuctionPermit.setValidTo(LocalDate.now().plusDays(DEFAULT_TAT_DAYS));
         surfaceCollectionAuctionPermit.setPermitStatus("APPROVED");
         permitRepository.save(surfaceCollectionAuctionPermit);
@@ -265,6 +269,8 @@ public class SurfaceCollectionReviewServiceImpl
         surfaceCollectionPermitEntity.setNameOfSurfaceCollection(entity.getSiteName());
         surfaceCollectionPermitEntity.setOrigin("AUCTION");
         surfaceCollectionPermitEntity.setPermitNo(surfaceCollectionAuctionPermit.getPermitNo());
+        surfaceCollectionPermitEntity.setPermitFileId(issuePermitFileId);
+
         surfaceCollectionPermitEntity.setApplicationNo(entity.getApplicationNo());
         surfaceCollectionPermitEntity.setCreatedBy(promoterId);
         if (bidWinner != null) {
