@@ -75,6 +75,9 @@ public class SurfaceCollectionAuctionApplication {
     @Column(name = "fc_approved_on")
     private LocalDateTime fcApprovedOn;
 
+    @Column(name = "issue_permit_file_id")
+    private String issuePermitFileId;
+
     /**
      * Auction Process
      */

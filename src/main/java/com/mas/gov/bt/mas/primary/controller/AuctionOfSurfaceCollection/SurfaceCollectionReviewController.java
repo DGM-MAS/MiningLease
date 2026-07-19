@@ -81,12 +81,13 @@ public class SurfaceCollectionReviewController {
     @PostMapping("/review/{auctionId}/issue-permit")
     public ResponseEntity<?> issuePermit(
             @PathVariable Long auctionId,
-            @RequestParam Long mdUserId
+            @RequestParam Long mdUserId,
+            @RequestParam String issuePermitFileId
     ) {
         return ResponseEntity.ok(
                 new SuccessResponse<>(
                         "Permit issued successfully",
-                        reviewService.issuePermit(auctionId, mdUserId)
+                        reviewService.issuePermit(auctionId, mdUserId, issuePermitFileId)
                 )
         );
     }

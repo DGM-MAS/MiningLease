@@ -693,6 +693,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                 .bgInstruction(entity.getBgInstruction())
                 .permitGenerated(entity.getPermitGenerated())
                 .createdOn(entity.getCreatedOn())
+                .issuePermitFileId(entity.getIssuePermitFileId())
                 .build();
     }
 
