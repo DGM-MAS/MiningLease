@@ -1,5 +1,6 @@
 package com.mas.gov.bt.mas.primary.services;
 
+import com.mas.gov.bt.mas.primary.dto.IssuePermitRequest;
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
 import com.mas.gov.bt.mas.primary.dto.request.ReassignRequestDTO;
 import com.mas.gov.bt.mas.primary.dto.request.ResubmitRequestDTO;
@@ -13,6 +14,7 @@ import com.mas.gov.bt.mas.primary.exception.BusinessException;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.repository.*;
 import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -205,7 +207,7 @@ public class SurfaceCollectionReviewServiceImpl
     public SurfaceCollectionAuctionResponseDTO issuePermit(
             Long reviewId,
             Long mdUserId,
-            String issuePermitFileId
+            @Valid IssuePermitRequest issuePermitFileId
     ) {
 
         SurfaceCollectionAuctionApplication entity = getAuction(reviewId);
@@ -215,7 +217,7 @@ public class SurfaceCollectionReviewServiceImpl
 
         entity.setApprovedDate(LocalDate.now());
         entity.setPermitGenerated(true);
-        entity.setIssuePermitFileId(issuePermitFileId);
+        entity.setIssuePermitFileId(issuePermitFileId.getIssuePermitFileId());
 
         entity.setAuctionStatus("APPROVED");
 
@@ -237,7 +239,7 @@ public class SurfaceCollectionReviewServiceImpl
         surfaceCollectionAuctionPermit.setAuctionApplication(entity);
         surfaceCollectionAuctionPermit.setValidFrom(LocalDate.now());
         surfaceCollectionAuctionPermit.setPermitNo(generatePermitNo());
-        surfaceCollectionAuctionPermit.setIssuePermitFileId(issuePermitFileId);
+        surfaceCollectionAuctionPermit.setIssuePermitFileId(issuePermitFileId.getIssuePermitFileId());
         surfaceCollectionAuctionPermit.setValidTo(LocalDate.now().plusDays(DEFAULT_TAT_DAYS));
         surfaceCollectionAuctionPermit.setPermitStatus("APPROVED");
         permitRepository.save(surfaceCollectionAuctionPermit);
@@ -269,7 +271,7 @@ public class SurfaceCollectionReviewServiceImpl
         surfaceCollectionPermitEntity.setNameOfSurfaceCollection(entity.getSiteName());
         surfaceCollectionPermitEntity.setOrigin("AUCTION");
         surfaceCollectionPermitEntity.setPermitNo(surfaceCollectionAuctionPermit.getPermitNo());
-        surfaceCollectionPermitEntity.setPermitFileId(issuePermitFileId);
+        surfaceCollectionPermitEntity.setPermitFileId(issuePermitFileId.getIssuePermitFileId());
 
         surfaceCollectionPermitEntity.setApplicationNo(entity.getApplicationNo());
         surfaceCollectionPermitEntity.setCreatedBy(promoterId);
