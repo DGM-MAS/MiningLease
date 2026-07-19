@@ -1,5 +1,6 @@
 package com.mas.gov.bt.mas.primary.repository;
 
+import com.mas.gov.bt.mas.primary.dto.CitizenApplicantProjection;
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
 import com.mas.gov.bt.mas.primary.entity.EnvironmentClearanceRenewal;
 import io.lettuce.core.dynamic.annotation.Param;
@@ -84,6 +85,18 @@ public interface RenewalEnvironmentalClearanceRepository extends JpaRepository<E
     LIMIT 1
     """, nativeQuery = true)
     UserWorkloadProjection findUserDetails(Long directorId);
+
+    @Query(value = """
+    SELECT
+        c.id AS id,
+        c.full_name AS fullName,
+        c.username AS username,
+        c.email AS email
+    FROM mas_db.t_citizens c
+    WHERE c.id = :citizenId
+    LIMIT 1
+    """, nativeQuery = true)
+    CitizenApplicantProjection findApplicantDetails(Long citizenId);
 
     Page<EnvironmentClearanceRenewal> findByAssignedMPCDId(Long userId, Pageable pageable);
 
