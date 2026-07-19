@@ -16,6 +16,7 @@ public class BidWinnerRequestDTO {
     private String emailAddress;
 
     private String cidNumber;
+    private String houseHoldNumber;
 
     private String licenseNumber;
 
