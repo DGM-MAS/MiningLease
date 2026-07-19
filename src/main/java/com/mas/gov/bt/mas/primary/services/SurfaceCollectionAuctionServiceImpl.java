@@ -405,7 +405,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                         .gewogId(gewogLookup)
                         .villageId(villageLookup)
                         .regionId(regionMaster)
-                        .promoterId(dto.getPromoterId())
+                        .promoterId(assignedUser.getUserId())
                         .cidNumber(dto.getCidNumber())
                         .bidAmount(dto.getBidAmount())
                         .auctionApplication(entity)
@@ -443,7 +443,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
             String title = "Surface Collection Auction Winner";
             String message = "Surface collection auction application has been won by you. Application No. " + entity.getApplicationNo();
             String serviceId = MENU_ID_PROMOTER;
-            notificationClient.sendUserNotification(title, message, assignedUser.getUserId(), serviceId, "STAFF", true, entity.getApplicationNo());
+            notificationClient.sendUserNotification(title, message, assignedUser.getUserId(), serviceId, "CITIZEN", true, entity.getApplicationNo());
         } else {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Bid winner user ID not present for notification.");
         }
