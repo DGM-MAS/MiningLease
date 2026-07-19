@@ -113,6 +113,9 @@ public class ManualMiningEntryRequestDTO {
     // -------------------------------------------------------
     // Surface Collection / Stock Lifting — Activity Details
     // -------------------------------------------------------
+    private String nameOfSurfaceCollection; // SC only
+    private String nameOfStockLifting;      // Stock Lifting only
+
     // STOCK LIFTING FIELDS ----------------
     private String applicationFileId;
     private String rcReportFileId;
