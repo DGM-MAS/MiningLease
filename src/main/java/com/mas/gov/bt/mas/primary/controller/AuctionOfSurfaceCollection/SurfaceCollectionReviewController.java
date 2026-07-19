@@ -1,12 +1,14 @@
 package com.mas.gov.bt.mas.primary.controller.AuctionOfSurfaceCollection;
 
 import com.mas.gov.bt.mas.primary.config.UserContext;
+import com.mas.gov.bt.mas.primary.dto.IssuePermitRequest;
 import com.mas.gov.bt.mas.primary.dto.request.ReassignRequestDTO;
 import com.mas.gov.bt.mas.primary.dto.request.ResubmitRequestDTO;
 import com.mas.gov.bt.mas.primary.dto.request.SurfaceCollectionAuctionListResponseDTO;
 import com.mas.gov.bt.mas.primary.services.SurfaceCollectionReviewService;
 import com.mas.gov.bt.mas.primary.utility.PageRequest1Based;
 import com.mas.gov.bt.mas.primary.utility.SuccessResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -82,12 +84,12 @@ public class SurfaceCollectionReviewController {
     public ResponseEntity<?> issuePermit(
             @PathVariable Long auctionId,
             @RequestParam Long mdUserId,
-            @RequestParam String issuePermitFileId
+            @Valid @RequestBody IssuePermitRequest request
     ) {
         return ResponseEntity.ok(
                 new SuccessResponse<>(
                         "Permit issued successfully",
-                        reviewService.issuePermit(auctionId, mdUserId, issuePermitFileId)
+                        reviewService.issuePermit(auctionId, mdUserId, request)
                 )
         );
     }
