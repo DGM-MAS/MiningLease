@@ -35,6 +35,17 @@ public interface SurfaceCollectionAuctionRepository
     """, nativeQuery = true)
     UserWorkloadProjection findUserDetails(Long directorId);
 
+
+    @Query(value = """
+    SELECT
+        c.id AS userId,
+        c.email AS email,
+        c.username AS userName
+    FROM mas_db.t_citizens c
+    WHERE c.email = :email
+    """, nativeQuery = true)
+    UserWorkloadProjection findCitizenByEmail(String email);
+
     @Query("""
     SELECT MAX(CAST(SUBSTRING(a.applicationNo, 10) AS integer))
     FROM SurfaceCollectionAuctionApplication a
