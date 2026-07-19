@@ -772,7 +772,7 @@ public class MiningLeaseService {
         Page<MiningLeaseApplication> applications;
 
         if (search == null || search.isBlank()) {
-            applications = miningLeaseApplicationRepository.findByApplicantUserIdAndStatusInApplication(
+            applications = miningLeaseApplicationRepository.findByApplicantUserId(
                     userId,
                     ApplicationStatus,
                     pageable);
