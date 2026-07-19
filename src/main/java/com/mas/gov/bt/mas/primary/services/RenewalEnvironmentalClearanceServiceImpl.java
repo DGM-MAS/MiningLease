@@ -885,7 +885,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             page = renewalEnvironmentalClearanceRepository
                     .findByCreatedByAndStatusIn(
                             userId,
-                            List.of("APPROVED", "REJECTED"),
+                            List.of("APPROVED", "REJECTED", "EC_RENEWED"),
                             pageable
                     );
 
@@ -894,7 +894,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             page = renewalEnvironmentalClearanceRepository
                     .findByCreatedByAndStatusInAndApplicationNoContainingIgnoreCase(
                             userId,
-                            List.of("APPROVED", "REJECTED"),
+                            List.of("APPROVED", "REJECTED", "EC_RENEWED"),
                             search,
                             pageable
                     );
@@ -1515,7 +1515,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         }
 
         if (Boolean.TRUE.equals(request.getForwardToDECC())) {
-            entity.setStatus("FORWARDED_TO_DECC"); a
+            entity.setStatus("FORWARDED_TO_DECC");
         } else {
             entity.setStatus("EC_RENEWED");
             // Terminal state — mark completion so the citizen tracking dashboard archives it
