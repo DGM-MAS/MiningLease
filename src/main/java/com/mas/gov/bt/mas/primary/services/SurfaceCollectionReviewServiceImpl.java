@@ -1,5 +1,6 @@
 package com.mas.gov.bt.mas.primary.services;
 
+import com.mas.gov.bt.mas.primary.dto.IssuePermitRequest;
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
 import com.mas.gov.bt.mas.primary.dto.request.ReassignRequestDTO;
 import com.mas.gov.bt.mas.primary.dto.request.ResubmitRequestDTO;
@@ -13,6 +14,7 @@ import com.mas.gov.bt.mas.primary.exception.BusinessException;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.repository.*;
 import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -204,7 +206,8 @@ public class SurfaceCollectionReviewServiceImpl
     @Transactional
     public SurfaceCollectionAuctionResponseDTO issuePermit(
             Long reviewId,
-            Long mdUserId
+            Long mdUserId,
+            @Valid IssuePermitRequest issuePermitFileId
     ) {
 
         SurfaceCollectionAuctionApplication entity = getAuction(reviewId);
@@ -214,7 +217,9 @@ public class SurfaceCollectionReviewServiceImpl
 
         entity.setApprovedDate(LocalDate.now());
         entity.setPermitGenerated(true);
-        entity.setAuctionStatus("APPROVED");
+        entity.setIssuePermitFileId(issuePermitFileId.getIssuePermitFileId());
+
+        entity.setAuctionStatus("PERMIT_ISSUED");
 
         auctionRepository.save(entity);
 
@@ -224,7 +229,7 @@ public class SurfaceCollectionReviewServiceImpl
         if (surfaceCollectionBankGuarantee1.isPresent()) {
             surfaceCollectionBankGuarantee = surfaceCollectionBankGuarantee1.get();
         }
-        surfaceCollectionBankGuarantee.setStatus("APPROVED");
+        surfaceCollectionBankGuarantee.setStatus("PERMIT_ISSUED");
 
         bgRepository.save(surfaceCollectionBankGuarantee);
 
@@ -234,8 +239,9 @@ public class SurfaceCollectionReviewServiceImpl
         surfaceCollectionAuctionPermit.setAuctionApplication(entity);
         surfaceCollectionAuctionPermit.setValidFrom(LocalDate.now());
         surfaceCollectionAuctionPermit.setPermitNo(generatePermitNo());
+        surfaceCollectionAuctionPermit.setIssuePermitFileId(issuePermitFileId.getIssuePermitFileId());
         surfaceCollectionAuctionPermit.setValidTo(LocalDate.now().plusDays(DEFAULT_TAT_DAYS));
-        surfaceCollectionAuctionPermit.setPermitStatus("APPROVED");
+        surfaceCollectionAuctionPermit.setPermitStatus("PERMIT_ISSUED");
         permitRepository.save(surfaceCollectionAuctionPermit);
 
         // Resolve (or auto-register) the winning bidder's own citizen account so the
@@ -265,6 +271,8 @@ public class SurfaceCollectionReviewServiceImpl
         surfaceCollectionPermitEntity.setNameOfSurfaceCollection(entity.getSiteName());
         surfaceCollectionPermitEntity.setOrigin("AUCTION");
         surfaceCollectionPermitEntity.setPermitNo(surfaceCollectionAuctionPermit.getPermitNo());
+        surfaceCollectionPermitEntity.setPermitFileId(issuePermitFileId.getIssuePermitFileId());
+
         surfaceCollectionPermitEntity.setApplicationNo(entity.getApplicationNo());
         surfaceCollectionPermitEntity.setCreatedBy(promoterId);
         if (bidWinner != null) {
@@ -329,7 +337,7 @@ public class SurfaceCollectionReviewServiceImpl
     public Page<SurfaceCollectionAuctionListResponseDTO> getMyArchiveMD(String search, Pageable pageable, Long userId) {
         Page<SurfaceCollectionAuctionApplication> page;
 
-        List<String> archivedStatuses = List.of("APPROVED");
+        List<String> archivedStatuses = List.of("PERMIT_ISSUED");
 
         if (search == null || search.isBlank()) {
 
@@ -367,6 +375,7 @@ public class SurfaceCollectionReviewServiceImpl
                 .ecStatus(entity.getEcStatus())
                 .fcStatus(entity.getFcStatus())
                 .auctionStatus(entity.getAuctionStatus())
+                .issuePermitFileId(entity.getIssuePermitFileId())
                 .bgRequested(entity.getBgRequested())
                 .permitGenerated(entity.getPermitGenerated())
                 .createdOn(entity.getCreatedOn())
