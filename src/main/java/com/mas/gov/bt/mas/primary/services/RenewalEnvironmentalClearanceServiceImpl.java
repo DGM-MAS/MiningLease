@@ -300,11 +300,6 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         UserWorkloadProjection md =
                 renewalEnvironmentalClearanceRepository.findMDEnvironmentalClearance(regionId);
 
-        if (regionId == 9L && md == null) {
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND,
-                    "No active MPCD officer available for assignment. Please ensure an MPCD officer is registered in the system.");
-        }
-
         return md;
     }
 
@@ -313,10 +308,6 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         UserWorkloadProjection mpcd =
                 renewalEnvironmentalClearanceRepository.findMPCDEnvironmentalClearance(regionId);
 
-        if (regionId == 9L && mpcd == null) {
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND,
-                    "No active MPCD officer available for assignment. Please ensure an MPCD officer is registered in the system.");
-        }
         return mpcd;
     }
 
@@ -885,7 +876,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             page = renewalEnvironmentalClearanceRepository
                     .findByCreatedByAndStatusIn(
                             userId,
-                            List.of("APPROVED", "REJECTED"),
+                            List.of("APPROVED", "REJECTED", "EC_RENEWED"),
                             pageable
                     );
 
@@ -894,7 +885,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             page = renewalEnvironmentalClearanceRepository
                     .findByCreatedByAndStatusInAndApplicationNoContainingIgnoreCase(
                             userId,
-                            List.of("APPROVED", "REJECTED"),
+                            List.of("APPROVED", "REJECTED", "EC_RENEWED"),
                             search,
                             pageable
                     );

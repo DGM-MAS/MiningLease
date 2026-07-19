@@ -36,6 +36,8 @@ public class SurfaceCollectionAuctionResponseDTO {
     private String fcStatus;
     private String auctionStatus;
 
+    private Long issuePermitFileId;
+
     private Boolean submittedForEc;
     private Boolean submittedForFc;
     private Boolean bgRequested;

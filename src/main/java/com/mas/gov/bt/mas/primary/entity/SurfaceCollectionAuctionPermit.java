@@ -22,6 +22,9 @@ public class SurfaceCollectionAuctionPermit {
     @Column(name = "permit_no")
     private String permitNo;
 
+    @Column(name = "issue_permit_file_id")
+    private String issuePermitFileId;
+
     @OneToOne
     @JoinColumn(name = "auction_id")
     private SurfaceCollectionAuctionApplication auctionApplication;
