@@ -231,7 +231,7 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
     public Page<SurfaceCollectionAuctionListResponseDTO> getMyArchive(String search, Pageable pageable, Long userId) {
         Page<SurfaceCollectionAuctionApplication> page;
 
-        List<String> archivedStatuses = List.of("APPROVED");
+        List<String> archivedStatuses = List.of("PERMIT_ISSUED");
         page = surfaceCollectionAuctionRepository.findByBidWinnerPromoterIdAndAuctionStatusIn(userId,archivedStatuses,pageable);
 
         return page.map(this::mapListResponse);
@@ -374,11 +374,15 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
                 .area(entity.getArea())
                 .material(entity.getMaterial())
                 .ecStatus(entity.getEcStatus())
+                .ecNumber(entity.getEcNumber())
+                .ecFileId(entity.getFileECid())
+                .ecValidUpto(entity.getEcValidUpto())
                 .fcStatus(entity.getFcStatus())
                 .auctionStatus(entity.getAuctionStatus())
                 .bgRequested(entity.getBgRequested())
                 .bgInstruction(entity.getBgInstruction())
                 .permitGenerated(entity.getPermitGenerated())
+                .issuePermitFileId(entity.getIssuePermitFileId())
                 .createdOn(entity.getCreatedOn())
                 .build();
     }

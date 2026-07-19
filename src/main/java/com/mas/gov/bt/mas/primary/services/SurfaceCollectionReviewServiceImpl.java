@@ -219,7 +219,7 @@ public class SurfaceCollectionReviewServiceImpl
         entity.setPermitGenerated(true);
         entity.setIssuePermitFileId(issuePermitFileId.getIssuePermitFileId());
 
-        entity.setAuctionStatus("APPROVED");
+        entity.setAuctionStatus("PERMIT_ISSUED");
 
         auctionRepository.save(entity);
 
@@ -229,7 +229,7 @@ public class SurfaceCollectionReviewServiceImpl
         if (surfaceCollectionBankGuarantee1.isPresent()) {
             surfaceCollectionBankGuarantee = surfaceCollectionBankGuarantee1.get();
         }
-        surfaceCollectionBankGuarantee.setStatus("APPROVED");
+        surfaceCollectionBankGuarantee.setStatus("PERMIT_ISSUED");
 
         bgRepository.save(surfaceCollectionBankGuarantee);
 
@@ -241,7 +241,7 @@ public class SurfaceCollectionReviewServiceImpl
         surfaceCollectionAuctionPermit.setPermitNo(generatePermitNo());
         surfaceCollectionAuctionPermit.setIssuePermitFileId(issuePermitFileId.getIssuePermitFileId());
         surfaceCollectionAuctionPermit.setValidTo(LocalDate.now().plusDays(DEFAULT_TAT_DAYS));
-        surfaceCollectionAuctionPermit.setPermitStatus("APPROVED");
+        surfaceCollectionAuctionPermit.setPermitStatus("PERMIT_ISSUED");
         permitRepository.save(surfaceCollectionAuctionPermit);
 
         // Resolve (or auto-register) the winning bidder's own citizen account so the
@@ -337,7 +337,7 @@ public class SurfaceCollectionReviewServiceImpl
     public Page<SurfaceCollectionAuctionListResponseDTO> getMyArchiveMD(String search, Pageable pageable, Long userId) {
         Page<SurfaceCollectionAuctionApplication> page;
 
-        List<String> archivedStatuses = List.of("APPROVED");
+        List<String> archivedStatuses = List.of("PERMIT_ISSUED");
 
         if (search == null || search.isBlank()) {
 
@@ -375,6 +375,7 @@ public class SurfaceCollectionReviewServiceImpl
                 .ecStatus(entity.getEcStatus())
                 .fcStatus(entity.getFcStatus())
                 .auctionStatus(entity.getAuctionStatus())
+                .issuePermitFileId(entity.getIssuePermitFileId())
                 .bgRequested(entity.getBgRequested())
                 .permitGenerated(entity.getPermitGenerated())
                 .createdOn(entity.getCreatedOn())
