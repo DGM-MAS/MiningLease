@@ -99,6 +99,8 @@ public class ManualMiningEntryResponseDTO {
     private Long workOrderDocId;
 
     // Surface Collection / Stock Lifting — Details
+    private String nameOfSurfaceCollection;
+    private String nameOfStockLifting;
     private String typeOfActivity;
     private String typeOfMaterials;
     private String collectionSite;
