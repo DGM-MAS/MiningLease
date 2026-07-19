@@ -248,10 +248,13 @@ public class ManualEntryFieldConfigService {
     }
 
     private SectionConfig scActivitySection(String activityType) {
-        return SectionConfig.builder()
-                .sectionKey("ACTIVITY_DETAILS")
-                .label("Activity Details")
-                .fields(List.of(
+        boolean isSurfaceCollection = "SURFACE_COLLECTION".equals(activityType);
+        List<FieldMetadata> fields = new java.util.ArrayList<>(List.of(
+                isSurfaceCollection
+                        ? field("nameOfSurfaceCollection", "Name of Surface Collection", "TEXT", true, null)
+                        : field("nameOfStockLifting",      "Name of Stock Lifting",      "TEXT", true, null)
+        ));
+        fields.addAll(List.of(
                         field("typeOfActivity",           "Type of Activity",            "MULTI_SELECT", true,  "Surface collection, Dredging, Stock lifting, Migration works"),
                         field("typeOfMaterials",          "Type of Materials",           "MULTI_SELECT", true,  "Stones, Sand, Boulder, Minerals"),
                         field("collectionSite",           "Collection Site",             "MULTI_SELECT", true,  "Land surface, Riverbeds/Riverbanks, Road Right of Way, Land Developments, Others"),
@@ -266,7 +269,12 @@ public class ManualEntryFieldConfigService {
                         field("isStateOwned",             "State Owned Entity",          "BOOLEAN",      false, null),
                         field("eligibleForExport",        "Eligible for Export",         "TEXT",         false, "Yes or No"),
                         field("isRpBased",                "RP Based",                    "BOOLEAN",      false, "true = RP-based (export eligible); false = Direct Allocation (domestic)")
-                ))
+                ));
+
+        return SectionConfig.builder()
+                .sectionKey("ACTIVITY_DETAILS")
+                .label("Activity Details")
+                .fields(fields)
                 .build();
     }
 

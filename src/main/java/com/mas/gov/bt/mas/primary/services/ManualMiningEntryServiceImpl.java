@@ -358,6 +358,7 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
 
         sc.setApplicantCid(req.getApplicantCid());
         sc.setApplicantName(req.getApplicantName());
+        sc.setNameOfSurfaceCollection(req.getNameOfSurfaceCollection());
         sc.setMobileNo(req.getApplicantContact());
         sc.setEmail(req.getApplicantEmail());
         sc.setSecurityClearanceValidity(req.getSecurityClearanceValidity());
@@ -423,6 +424,7 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
 
         sl.setApplicantCid(req.getApplicantCid());
         sl.setApplicantName(req.getApplicantName());
+        sl.setNameOfStockLifting(req.getNameOfStockLifting());
         sl.setApplicantType(req.getApplicantType());
         sl.setApplicantEmail(req.getApplicantEmail());
         sl.setApplicantCid(req.getApplicantCid());
@@ -689,6 +691,7 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
                 .isManualEntry(true)
                 .applicantCid(sc.getApplicantCid())
                 .applicantName(sc.getApplicantName())
+                .nameOfSurfaceCollection(sc.getNameOfSurfaceCollection())
                 .applicantContact(sc.getMobileNo())
                 .applicantEmail(sc.getEmail())
                 .securityClearanceValidity(sc.getSecurityClearanceValidity())
@@ -739,6 +742,7 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
                 .applicantType(ql.getApplicantType())
                 .applicantCid(ql.getApplicantCid())
                 .applicantName(ql.getApplicantName())
+                .nameOfStockLifting(ql.getNameOfStockLifting())
                 .applicantContact(ql.getApplicantContact())
                 .applicantEmail(ql.getApplicantEmail())
                 .postalAddress(ql.getPostalAddress())
