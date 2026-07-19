@@ -55,6 +55,13 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
 
     private static final String SERVICE_CODE = "SURFACE_COLLECTION_AUCTION";
 
+    // Real sidebar menu ids (permissions.id) per recipient role for this service — used to target
+    // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
+    // NOT the same thing as SERVICE_CODE above, which is an unrelated t_application_master.service_code value.
+    private static final String MENU_ID_MPCD            = "72"; // "MPCD" — SURFACE_COLLECTION_AUCTION
+    private static final String MENU_ID_PROMOTER         = "73"; // "PROMOTER"
+    private static final String MENU_ID_MINING_DIRECTOR  = "74"; // "MINING_DIRECTOR"
+
     private static final int DEFAULT_TAT_DAYS = 2;
 
     private static final int DEFAULT_MAX_APPLICATIONS = 2;
@@ -154,8 +161,8 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
         if(assignedMD.getUserId()!= null) {
             String title = "Surface Collection Auction application has been assigned.";
             String message = "An application for surface collection auction has been assigned for review. Application No. "+ entity.getApplicationNo();
-            String serviceId = "71";
-            notificationClient.sendUserNotification(title, message, assignedMD.getUserId(), serviceId, "STAFF", true);
+            String serviceId = MENU_ID_MINING_DIRECTOR;
+            notificationClient.sendUserNotification(title, message, assignedMD.getUserId(), serviceId, "STAFF", true, entity.getApplicationNo());
         }else {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND,"Assigned MD user ID not Found");
         }
@@ -300,6 +307,8 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
         SurfaceCollectionAuctionApplication entity = getAuction(auctionId);
 
         entity.setFileECid(fileECid.getEcFileId());
+        entity.setEcNumber(fileECid.getEcNumber());
+        entity.setEcValidUpto(fileECid.getEcValidUpto());
         entity.setMdRemarks(fileECid.getRemarks());
         entity.setEcStatus("EC_APPROVED");
         entity.setEcApprovedOn(LocalDateTime.now());
@@ -317,8 +326,8 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
         if(entity.getCreatedBy()!= null) {
             String title = "EC for Surface Collection Auction application has been approved.";
             String message = "EC for surface collection auction has been APPROVED. Application No. "+ entity.getApplicationNo();
-            String serviceId = "71";
-            notificationClient.sendUserNotification(title, message, entity.getCreatedBy(), serviceId, "STAFF", true);
+            String serviceId = MENU_ID_MPCD;
+            notificationClient.sendUserNotification(title, message, entity.getCreatedBy(), serviceId, "STAFF", true, entity.getApplicationNo());
         }else {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "MPCD User details not present for notification.");
         }
@@ -425,8 +434,8 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
         if(assignedUser.getUserId()!= null) {
             String title = "Surface Collection Auction Winner";
             String message = "Surface collection auction application has been won by you. Application No. "+ entity.getApplicationNo();
-            String serviceId = "71";
-            notificationClient.sendUserNotification(title, message, assignedUser.getUserId(), serviceId, "STAFF", true);
+            String serviceId = MENU_ID_PROMOTER;
+            notificationClient.sendUserNotification(title, message, assignedUser.getUserId(), serviceId, "STAFF", true, entity.getApplicationNo());
         }else {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Bid winner user ID not present for notification.");
         }
@@ -497,6 +506,9 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                 .dzongkhagName(entity.getDzongkhagId().getDzongkhagName())
                 .gewogName(entity.getGewogId().getGewogName())
                 .villageName(entity.getVillageId().getVillageName())
+                .ecFileId(entity.getFileECid())
+                .ecNumber(entity.getEcNumber())
+                .ecValidUpto(entity.getEcValidUpto())
                 .ecStatus(entity.getEcStatus())
                 .fcStatus(entity.getFcStatus())
                 .auctionStatus(entity.getAuctionStatus())
@@ -660,6 +672,9 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                 .dzongkhagName(entity.getDzongkhagId().getDzongkhagName())
                 .gewogName(entity.getGewogId().getGewogName())
                 .villageName(entity.getVillageId().getVillageName())
+                .ecFileId(entity.getFileECid())
+                .ecNumber(entity.getEcNumber())
+                .ecValidUpto(entity.getEcValidUpto())
                 .ecStatus(entity.getEcStatus())
                 .fcStatus(entity.getFcStatus())
                 .auctionStatus(entity.getAuctionStatus())

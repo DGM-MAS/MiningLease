@@ -33,6 +33,12 @@ public class ImmediateSuspensionService {
     private static final String SERVICE_CODE = "IMMEDIATE_SUSPENSION";
     private static final int DEFAULT_TAT_DAYS = 2;
 
+    // Real sidebar menu ids (permissions.id) per recipient role for this service — used to target
+    // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
+    // NOT the same thing as SERVICE_CODE above, which is an unrelated t_application_master.service_code value.
+    private static final String MENU_ID_APPLICANT = "117"; // "APPLICANT" — IMMEDIATE_SUSPENSION
+    private static final String MENU_ID_MI         = "119"; // "MI"
+
     private final ImmediateSuspensionApplicationRepository immediateSuspensionApplicationRepository;
 
     private final MiningLeaseApplicationRepository miningLeaseApplicationRepository;
@@ -274,7 +280,7 @@ public class ImmediateSuspensionService {
             String title = "Immediate Suspension application has been issued related to your lease.";
             String message = "Application No. " + appNo;
 
-            notificationClient.sendUserNotification(title, message, userId, "116", "CITIZEN", false);
+            notificationClient.sendUserNotification(title, message, userId, MENU_ID_APPLICANT, "CITIZEN", false, appNo);
         }
     }
 
@@ -416,8 +422,8 @@ public class ImmediateSuspensionService {
 
                 String title = "A new immediate suspension application has been assigned.";
                 String message = "A new immediate suspension application has been assigned.";
-                String serviceId = "116";
-                notificationClient.sendUserNotification(title, message, userMI.getUserId(), serviceId, "STAFF", true);
+                String serviceId = MENU_ID_MI;
+                notificationClient.sendUserNotification(title, message, userMI.getUserId(), serviceId, "STAFF", true, immediateSuspensionApplication.getApplicationNumber());
             }
         }
         return immediateSuspensionMapper.toResponse(immediateSuspensionApplication);
@@ -779,8 +785,8 @@ public class ImmediateSuspensionService {
 
                 String title = "A new immediate suspension application has been assigned.";
                 String message = "A new immediate suspension application has been assigned.";
-                String serviceId = "116";
-                notificationClient.sendUserNotification(title, message, userMI.getUserId(), serviceId, "STAFF", true);
+                String serviceId = MENU_ID_MI;
+                notificationClient.sendUserNotification(title, message, userMI.getUserId(), serviceId, "STAFF", true, immediateSuspensionApplication.getApplicationNumber());
             }
         return immediateSuspensionMapper.toResponse(immediateSuspensionApplication);
 

@@ -66,4 +66,10 @@ public interface RenewalEnvironmentalClearanceService {
     SuccessResponse<List<EnvironmentClearanceRenewalResponseDTO>> getAssignedToMD(Long userId, Pageable pageable, String search);
 
     EnvironmentClearanceRenewalResponseDTO approveEC(@Valid ApproveECRequestDTO request, Long userId);
+
+    EnvironmentClearanceRenewalResponseDTO requestResubmissionRC(@Valid RequestResubmissionDTO request, Long userId);
+
+    EnvironmentClearanceRenewalResponseDTO requestResubmissionMI(@Valid RequestResubmissionDTO request, Long userId);
+
+    EnvironmentClearanceRenewalResponseDTO requestResubmissionMD(@Valid RequestResubmissionDTO request, Long userId);
 }

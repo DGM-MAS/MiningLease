@@ -50,8 +50,8 @@ public class ManualMiningEntryRequestDTO {
     // -------------------------------------------------------
     private String nameOfMine;       // ML only
     private String nameOfQuarry;     // QL only
-    private String ecFileId;         // ML only — newer EC requirement
-    private String ecNumber;         // ML only — newer EC requirement
+    private String ecFileId;         // ML + QL — newer EC requirement
+    private String ecNumber;         // ML + QL — newer EC requirement
     private String mlaSignedDocId;   // QL only
 
     // -------------------------------------------------------
@@ -138,6 +138,7 @@ public class ManualMiningEntryRequestDTO {
     private Double proposedAreaRow;
     private String permitNo;
     private String ecNo;
+    private LocalDate ecValidUpto;
     private String securityClearanceValidity;
     private String taxClearanceValidity;
     private Boolean isStateOwned;

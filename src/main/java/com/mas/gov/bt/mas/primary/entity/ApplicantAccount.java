@@ -36,6 +36,9 @@ public class ApplicantAccount {
     @Column(name = "registration_type", length = 50)
     private String registrationType;
 
+    @Column(name = "username", length = 100)
+    private String username;
+
     @Column(name = "email", length = 150)
     private String email;
 

@@ -152,6 +152,21 @@ public class StockLiftingApplication {
     @Column(name = "manual_entry_on")
     private LocalDateTime manualEntryOn;
 
+    @Column(name = "name_of_stock_lifting")
+    private String nameOfStockLifting;
+
+    @Column(name = "dzongkhag")
+    private String dzongkhag;
+
+    @Column(name = "gewog")
+    private String gewog;
+
+    @Column(name = "place_village")
+    private String placeVillage;
+
+    @Column(name = "dzongkhag_id")
+    private String dzongkhagId;
+
     @PrePersist
     public void onCreate() {
         this.createdOn = LocalDateTime.now();

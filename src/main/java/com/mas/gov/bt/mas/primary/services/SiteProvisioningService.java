@@ -2,13 +2,18 @@ package com.mas.gov.bt.mas.primary.services;
 
 import com.mas.gov.bt.mas.primary.entity.MiningLeaseApplication;
 import com.mas.gov.bt.mas.primary.entity.MiningLeaseRenewalApplication;
+import com.mas.gov.bt.mas.primary.entity.QuarryLeaseApplication;
 import com.mas.gov.bt.mas.primary.entity.SiteMaster;
+import com.mas.gov.bt.mas.primary.entity.StockLiftingApplication;
 import com.mas.gov.bt.mas.primary.entity.SurfaceCollectionAuctionApplication;
+import com.mas.gov.bt.mas.primary.entity.SurfaceCollectionPermitEntity;
 import com.mas.gov.bt.mas.primary.repository.SiteMasterRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Creates the promotor's site in shared mas_db.site_master when a mining
@@ -20,8 +25,9 @@ import java.util.Optional;
 public class SiteProvisioningService {
 
     private static final String LEASE_TYPE = "MINING_LEASE";
-
-    private static final String SURFACE_COLLECTION_CATEGORY   = "SURFACE_COLLECTION_PERMIT";
+    private static final String QUARRY_LEASE_TYPE = "QUARRY_LEASE";
+    private static final String SURFACE_COLLECTION_TYPE = "SURFACE_COLLECTION";
+    private static final String STOCK_LIFTING_TYPE = "STOCK_LIFTING";
 
     private final SiteMasterRepository siteMasterRepository;
 
@@ -60,8 +66,95 @@ public class SiteProvisioningService {
         return site;
     }
 
+    /**
+     * Mirrors Quarrying-Lease's own SiteProvisioningService.provisionSiteForApprovedLease —
+     * needed here too because ManualMiningEntryServiceImpl writes quarry lease manual
+     * entries directly into the shared t_quarry_lease_application table from this service,
+     * bypassing the Quarrying-Lease microservice's real approval flow entirely.
+     */
+    public SiteMaster provisionSiteForApprovedLease(QuarryLeaseApplication app) {
+        Optional<SiteMaster> existing = siteMasterRepository.findByLeaseTypeAndLeaseApplicationNumber(QUARRY_LEASE_TYPE, app.getApplicationNumber());
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+        SiteMaster site = new SiteMaster();
+        site.setSiteName(app.getNameOfQuarry() != null && !app.getNameOfQuarry().isBlank()
+                ? app.getNameOfQuarry()
+                : "Quarry - " + app.getApplicationNumber());
+        site.setApplicantUserId(app.getApplicantUserId());
+        site.setLeaseType(QUARRY_LEASE_TYPE);
+        site.setLeaseApplicationId(app.getId());
+        site.setLeaseApplicationNumber(app.getApplicationNumber());
+        site.setDzongkhagId(app.getDzongkhag() != null ? app.getDzongkhag().getId() : null);
+        site.setGewogNameId(app.getGewog() != null ? String.valueOf(app.getGewog().getGewogSerialNo()) : null);
+        site.setDungkhagName(app.getDungkhag());
+        site.setNearestVillageId(app.getNearestVillage() != null
+                ? String.valueOf(app.getNearestVillage().getVillageSerialNo()) : null);
+        site.setPlace(app.getPlaceOfMiningActivity());
+        site.setCreatedBy("system-lease-approval");
+        siteMasterRepository.save(site);
+        log.info("Provisioned site '{}' for approved quarry lease {}", site.getSiteName(), app.getApplicationNumber());
+        return site;
+    }
+
+    /**
+     * Mirrors mas-royalty-service's own SiteProvisioningService.provisionSiteForSurfaceCollection —
+     * needed here too because ManualMiningEntryServiceImpl writes surface collection manual
+     * entries directly into the shared surface_collection_permit table from this service.
+     */
+    public SiteMaster provisionSiteForSurfaceCollection(SurfaceCollectionPermitEntity entity) {
+        Optional<SiteMaster> existing = siteMasterRepository.findByLeaseTypeAndLeaseApplicationNumber(SURFACE_COLLECTION_TYPE, entity.getApplicationNo());
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+        SiteMaster site = new SiteMaster();
+        site.setSiteName(entity.getNameOfSurfaceCollection() != null && !entity.getNameOfSurfaceCollection().isBlank()
+                ? entity.getNameOfSurfaceCollection()
+                : "Surface Collection - " + entity.getApplicationNo());
+        site.setApplicantUserId(entity.getCreatedBy());
+        site.setLeaseType(SURFACE_COLLECTION_TYPE);
+        site.setLeaseApplicationId(entity.getId());
+        site.setLeaseApplicationNumber(entity.getApplicationNo());
+        site.setPlace(joinLocation(entity.getPlaceVillage(), entity.getGewog(), entity.getDzongkhag()));
+        site.setCreatedBy("system-scp-approval");
+        siteMasterRepository.save(site);
+        log.info("Provisioned site '{}' for approved surface collection permit {}", site.getSiteName(), entity.getApplicationNo());
+        return site;
+    }
+
+    /**
+     * Mirrors mas-royalty-service's own SiteProvisioningService.provisionSiteForStockLifting —
+     * needed here too because ManualMiningEntryServiceImpl writes stock lifting manual
+     * entries directly into the shared stock_lifting_application table from this service.
+     */
+    public SiteMaster provisionSiteForStockLifting(StockLiftingApplication app) {
+        Optional<SiteMaster> existing = siteMasterRepository.findByLeaseTypeAndLeaseApplicationNumber(STOCK_LIFTING_TYPE, app.getApplicationNo());
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+        SiteMaster site = new SiteMaster();
+        site.setSiteName(app.getNameOfStockLifting() != null && !app.getNameOfStockLifting().isBlank()
+                ? app.getNameOfStockLifting()
+                : "Stock Lifting - " + app.getApplicationNo());
+        site.setApplicantUserId(app.getCreatedBy());
+        site.setLeaseType(STOCK_LIFTING_TYPE);
+        site.setLeaseApplicationId(app.getId());
+        site.setLeaseApplicationNumber(app.getApplicationNo());
+        site.setPlace(joinLocation(app.getPlaceVillage(), app.getGewog(), app.getDzongkhag()));
+        site.setCreatedBy("system-stocklifting-approval");
+        siteMasterRepository.save(site);
+        log.info("Provisioned site '{}' for approved stock lifting application {}", site.getSiteName(), app.getApplicationNo());
+        return site;
+    }
+
+    private String joinLocation(String... parts) {
+        return Arrays.stream(parts)
+                .filter(p -> p != null && !p.isBlank())
+                .collect(Collectors.joining(", "));
+    }
+
     public SiteMaster provisionSiteForApprovedLeaseSurfaceAuction(SurfaceCollectionAuctionApplication app) {
-        Optional<SiteMaster> existing = siteMasterRepository.findByLeaseTypeAndLeaseApplicationNumber(SURFACE_COLLECTION_CATEGORY, app.getApplicationNo());
+        Optional<SiteMaster> existing = siteMasterRepository.findByLeaseTypeAndLeaseApplicationNumber(SURFACE_COLLECTION_TYPE, app.getApplicationNo());
         if (existing.isPresent()) {
             return existing.get();
         }
@@ -71,8 +164,8 @@ public class SiteProvisioningService {
                 ? app.getSiteName()
                 : "Surface Collection Auction - " + app.getApplicationNo());
 
-        site.setApplicantUserId(app.getBidWinner().getPromoterId() != null ? app.getBidWinner().getPromoterId() : null);
-        site.setLeaseType(SURFACE_COLLECTION_CATEGORY);
+        site.setApplicantUserId(app.getBidWinner() != null ? app.getBidWinner().getPromoterId() : null);
+        site.setLeaseType(SURFACE_COLLECTION_TYPE);
         site.setLeaseApplicationId(app.getId());
         site.setLeaseApplicationNumber(app.getApplicationNo());
         site.setDzongkhagId(app.getDzongkhagId() != null ? app.getDzongkhagId().getId() : null);

@@ -122,7 +122,7 @@ public class NotificationClient {
      * account was just provisioned from a manual-entry submission.
      */
     @Async
-    public void sendApplicantAccountCredentialsEmail(String to, String fullName, String registrationType, String tempPassword) {
+    public void sendApplicantAccountCredentialsEmail(String to, String fullName, String registrationType, String tempPassword, String username) {
         if (!emailEnabled) {
             log.info("Email disabled. Would have sent applicant account credentials to: {}", to);
             return;
@@ -146,7 +146,7 @@ public class NotificationClient {
                         following your recent manual-entry application submission.</p>
                         <div style="background-color: #fff; padding: 15px; border-left: 4px solid #28a745; margin: 20px 0;">
                             <h3 style="margin-top:0;">Your Login Credentials</h3>
-                            <p><strong>Email:</strong><br><span style="font-family: monospace; color:#28a745;">%s</span></p>
+                            <p><strong>Username:</strong><br><span style="font-family: monospace; color:#28a745;">%s</span></p>
                             <p><strong>Temporary Password:</strong><br><span style="font-family: monospace; color:#28a745;">%s</span></p>
                         </div>
                         <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0;">
@@ -159,7 +159,7 @@ public class NotificationClient {
                         <p>You can log in to the system to track the status of your application.</p>
                     </div>
                 </div>
-                """, fullName, typeDisplay, to, tempPassword);
+                """, fullName, typeDisplay, username, tempPassword);
 
         try {
             sendHtmlEmail(to, subject, htmlContent);
@@ -1265,16 +1265,27 @@ public class NotificationClient {
     }
 
     public void sendUserNotification(String title, String message, Long userId, String serviceId, String recipientType, boolean actionRequired) {
+        sendUserNotification(title, message, userId, serviceId, recipientType, actionRequired, null);
+    }
 
-        String url = UriComponentsBuilder
+    /**
+     * Same as {@link #sendUserNotification(String, String, Long, String, String, boolean)}, but also
+     * carries the specific application this notification is about, so the frontend can deep-link
+     * straight to it (via Track Applications) instead of only the generic sidebar list page.
+     */
+    public void sendUserNotification(String title, String message, Long userId, String serviceId, String recipientType, boolean actionRequired, String applicationNumber) {
+
+        UriComponentsBuilder urlBuilder = UriComponentsBuilder
                 .fromHttpUrl(notificationApiUrl + "/user/{userId}")
                 .queryParam("title", title)
                 .queryParam("message", message)
                 .queryParam("serviceId", serviceId)
                 .queryParam("recipientType", recipientType)
-                .queryParam("actionRequired", actionRequired)
-                .buildAndExpand(userId)
-                .toUriString();
+                .queryParam("actionRequired", actionRequired);
+        if (applicationNumber != null && !applicationNumber.isBlank()) {
+            urlBuilder.queryParam("applicationNumber", applicationNumber);
+        }
+        String url = urlBuilder.buildAndExpand(userId).toUriString();
 
         try {
             ResponseEntity<String> response =

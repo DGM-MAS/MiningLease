@@ -41,7 +41,7 @@ public interface RenewalEnvironmentalClearanceRepository extends JpaRepository<E
     LEFT JOIN mas_db.t_environment_clearance_renewal ecr
         ON ecr.assignedmdid = u.id
         AND ecr.status NOT IN ('APPROVED', 'REJECTED', 'EC_RENEWED')
-    WHERE ur.role_id = 21
+    WHERE ur.role_id = 20
       AND u.account_status = 'ACTIVE'
       AND u.region_id = :regionId
     GROUP BY u.id, u.email, u.username

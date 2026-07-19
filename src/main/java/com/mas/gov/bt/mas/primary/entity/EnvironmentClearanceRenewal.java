@@ -48,6 +48,10 @@ public class EnvironmentClearanceRenewal {
     // Status Code
     private String status;
 
+    // Stage that most recently requested a revision ("MPCD" | "RC" | "MI" | "MD"),
+    // used to route a resubmitted application back to that same stage
+    private String pendingRevisionStage;
+
     // Assigned focal
     private Long assignedMPCDId;
 

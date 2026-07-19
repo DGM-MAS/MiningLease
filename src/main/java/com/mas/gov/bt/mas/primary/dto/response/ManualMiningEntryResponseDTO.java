@@ -108,6 +108,7 @@ public class ManualMiningEntryResponseDTO {
     private Double proposedAreaRow;
     private String permitNo;
     private String ecNo;
+    private LocalDate ecValidUpto;
     private String securityClearanceValidity;
     private String taxClearanceValidity;
     private Boolean isStateOwned;
