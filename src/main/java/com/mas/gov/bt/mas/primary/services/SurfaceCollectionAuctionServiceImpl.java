@@ -1,14 +1,17 @@
 package com.mas.gov.bt.mas.primary.services;
 
+import com.mas.gov.bt.mas.primary.dto.CitizenRegisterRequest;
 import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
 import com.mas.gov.bt.mas.primary.dto.request.*;
 import com.mas.gov.bt.mas.primary.dto.response.*;
 import com.mas.gov.bt.mas.primary.entity.*;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
+import com.mas.gov.bt.mas.primary.integration.CitizenRegistrationClient;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.repository.*;
 import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
 import com.mas.gov.bt.mas.primary.utility.LookupHelper;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -16,6 +19,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.LocalDateTime;
 import java.time.Year;
@@ -65,6 +70,8 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
     private static final int DEFAULT_TAT_DAYS = 2;
 
     private static final int DEFAULT_MAX_APPLICATIONS = 2;
+
+    private final CitizenRegistrationClient citizenRegistrationClient;
 
     @Override
     @Transactional
@@ -372,13 +379,19 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
 
         RegionMaster regionMaster =
                 lookupHelper.fetchLookup(dzongkhagLookup.getRegion().getId(), regionMasterRepository, "RegionMaster");
-        //         ============================================================
-        //         0. Checking the applicant hasn't exceeded the configured cap
-        //         ============================================================
-//        CapCheckResponse cap = checkCap(userId);
-//        if (!cap.isAllowed()) {
-//            throw new BusinessException(ErrorCodes.DATA_INTEGRITY_VIOLATION, cap.getMessage());
-//        }
+
+        CitizenRegisterRequest registerRequest = toCitizenRegisterRequest(dto);
+        if (!isValidRegisterRequest(registerRequest)) {
+            throw new BusinessException(ErrorCodes.DATA_INTEGRITY_VIOLATION,
+                    "Insufficient bid winner details to create a user account.");
+        }
+
+        citizenRegistrationClient.registerCitizen(registerRequest);
+
+        UserWorkloadProjection assignedUser = auctionRepository.findCitizenByEmail(dto.getEmailAddress());
+        if (assignedUser == null || assignedUser.getUserId() == null) {
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Bid winner details not found.");
+        }
 
         SurfaceCollectionBidWinner winner =
                 SurfaceCollectionBidWinner.builder()
@@ -406,20 +419,15 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
         entity.setSiteName(dto.getSiteName());
         auctionRepository.save(entity);
 
-        UserWorkloadProjection assignedUser = auctionRepository.findUserDetailsByEmail(dto.getEmailAddress());
-
-        if(assignedUser == null || assignedUser.getUserId() == null) {
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Bid winner details not found.");
-        }
         // =====================================================
-        // 3. Application master and create task for director
+        // Application master and create task for director
         // =====================================================
         ApplicationMaster applicationMaster = entity.getApplicationMaster();
         applicationMaster.setCurrentStatus("AUCTION_COMPLETED");
 
         applicationMasterRepository.save(applicationMaster);
 
-        createTask(entity.getApplicationMaster(), entity,"PROMOTER", entity.getCreatedBy(), assignedUser.getUserId());
+        createTask(entity.getApplicationMaster(), entity, "PROMOTER", entity.getCreatedBy(), entity.getCreatedBy());
 
         // Notification and Email
         if (assignedUser.getEmail() != null) {
@@ -427,16 +435,16 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                     assignedUser.getEmail(),
                     assignedUser.getUsername(),
                     entity.getApplicationNo());
-        }else {
+        } else {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Bid winner Email address not found.");
         }
 
-        if(assignedUser.getUserId()!= null) {
+        if (assignedUser.getEmail() != null) {
             String title = "Surface Collection Auction Winner";
-            String message = "Surface collection auction application has been won by you. Application No. "+ entity.getApplicationNo();
+            String message = "Surface collection auction application has been won by you. Application No. " + entity.getApplicationNo();
             String serviceId = MENU_ID_PROMOTER;
             notificationClient.sendUserNotification(title, message, assignedUser.getUserId(), serviceId, "STAFF", true, entity.getApplicationNo());
-        }else {
+        } else {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Bid winner user ID not present for notification.");
         }
 
@@ -479,7 +487,10 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
 
     private SurfaceCollectionAuctionApplication getAuction(Long id) {
         return auctionRepository.findById(id)
-                .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND,"Auction data not found. Auction Id is missing"));
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCodes.RECORD_NOT_FOUND,
+                        "Auction data not found. Auction Id is missing"
+                ));
     }
 
     private String generateApplicationNo() {
@@ -696,4 +707,38 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                 .resubmittedOn(bg.getResubmittedOn())
                 .build();
     }
+
+    private CitizenRegisterRequest toCitizenRegisterRequest(BidWinnerRequestDTO dto) {
+        CitizenRegisterRequest request = new CitizenRegisterRequest();
+        request.setEmail(dto.getEmailAddress());
+        request.setPhoneNumber(dto.getContactNumber());
+
+        if (isNotBlank(dto.getCompanyRegistrationNumber())) {
+            request.setRegistrationType("REGISTERED_COMPANY");
+            request.setCompanyRegistrationNumber(dto.getCompanyRegistrationNumber());
+            request.setCompanyName(dto.getBidWinnerName());
+            request.setCompanyType(dto.getCompanyType());
+        } else if (isNotBlank(dto.getLicenseNumber())) {
+            request.setRegistrationType("BUSINESS_LICENSE");
+            request.setLicenseNumber(dto.getLicenseNumber());
+            request.setBusinessName(dto.getBidWinnerName());
+            request.setBusinessOwner(dto.getBidWinnerName());
+        } else {
+            request.setRegistrationType("INDIVIDUAL");
+            request.setCid(dto.getCidNumber());
+            request.setName(dto.getBidWinnerName());
+            request.setMobileNumber(dto.getContactNumber());
+        }
+        return request;
+    }
+
+    private boolean isValidRegisterRequest(CitizenRegisterRequest r) {
+        return switch (r.getRegistrationType()) {
+            case "INDIVIDUAL" -> isNotBlank(r.getCid()) && isNotBlank(r.getName());
+            case "BUSINESS_LICENSE" -> isNotBlank(r.getLicenseNumber()) && isNotBlank(r.getBusinessName()) && isNotBlank(r.getBusinessOwner());
+            case "REGISTERED_COMPANY" -> isNotBlank(r.getCompanyRegistrationNumber()) && isNotBlank(r.getCompanyName()) && isNotBlank(r.getCompanyType());
+            default -> false;
+        };
+    }
+
 }
