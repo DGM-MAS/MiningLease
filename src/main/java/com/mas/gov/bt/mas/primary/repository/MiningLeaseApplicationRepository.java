@@ -44,8 +44,8 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     @Query("SELECT a FROM MiningLeaseApplication a WHERE a.applicantUserId = :userId AND a.currentStatus IN :applicationStatus ")
     Page<MiningLeaseApplication> findByApplicantUserIdAndStatusInApplication(Long userId, List<String> applicationStatus, Pageable pageable);
 
-    @Query("SELECT a FROM MiningLeaseApplication a WHERE a.applicantUserId = :userId ")
-    Page<MiningLeaseApplication> findByApplicantUserId(Long userId, Pageable pageable);
+    @Query("SELECT a FROM MiningLeaseApplication a WHERE a.applicantUserId = :userId AND a.currentStatus NOT IN :applicationStatus ")
+    Page<MiningLeaseApplication> findByApplicantUserId(Long userId, List<String> applicationStatus, Pageable pageable);
 
     @Query("SELECT a FROM MiningLeaseApplication a WHERE a.currentStatus IN :statuses")
     Page<MiningLeaseApplication> findByStatusIn(@Param("statuses") List<String> statuses, Pageable pageable);
