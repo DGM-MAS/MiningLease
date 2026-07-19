@@ -795,6 +795,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                 "ASSIGNED TO MD",
                 "ASSIGNED TO MPCD",
                 "UNDER_MPCD_REVIEW",
+                "UNDER_MPCD_REVIEW",
                 "APPROVED_BY_MPCD",
                 "PAYMENT_PENDING",
                 "IOM_SUBMITTED_TO_MD",
@@ -805,8 +806,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                 "MI_REPORT_SUBMITTED",
                 "UNDER_MD_REVIEW",
                 "PAID",
-                "FORWARDED_TO_DECC",
-                "EC_RENEWED");
+                "FORWARDED_TO_DECC");
         Page<EnvironmentClearanceRenewal> applications;
 
         if (search == null || search.isBlank()) {
@@ -857,7 +857,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
 
             page = renewalEnvironmentalClearanceRepository
                     .findByStatusIn(
-                            List.of("APPROVED", "REJECTED"),
+                            List.of("APPROVED", "REJECTED", "EC_RENEWED"),
                             pageable
                     );
 
@@ -865,7 +865,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
 
             page = renewalEnvironmentalClearanceRepository
                     .findByStatusInAndApplicationNoContainingIgnoreCase(
-                            List.of("APPROVED", "REJECTED"),
+                            List.of("APPROVED", "REJECTED", "EC_RENEWED"),
                             search,
                             pageable
                     );
@@ -1515,7 +1515,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         }
 
         if (Boolean.TRUE.equals(request.getForwardToDECC())) {
-            entity.setStatus("FORWARDED_TO_DECC");
+            entity.setStatus("FORWARDED_TO_DECC"); a
         } else {
             entity.setStatus("EC_RENEWED");
             // Terminal state — mark completion so the citizen tracking dashboard archives it
