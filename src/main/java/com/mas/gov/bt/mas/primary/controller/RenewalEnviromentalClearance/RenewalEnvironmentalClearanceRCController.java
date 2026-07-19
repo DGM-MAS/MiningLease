@@ -2,6 +2,7 @@ package com.mas.gov.bt.mas.primary.controller.RenewalEnviromentalClearance;
 
 import com.mas.gov.bt.mas.primary.config.UserContext;
 import com.mas.gov.bt.mas.primary.dto.request.AssignMIRequestDTO;
+import com.mas.gov.bt.mas.primary.dto.request.RequestResubmissionDTO;
 import com.mas.gov.bt.mas.primary.dto.request.SubmitRCReportDTO;
 import com.mas.gov.bt.mas.primary.dto.response.EnvironmentClearanceRenewalResponseDTO;
 import com.mas.gov.bt.mas.primary.services.RenewalEnvironmentalClearanceService;
@@ -93,6 +94,28 @@ public class RenewalEnvironmentalClearanceRCController {
         return ResponseEntity.ok(
                 new SuccessResponse<>(
                         "MI assigned successfully",
+                        response
+                )
+        );
+    }
+
+    @PutMapping("/request-resubmission")
+    public ResponseEntity<SuccessResponse<EnvironmentClearanceRenewalResponseDTO>> requestResubmission(
+            @Valid @RequestBody RequestResubmissionDTO request
+    ) {
+
+        Long userId = userContext.getCurrentUserId();
+
+        EnvironmentClearanceRenewalResponseDTO response =
+                renewalEnvironmentalClearanceService
+                        .requestResubmissionRC(
+                                request,
+                                userId
+                        );
+
+        return ResponseEntity.ok(
+                new SuccessResponse<>(
+                        "Resubmission requested successfully",
                         response
                 )
         );

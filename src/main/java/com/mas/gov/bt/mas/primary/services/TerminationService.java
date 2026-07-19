@@ -36,6 +36,11 @@ public class TerminationService {
     private static final String SERVICE_CODE = "TERMINATION_SERVICE";
     private static final int DEFAULT_TAT_DAYS = 2;
 
+    // Real sidebar menu ids (permissions.id) per recipient role for this service — used to target
+    // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
+    // NOT the same thing as SERVICE_CODE above, which is an unrelated t_application_master.service_code value.
+    private static final String MENU_ID_CMS_HEAD = "114"; // "CMS HEAD" — TERMINATION_SERVICE
+
     private final TerminationApplicationRepository terminationApplicationRepository;
 
     private final ApplicationMasterRepository applicationMasterRepository;
@@ -124,8 +129,8 @@ public class TerminationService {
             if (assignedCMSHead.getUserId() != null) {
                 String title = "Termination application has been assigned.";
                 String message = "Application No. " + entity.getTerminationId() + " assigned for review.";
-                String serviceId = "112";
-                notificationClient.sendUserNotification(title, message, assignedCMSHead.getUserId(), serviceId, "STAFF", true);
+                String serviceId = MENU_ID_CMS_HEAD;
+                notificationClient.sendUserNotification(title, message, assignedCMSHead.getUserId(), serviceId, "STAFF", true, entity.getTerminationId());
             }
 
             // ✅ Add to response list
@@ -334,8 +339,8 @@ public class TerminationService {
         if(userDetails.getUserId()!= null) {
             String title = "An new application has been reassigned.";
             String message = "An application for termination has been assigned for review. Application No. " +app.getTerminationId() +" Please login to review the application";
-            String serviceId = "112";
-            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true);
+            String serviceId = MENU_ID_CMS_HEAD;
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true, app.getTerminationId());
         }else {
             throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }

@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDate;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -20,6 +22,13 @@ public class ApproveECRequestDTO {
 
     private Boolean forwardToDECC;
 
+    // Optional — the DECC-issued EC reference, only known once DECC has actually
+    // issued/renewed the clearance (not always available at the moment MD approves,
+    // e.g. when forwarding a lease renewal to DECC for later processing).
+    private String ecNumber;
 
+    private String ecFileId;
+
+    private LocalDate ecExpiryDate;
 
 }

@@ -85,6 +85,15 @@ public class ApplicationMaster {
     @Column(name = "site_id")
     private Long siteId;
 
+    // Shared physical table has 7 independent JPA entity copies (this one plus
+    // Quarrying-Lease, mas-backend-masters, mas-royalty-service, promotor-reporting,
+    // mas-file-upload, Reports) writing to it. Without @Version, a stale in-memory save from
+    // one service silently overwrote columns (e.g. current_status, site_id) written by another
+    // service in the meantime — now fails fast with an optimistic-lock exception instead.
+    @Version
+    @Column(name = "row_version")
+    private Long rowVersion;
+
     /** Keeps the _at/_on timestamp pairs in sync regardless of which one this service's code sets. */
     @PrePersist
     @PreUpdate

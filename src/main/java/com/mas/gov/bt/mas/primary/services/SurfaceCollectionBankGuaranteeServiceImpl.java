@@ -45,6 +45,11 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
 
     private static final String SERVICE_CODE = "SURFACE_COLLECTION_AUCTION";
 
+    // Real sidebar menu ids (permissions.id) per recipient role — used to target
+    // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
+    // Same SURFACE_COLLECTION_AUCTION menu tree as SurfaceCollectionAuctionServiceImpl.java.
+    private static final String MENU_ID_MINING_DIRECTOR = "74"; // "MINING_DIRECTOR"
+
     private static final int DEFAULT_TAT_DAYS = 2;
 
     @Override
@@ -115,8 +120,8 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
         if(userMDDetails.getUserId()!= null) {
             String title = "Bank guarantor details has been submitted Surface Collection Auction.";
             String message = "Bank guarantor details has been submitted for surface collection auction. Application No. "+ surfaceCollectionAuctionApplication1.getApplicationNo();
-            String serviceId = "71";
-            notificationClient.sendUserNotification(title, message, userMDDetails.getUserId(), serviceId, "STAFF", true);
+            String serviceId = MENU_ID_MINING_DIRECTOR;
+            notificationClient.sendUserNotification(title, message, userMDDetails.getUserId(), serviceId, "STAFF", true, surfaceCollectionAuctionApplication1.getApplicationNo());
         }else {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "User ID not found.");
         }
@@ -203,8 +208,8 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
         if(userMDDetails.getUserId()!= null) {
             String title = "Bank guarantor details has been resubmitted Surface Collection Auction.";
             String message = "Bank guarantor details has been resubmitted for surface collection auction. Application No. "+ surfaceCollectionAuctionApplication1.getApplicationNo();
-            String serviceId = "71";
-            notificationClient.sendUserNotification(title, message, userMDDetails.getUserId(), serviceId, "STAFF", true);
+            String serviceId = MENU_ID_MINING_DIRECTOR;
+            notificationClient.sendUserNotification(title, message, userMDDetails.getUserId(), serviceId, "STAFF", true, surfaceCollectionAuctionApplication1.getApplicationNo());
         }else {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "MD User ID not found.");
         }

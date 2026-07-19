@@ -46,9 +46,20 @@ public class SurfaceCollectionReviewServiceImpl
 
     private final SiteProvisioningService siteProvisioningService;
 
-    private final HouseholdPermitThresholdEntryRepository thresholdEntryRepository;
+    private final SurfaceCollectionBidWinnerRepository bidWinnerRepository;
+    private final ApplicantAccountProvisioningService applicantAccountProvisioningService;
+    private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
 
     private static final String SERVICE_CODE = "SURFACE_COLLECTION_AUCTION";
+    /** Matches HouseholdPermitThresholdService.SURFACE_COLLECTION_PERMIT in mas-royalty-service —
+     * the service type actually checked by the live household-cap enforcement, so an auction-won
+     * permit counts against the same cap a regular Surface Collection application would. */
+    private static final String HOUSEHOLD_CAP_SERVICE_TYPE = "SURFACE_COLLECTION_PERMIT";
+
+    // Real sidebar menu ids (permissions.id) per recipient role — used to target
+    // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
+    // Same SURFACE_COLLECTION_AUCTION menu tree as SurfaceCollectionAuctionServiceImpl.java.
+    private static final String MENU_ID_PROMOTER = "73"; // "PROMOTER"
 
     private static final int DEFAULT_TAT_DAYS = 2;
 
@@ -160,8 +171,8 @@ public class SurfaceCollectionReviewServiceImpl
         if(userPromoterDetails.getUserId()!= null) {
             String title = "Bank guarantor details has been reviewed.";
             String message = "Bank guarantor details has been reviewed for surface collection auction. Application No. "+ surfaceCollectionAuctionApplication1.getApplicationNo();
-            String serviceId = "71";
-            notificationClient.sendUserNotification(title, message, userPromoterDetails.getUserId(), serviceId, "STAFF", true);
+            String serviceId = MENU_ID_PROMOTER;
+            notificationClient.sendUserNotification(title, message, userPromoterDetails.getUserId(), serviceId, "STAFF", true, surfaceCollectionAuctionApplication1.getApplicationNo());
         }else {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Promoter Email Address not found.");
         }
@@ -190,6 +201,7 @@ public class SurfaceCollectionReviewServiceImpl
     }
 
     @Override
+    @Transactional
     public SurfaceCollectionAuctionResponseDTO issuePermit(
             Long reviewId,
             Long mdUserId
@@ -198,6 +210,7 @@ public class SurfaceCollectionReviewServiceImpl
         SurfaceCollectionAuctionApplication entity = getAuction(reviewId);
 
         ApplicationMaster master = entity.getApplicationMaster();
+        SurfaceCollectionBidWinner bidWinner = entity.getBidWinner();
 
         entity.setApprovedDate(LocalDate.now());
         entity.setPermitGenerated(true);
@@ -225,14 +238,49 @@ public class SurfaceCollectionReviewServiceImpl
         surfaceCollectionAuctionPermit.setPermitStatus("APPROVED");
         permitRepository.save(surfaceCollectionAuctionPermit);
 
+        // Resolve (or auto-register) the winning bidder's own citizen account so the
+        // permit, the site, and the tracked application get attributed to the actual
+        // winner rather than the MD/officer who processed the issuance. Runs
+        // synchronously (REQUIRES_NEW, commits independently) since downstream steps
+        // in this method need the id right away.
+        Long promoterId = null;
+        if (bidWinner != null) {
+            promoterId = applicantAccountProvisioningService.provisionForApplicant(
+                    null, bidWinner.getCidNumber(), bidWinner.getBidWinnerName(),
+                    bidWinner.getContactNumber(), bidWinner.getEmailAddress(),
+                    bidWinner.getLicenseNumber(), null,
+                    bidWinner.getCompanyRegistrationNumber(), bidWinner.getBidWinnerName(), bidWinner.getCompanyType());
+            if (promoterId != null) {
+                bidWinner.setPromoterId(promoterId);
+                bidWinnerRepository.save(bidWinner);
+            }
+        }
+        if (promoterId != null) {
+            master.setApplicantUserId(promoterId);
+        }
 
         // Surface Collection Permit is stored here
         SurfaceCollectionPermitEntity surfaceCollectionPermitEntity = new SurfaceCollectionPermitEntity();
         surfaceCollectionPermitEntity.setApprovedOn(LocalDate.now());
         surfaceCollectionPermitEntity.setNameOfSurfaceCollection(entity.getSiteName());
         surfaceCollectionPermitEntity.setOrigin("AUCTION");
-        surfaceCollectionPermitEntity.setPermitNo(surfaceCollectionAuctionPermit.getPermitNo());;
+        surfaceCollectionPermitEntity.setPermitNo(surfaceCollectionAuctionPermit.getPermitNo());
         surfaceCollectionPermitEntity.setApplicationNo(entity.getApplicationNo());
+        surfaceCollectionPermitEntity.setCreatedBy(promoterId);
+        if (bidWinner != null) {
+            surfaceCollectionPermitEntity.setApplicantCid(bidWinner.getCidNumber());
+            surfaceCollectionPermitEntity.setApplicantName(bidWinner.getBidWinnerName());
+            surfaceCollectionPermitEntity.setMobileNo(bidWinner.getContactNumber());
+            surfaceCollectionPermitEntity.setEmail(bidWinner.getEmailAddress());
+            surfaceCollectionPermitEntity.setDzongkhag(bidWinner.getDzongkhagId() != null ? bidWinner.getDzongkhagId().getDzongkhagName() : null);
+            surfaceCollectionPermitEntity.setGewog(bidWinner.getGewogId() != null ? bidWinner.getGewogId().getGewogName() : null);
+            surfaceCollectionPermitEntity.setPlaceVillage(bidWinner.getVillageId() != null ? bidWinner.getVillageId().getVillageName() : null);
+            surfaceCollectionPermitEntity.setRegionId(bidWinner.getRegionId() != null ? bidWinner.getRegionId().getId() : null);
+        }
+        surfaceCollectionPermitEntity.setEcFileId(entity.getFileECid());
+        surfaceCollectionPermitEntity.setEcNo(entity.getEcNumber());
+        surfaceCollectionPermitEntity.setEcValidUpto(entity.getEcValidUpto());
+        surfaceCollectionPermitEntity.setECStatus(entity.getEcStatus());
 
         repository.save(surfaceCollectionPermitEntity);
 
@@ -241,7 +289,7 @@ public class SurfaceCollectionReviewServiceImpl
 
         applicationMasterRepository.save(master);
 
-//        recordApprovedForThreshold(entity);
+        recordApprovedForThreshold(entity, bidWinner, surfaceCollectionAuctionPermit.getPermitNo());
 
         return mapToResponse(entity);
     }
@@ -313,6 +361,9 @@ public class SurfaceCollectionReviewServiceImpl
                 .location(entity.getLocation())
                 .area(entity.getArea())
                 .material(entity.getMaterial())
+                .ecFileId(entity.getFileECid())
+                .ecNumber(entity.getEcNumber())
+                .ecValidUpto(entity.getEcValidUpto())
                 .ecStatus(entity.getEcStatus())
                 .fcStatus(entity.getFcStatus())
                 .auctionStatus(entity.getAuctionStatus())
@@ -369,6 +420,9 @@ public class SurfaceCollectionReviewServiceImpl
                 .location(entity.getLocation())
                 .area(entity.getArea())
                 .material(entity.getMaterial())
+                .ecFileId(entity.getFileECid())
+                .ecNumber(entity.getEcNumber())
+                .ecValidUpto(entity.getEcValidUpto())
                 .ecStatus(entity.getEcStatus())
                 .fcStatus(entity.getFcStatus())
                 .auctionStatus(entity.getAuctionStatus())
@@ -401,17 +455,19 @@ public class SurfaceCollectionReviewServiceImpl
                 .build();
     }
 
-    /** Records an ACTIVE entry in the shared threshold table when a lease is finally approved. */
-//    private void recordApprovedForThreshold(SurfaceCollectionAuctionApplication app) {
-//        if (app. == null || app.getApplicantCid().isBlank()) return;
-//        if (thresholdEntryRepository.existsByServiceTypeAndApplicationNo(SERVICE_CODE, app.getApplicationNumber())) {
-//            return;
-//        }
-//        HouseholdPermitThresholdEntry entry = new HouseholdPermitThresholdEntry();
-//        entry.setApplicantCid(app.getApplicantCid());
-//        entry.setServiceType(SERVICE_CODE);
-//        entry.setApplicationNo(app.getApplicationNumber());
-//        entry.setStatus("ACTIVE");
-//        thresholdEntryRepository.save(entry);
-//    }
+    /**
+     * Records an ACTIVE entry in the same household-cap table the real (non-auction)
+     * Surface Collection flow uses, so an auction-won permit counts against a
+     * household's cap exactly like a regular SC application would.
+     */
+    private void recordApprovedForThreshold(SurfaceCollectionAuctionApplication app, SurfaceCollectionBidWinner bidWinner, String permitNo) {
+        if (bidWinner == null || bidWinner.getCidNumber() == null || bidWinner.getCidNumber().isBlank()) return;
+        HouseholdPermitThresholdEntity entry = new HouseholdPermitThresholdEntity();
+        entry.setApplicantCid(bidWinner.getCidNumber());
+        entry.setServiceType(HOUSEHOLD_CAP_SERVICE_TYPE);
+        entry.setApplicationNo(app.getApplicationNo());
+        entry.setPermitNo(permitNo);
+        entry.setStatus("ACTIVE");
+        householdPermitThresholdRepository.save(entry);
+    }
 }

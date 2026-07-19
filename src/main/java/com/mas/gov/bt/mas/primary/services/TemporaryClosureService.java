@@ -34,6 +34,19 @@ public class TemporaryClosureService {
     private static final String SERVICE_ID = "108";
     private static final int DEFAULT_TAT_DAYS = 2;
 
+    // Real sidebar menu ids (permissions.id) per recipient role — used to target
+    // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
+    // NOT the same thing as SERVICE_ID above, which is an unrelated t_application_master.service_id
+    // value (108 is actually the parent "Temporary Closure" folder /temporaryClosure, not a leaf).
+    // Confirmed via DB: children of permissions.id=108 are
+    //   109 = "Temporary Closure Application" (/temporaryclosurelist) — PROMOTOR/citizen (no
+    //         sendUserNotification call site in this file currently targets the citizen, so no
+    //         constant is defined for 109 — add one here if/when that changes)
+    //   110 = "RC Closure Application List"   (/rcapproverejectlist)  — RC
+    //   111 = "MI Closure Application List"   (/miverifiactionlist)   — MI
+    private static final String MENU_ID_RC = "110";
+    private static final String MENU_ID_MI = "111";
+
     private final TemporaryClosureRepository temporaryClosureRepository;
     private final TaskManagementRepository taskManagementRepository;
     private final ApplicationMasterRepository  applicationMasterRepository;
@@ -149,8 +162,8 @@ public class TemporaryClosureService {
         if(assignedRC.getUserId()!= null) {
             String title = "Temporary closure application has been assigned.";
             String message = "An application for temporary has been assigned for review. Application No. "+ temporaryClosureEntity.getApplicationId()+" Please login to review the temporary closure application.";
-            String serviceId = "108";
-            notificationClient.sendUserNotification(title, message, assignedRC.getUserId(), serviceId, "STAFF", true);
+            String serviceId = MENU_ID_RC;
+            notificationClient.sendUserNotification(title, message, assignedRC.getUserId(), serviceId, "STAFF", true, temporaryClosureEntity.getApplicationId());
         }else {
             throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
@@ -299,8 +312,8 @@ public class TemporaryClosureService {
 
                 String title = "A new temporary closure application has been assigned.";
                 String message = "A new temporary closure application has been assigned.";
-                String serviceId = "108";
-                notificationClient.sendUserNotification(title, message, userMI.getUserId(), serviceId, "STAFF", true);
+                String serviceId = MENU_ID_MI;
+                notificationClient.sendUserNotification(title, message, userMI.getUserId(), serviceId, "STAFF", true, temporaryClosureEntity.getApplicationId());
             }
         }
         return TemporaryClosureMapper.toResponse(temporaryClosureEntity);
@@ -507,8 +520,8 @@ public class TemporaryClosureService {
         if(assignedMIDetails.getUserId() != null) {
             String title = "Mining lease application has been assigned for MLA review.";
             String message = "Mining lease application has been  assigned for MLA review.";
-            String serviceId = "108";
-            notificationClient.sendUserNotification(title, message, assignedMIDetails.getUserId(), serviceId, "STAFF", true);
+            String serviceId = MENU_ID_MI;
+            notificationClient.sendUserNotification(title, message, assignedMIDetails.getUserId(), serviceId, "STAFF", true, temporaryClosureEntity.getApplicationId());
         }
 
         return  TemporaryClosureMapper.toResponse(temporaryClosureRepository.save(temporaryClosureEntity));
@@ -544,8 +557,8 @@ public class TemporaryClosureService {
         if(userDetails.getUserId()!= null) {
             String title = "An new application has been reassigned.";
             String message = "An application for temporary closure has been assigned for review. Application No. "+ request.getApplicationNumber()+" Please login in review the application";
-            String serviceId = "108";
-            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true);
+            String serviceId = MENU_ID_RC;
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true, request.getApplicationNumber());
         }else {
             throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
@@ -606,8 +619,8 @@ public class TemporaryClosureService {
         if(userDetails.getUserId()!= null) {
             String title = "An new application has been reassigned.";
             String message = "An application for temporary closure has been assigned for review. Application No. "+ request.getApplicationNumber()+" Please login in review the application";
-            String serviceId = "108";
-            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true);
+            String serviceId = MENU_ID_MI;
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true, request.getApplicationNumber());
         }else {
             throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }

@@ -23,6 +23,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Year;
 import java.time.ZoneId;
+import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -33,6 +34,12 @@ import java.util.Optional;
 public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironmentalClearanceService {
 
     private static final String SERVICE_CODE = "RENEWAL_ENV_CLEARANCE";
+
+    // Real sidebar menu ids (permissions.id) per recipient role for this service — used to target
+    // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
+    // NOT the same thing as SERVICE_CODE above, which is an unrelated t_application_master.service_code value.
+    private static final String MENU_ID_MPCD            = "94"; // "MPCD" — RENEWAL_ENV_CLEARANCE
+    private static final String MENU_ID_MINING_ENGINEER  = "95"; // "MINING ENGINEER"
 
     private final EnvironmentClearanceRenewalMapper environmentClearanceRenewalMapper;
 
@@ -125,8 +132,8 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
 
             String title = "Renewal environmental clearance application has been assigned.";
             String message = "An application for environmental clearance lease has been assigned for review. Application No. "+ entity.getApplicationNo()+" Please login in review the Geological report.";
-            String serviceId = "78";
-            notificationClient.sendUserNotification(title, message, assignedMDEngineer.getUserId(), serviceId, "STAFF", true);
+            String serviceId = MENU_ID_MINING_ENGINEER;
+            notificationClient.sendUserNotification(title, message, assignedMDEngineer.getUserId(), serviceId, "STAFF", true, entity.getApplicationNo());
 
         }else {
 
@@ -159,8 +166,8 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
 
             String title = "Renewal environmental clearance application has been assigned.";
             String message = "An application for environmental clearance lease has been assigned for review. Application No. "+ entity.getApplicationNo()+" Please login in review the Geological report.";
-            String serviceId = "78";
-            notificationClient.sendUserNotification(title, message, assignedMPCD.getUserId(), serviceId, "STAFF", true);
+            String serviceId = MENU_ID_MPCD;
+            notificationClient.sendUserNotification(title, message, assignedMPCD.getUserId(), serviceId, "STAFF", true, entity.getApplicationNo());
 
         }
 
@@ -190,24 +197,32 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             );
         }
 
-        if (request.getLocation() == null ||
-                request.getLocation().isBlank()) {
-            throw new IllegalArgumentException(
-                    "Location is required"
-            );
-        }
+        boolean isLeaseType = request.getServiceType().equals("MINING LEASE")
+                || request.getServiceType().equals("QUARRY LEASE");
 
-        if (request.getArea() == null ||
-                request.getArea().isBlank()) {
-            throw new IllegalArgumentException(
-                    "Area is required"
-            );
-        }
+        // Location/Area/Previous EC only apply to Surface Collection renewals —
+        // the applicant form never collects them for Mining/Quarry Lease renewals.
+        if (!isLeaseType) {
 
-        if (request.getPreviousEcFileId() == null) {
-            throw new IllegalArgumentException(
-                    "Previous EC file is required"
-            );
+            if (request.getLocation() == null ||
+                    request.getLocation().isBlank()) {
+                throw new IllegalArgumentException(
+                        "Location is required"
+                );
+            }
+
+            if (request.getArea() == null ||
+                    request.getArea().isBlank()) {
+                throw new IllegalArgumentException(
+                        "Area is required"
+                );
+            }
+
+            if (request.getPreviousEcFileId() == null) {
+                throw new IllegalArgumentException(
+                        "Previous EC file is required"
+                );
+            }
         }
 
         if (request.getSelfMonitoringReportFileId() == null) {
@@ -377,7 +392,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
 
             UserWorkloadProjection assignedMD = assignMD(regionId);
 
-            if (assignedMD != null) {
+            if (assignedMD == null) {
                 assignedMD = assignMD(9L);
             }
             entity.setAssignedMDId(assignedMD.getUserId());
@@ -400,7 +415,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                     "Renewal environmental clearance IOM has been assigned.",
                     "An IOM for environmental clearance renewal has been forwarded for your review. Application No. " + entity.getApplicationNo(),
                     assignedMD.getUserId(),
-                    "78", "STAFF", true);
+                    MENU_ID_MINING_ENGINEER, "STAFF", true, entity.getApplicationNo());
 
             return environmentClearanceRenewalMapper.toResponseDTO(saved);
 
@@ -448,6 +463,60 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         }
 
         if (!entity.getAssignedMPCDId().equals(userId)) {
+            throw new CustomRuntimeException(
+                    "You are not assigned to this application"
+            );
+        }
+    }
+
+    private void validateRCAssignment(
+            EnvironmentClearanceRenewal entity,
+            Long userId
+    ) {
+
+        if (entity.getAssignedRCId() == null) {
+            throw new CustomRuntimeException(
+                    "Application is not assigned"
+            );
+        }
+
+        if (!entity.getAssignedRCId().equals(userId)) {
+            throw new CustomRuntimeException(
+                    "You are not assigned to this application"
+            );
+        }
+    }
+
+    private void validateMIAssignment(
+            EnvironmentClearanceRenewal entity,
+            Long userId
+    ) {
+
+        if (entity.getAssignedMIId() == null) {
+            throw new CustomRuntimeException(
+                    "Application is not assigned"
+            );
+        }
+
+        if (!entity.getAssignedMIId().equals(userId)) {
+            throw new CustomRuntimeException(
+                    "You are not assigned to this application"
+            );
+        }
+    }
+
+    private void validateMDAssignment(
+            EnvironmentClearanceRenewal entity,
+            Long userId
+    ) {
+
+        if (entity.getAssignedMDId() == null) {
+            throw new CustomRuntimeException(
+                    "Application is not assigned"
+            );
+        }
+
+        if (!entity.getAssignedMDId().equals(userId)) {
             throw new CustomRuntimeException(
                     "You are not assigned to this application"
             );
@@ -544,8 +613,8 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         if(userDetails.getUserId()!= null) {
             String title = "An new application has been reassigned.";
             String message = "An application for environmental clearance renewal has been assigned for review. Application No. "+ request.getApplicationNumber()+" Please login in review the application";
-            String serviceId = "78";
-            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true);
+            String serviceId = MENU_ID_MPCD;
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true, request.getApplicationNumber());
         }else {
             throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
@@ -736,7 +805,34 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                 request.getSelfMonitoringReportFileId()
         );
 
-        routeApplication(entity);
+        String pendingRevisionStage = entity.getPendingRevisionStage();
+
+        if ("RC".equals(pendingRevisionStage)) {
+
+            entity.setStatus("ASSIGNED_TO_RC");
+            entity.getApplicationMaster()
+                    .setCurrentStatus("ASSIGNED_TO_RC");
+
+        } else if ("MI".equals(pendingRevisionStage)) {
+
+            entity.setStatus("ASSIGNED_TO_MI");
+            entity.getApplicationMaster()
+                    .setCurrentStatus("ASSIGNED_TO_MI");
+
+        } else if ("MD".equals(pendingRevisionStage)) {
+
+            entity.setStatus("UNDER_MD_REVIEW");
+            entity.getApplicationMaster()
+                    .setCurrentStatus("UNDER_MD_REVIEW");
+
+        } else {
+
+            routeApplication(entity);
+            entity.getApplicationMaster()
+                    .setCurrentStatus(entity.getStatus());
+        }
+
+        entity.setPendingRevisionStage(null);
 
         EnvironmentClearanceRenewal saved =
                 renewalEnvironmentalClearanceRepository
@@ -804,6 +900,100 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
 
         entity.setRemarkMPCD(request.getRemarks());
         entity.setStatus("RESUBMISSION_REQUIRED");
+        entity.setPendingRevisionStage("MPCD");
+
+        entity.getApplicationMaster()
+                .setCurrentStatus("RESUBMISSION_REQUIRED");
+
+        EnvironmentClearanceRenewal saved =
+                renewalEnvironmentalClearanceRepository
+                        .save(entity);
+
+        return environmentClearanceRenewalMapper
+                .toResponseDTO(saved);
+    }
+
+    @Override
+    public EnvironmentClearanceRenewalResponseDTO requestResubmissionRC(
+            RequestResubmissionDTO request,
+            Long userId
+    ) {
+
+        EnvironmentClearanceRenewal entity =
+                renewalEnvironmentalClearanceRepository
+                        .findById(request.getRenewalId())
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Application not found"
+                                ));
+
+        validateRCAssignment(entity, userId);
+
+        entity.setRemarkRC(request.getRemarks());
+        entity.setStatus("RESUBMISSION_REQUIRED");
+        entity.setPendingRevisionStage("RC");
+
+        entity.getApplicationMaster()
+                .setCurrentStatus("RESUBMISSION_REQUIRED");
+
+        EnvironmentClearanceRenewal saved =
+                renewalEnvironmentalClearanceRepository
+                        .save(entity);
+
+        return environmentClearanceRenewalMapper
+                .toResponseDTO(saved);
+    }
+
+    @Override
+    public EnvironmentClearanceRenewalResponseDTO requestResubmissionMI(
+            RequestResubmissionDTO request,
+            Long userId
+    ) {
+
+        EnvironmentClearanceRenewal entity =
+                renewalEnvironmentalClearanceRepository
+                        .findById(request.getRenewalId())
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Application not found"
+                                ));
+
+        validateMIAssignment(entity, userId);
+
+        entity.setRemarkMI(request.getRemarks());
+        entity.setStatus("RESUBMISSION_REQUIRED");
+        entity.setPendingRevisionStage("MI");
+
+        entity.getApplicationMaster()
+                .setCurrentStatus("RESUBMISSION_REQUIRED");
+
+        EnvironmentClearanceRenewal saved =
+                renewalEnvironmentalClearanceRepository
+                        .save(entity);
+
+        return environmentClearanceRenewalMapper
+                .toResponseDTO(saved);
+    }
+
+    @Override
+    public EnvironmentClearanceRenewalResponseDTO requestResubmissionMD(
+            RequestResubmissionDTO request,
+            Long userId
+    ) {
+
+        EnvironmentClearanceRenewal entity =
+                renewalEnvironmentalClearanceRepository
+                        .findById(request.getRenewalId())
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Application not found"
+                                ));
+
+        validateMDAssignment(entity, userId);
+
+        entity.setRemarkMD(request.getRemarks());
+        entity.setStatus("RESUBMISSION_REQUIRED");
+        entity.setPendingRevisionStage("MD");
 
         entity.getApplicationMaster()
                 .setCurrentStatus("RESUBMISSION_REQUIRED");
@@ -945,9 +1135,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                         .orElseThrow(() ->
                                 new RuntimeException("Application not found"));
 
-        if (!entity.getAssignedRCId().equals(userId)) {
-            throw new CustomRuntimeException("You are not assigned");
-        }
+        validateRCAssignment(entity, userId);
 
         entity.setRcSiteReportFileId(
                 request.getRcSiteReportFileId()
@@ -984,9 +1172,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                         .orElseThrow(() ->
                                 new RuntimeException("Application not found"));
 
-        if (!entity.getAssignedRCId().equals(userId)) {
-            throw new CustomRuntimeException("You are not assigned as RC");
-        }
+        validateRCAssignment(entity, userId);
 
         entity.setAssignedMIId(request.getMiUserId());
         entity.setRemarkMI(request.getRemarks());
@@ -1068,11 +1254,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                                         "Application not found"
                                 ));
 
-        if (!entity.getAssignedMIId().equals(userId)) {
-            throw new CustomRuntimeException(
-                    "You are not assigned as MI"
-            );
-        }
+        validateMIAssignment(entity, userId);
 
         entity.setMiSiteReportFileId(
                 request.getMiSiteReportFileId()
@@ -1106,7 +1288,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         Page<EnvironmentClearanceRenewal> page;
 
         List<String> statuses = List.of(
-                "ASSIGNED_TO_MD",
+                "ASSIGNED TO MD",
                 "UNDER_MD_REVIEW",
                 "IOM_SUBMITTED_TO_MD",
                 "PAID"
@@ -1148,13 +1330,23 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                         .findById(request.getRenewalId())
                         .orElseThrow(() -> new RuntimeException("Application not found"));
 
-        if (!userId.equals(entity.getAssignedMDId())) {
-            throw new CustomRuntimeException("You are not assigned as MD");
-        }
+        validateMDAssignment(entity, userId);
 
         entity.setEcCertificateFileId(request.getEcCertificateFileId());
         entity.setEcGeneratedOn(LocalDateTime.now());
         entity.setMdApprovedOn(LocalDateTime.now());
+
+        if (request.getEcNumber() != null) {
+            entity.setEcNumber(request.getEcNumber());
+        }
+        if (request.getEcFileId() != null) {
+            entity.setEcFileId(request.getEcFileId());
+        }
+        if (request.getEcExpiryDate() != null) {
+            entity.setEcExpiryDate(
+                    Date.from(request.getEcExpiryDate().atStartOfDay(ZoneId.systemDefault()).toInstant())
+            );
+        }
 
         if (Boolean.TRUE.equals(request.getForwardToDECC())) {
             entity.setStatus("FORWARDED_TO_DECC");

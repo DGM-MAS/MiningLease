@@ -44,6 +44,10 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
     private final DzongkhagLookupRepository dzongkhagLookupRepository;
     private final GewogLookupRepository gewogLookupRepository;
     private final VillageLookupRepository villageLookupRepository;
+    private final SiteProvisioningService siteProvisioningService;
+    private final HouseholdPermitThresholdEntryRepository thresholdEntryRepository;
+    private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
+    private final ApplicantAccountRepository applicantAccountRepository;
 
     @Autowired
     private StockLiftingRepository stockLiftingRepository;
@@ -188,7 +192,8 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         ml.setWorkOrderDocId(req.getWorkOrderDocId());
         ml.setApplicationNumber(generateMlAppNumber(prefix));
         ml.setCurrentStatus(status);
-        ml.setApplicantUserId(userId);
+        ml.setApplicantUserId(resolveApplicantUserId(req.getApplicantType(), req.getApplicantCid(),
+                req.getLicenseNo(), req.getBusinessLicenseNo(), req.getCompanyRegistrationNo()));
         ml.setCreatedBy(userId);
         ml.setIsManualEntry(IS_MANUAL);
         ml.setManualEntryBy(userId);
@@ -205,6 +210,13 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         ApplicationMaster master = createApplicationMaster(saved.getApplicationNumber(), userId, status, now);
         saved.setApplicationMaster(master);
         mlRepo.save(saved);
+
+        SiteMaster provisionedSite = siteProvisioningService.provisionSiteForApprovedLease(saved);
+        master.setSiteId(provisionedSite.getId());
+        applicationMasterRepository.save(master);
+        recordHouseholdThresholdEntry("MINING_LEASE", saved.getApplicationNumber(), saved.getApplicantCid());
+        recordHouseholdThresholdEntity("MINING_LEASE", saved.getApplicationNumber(), saved.getApplicantCid(), saved.getExpPermitNo());
+
         notifyPromoter(req.getPromoterId(), saved.getApplicationNumber());
 
         return toResponseFromMl(saved, req.getFileIds());
@@ -242,6 +254,8 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         ql.setCompanyType(req.getCompanyType());
         ql.setApplicationType("Submitted");
         ql.setNameOfQuarry(req.getNameOfQuarry());
+        ql.setEcFileId(req.getEcFileId());
+        ql.setEcNumber(req.getEcNumber());
         ql.setMlaSignedDocId(req.getMlaSignedDocId());
         ql.setPlaceOfMiningActivity(req.getPlaceOfActivity());
         DzongkhagLookup qlDzongkhag = resolveDzongkhag(req.getDzongkhag());
@@ -295,7 +309,8 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         ql.setWorkOrderDocId(req.getWorkOrderDocId());
         ql.setApplicationNumber(generateQlAppNumber(prefix));
         ql.setCurrentStatus(status);
-        ql.setApplicantUserId(userId);
+        ql.setApplicantUserId(resolveApplicantUserId(req.getApplicantType(), req.getApplicantCid(),
+                req.getLicenseNo(), req.getBusinessLicenseNo(), req.getCompanyRegistrationNo()));
         ql.setCreatedBy(userId);
         ql.setIsManualEntry(IS_MANUAL);
         ql.setManualEntryBy(userId);
@@ -311,6 +326,13 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         ApplicationMaster master = createApplicationMaster(saved.getApplicationNumber(), userId, status, now);
         saved.setApplicationMaster(master);
         qlRepo.save(saved);
+
+        SiteMaster provisionedSite = siteProvisioningService.provisionSiteForApprovedLease(saved);
+        master.setSiteId(provisionedSite.getId());
+        applicationMasterRepository.save(master);
+        recordHouseholdThresholdEntry("QUARRYING", saved.getApplicationNumber(), saved.getApplicantCid());
+        recordHouseholdThresholdEntity("QUARRY_LEASE", saved.getApplicationNumber(), saved.getApplicantCid(), null);
+
         notifyPromoter(req.getPromoterId(), saved.getApplicationNumber());
 
         return toResponseFromQl(saved, req.getFileIds());
@@ -354,6 +376,7 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         sc.setProposedAreaRow(req.getProposedAreaRow());
         sc.setPermitNo(req.getPermitNo());
         sc.setEcNo(req.getEcNo());
+        sc.setEcValidUpto(req.getEcValidUpto());
         sc.setAttachmentMapFileId(req.getAttachmentMapFileId());
         sc.setRecommendationLetterFileId(req.getRecommendationLetterFileId());
         sc.setConsentLetterFileId(req.getScConsentLetterFileId());
@@ -370,7 +393,8 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         sc.setEcFileId(req.getScEcFileId());
         sc.setApplicationNo(generateScAppNumber(prefix));
         sc.setStatus(status);
-        sc.setCreatedBy(userId);
+        sc.setCreatedBy(resolveApplicantUserId(req.getApplicantType(), req.getApplicantCid(),
+                req.getLicenseNo(), req.getBusinessLicenseNo(), req.getCompanyRegistrationNo()));
         sc.setIsManualEntry(IS_MANUAL);
         sc.setManualEntryBy(userId);
         sc.setManualEntryOn(now);
@@ -380,7 +404,13 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
 
         SurfaceCollectionPermitEntity saved = scRepo.save(sc);
         saveAttachments(req.getFileIds(), saved.getApplicationNo());
-        createApplicationMaster(saved.getApplicationNo(), userId, status, now);
+        ApplicationMaster master = createApplicationMaster(saved.getApplicationNo(), userId, status, now);
+
+        SiteMaster provisionedSite = siteProvisioningService.provisionSiteForSurfaceCollection(saved);
+        master.setSiteId(provisionedSite.getId());
+        applicationMasterRepository.save(master);
+        recordHouseholdThresholdEntity("SURFACE_COLLECTION_PERMIT", saved.getApplicationNo(), saved.getApplicantCid(), saved.getPermitNo());
+
         notifyPromoter(req.getPromoterId(), saved.getApplicationNo());
 
         return toResponseFromSc(saved, req.getFileIds());
@@ -417,17 +447,28 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         sl.setApplicationNo(generateSLApplicationNumber());
         sl.setStatus(status);
 
+        sl.setDzongkhag(req.getDzongkhag());
+        sl.setGewog(req.getGewog());
+        sl.setPlaceVillage(req.getNearestVillage());
+
         sl.setManualEntryOn(now);
         sl.setManualEntryBy(userId);
         sl.setIsManualEntry(IS_MANUAL);
 
-        sl.setCreatedBy(userId);
+        sl.setCreatedBy(resolveApplicantUserId(req.getApplicantType(), req.getApplicantCid(),
+                req.getLicenseNo(), req.getBusinessLicenseNo(), req.getCompanyRegistrationNo()));
 
         sl.setIsActive(true);
 
         StockLiftingApplication saved = stockLiftingRepository.save(sl);
         saveAttachments(req.getFileIds(), saved.getApplicationNo());
-        createApplicationMaster(saved.getApplicationNo(), userId, status, now);
+        ApplicationMaster master = createApplicationMaster(saved.getApplicationNo(), userId, status, now);
+
+        SiteMaster provisionedSite = siteProvisioningService.provisionSiteForStockLifting(saved);
+        master.setSiteId(provisionedSite.getId());
+        applicationMasterRepository.save(master);
+        recordHouseholdThresholdEntity("STOCK_LIFTING", saved.getApplicationNo(), saved.getApplicantCid(), saved.getStockLiftingPermitNo());
+
         notifyPromoter(req.getPromoterId(), saved.getApplicationNo());
 
         return toResponseFromSL(saved, req.getFileIds());
@@ -581,6 +622,8 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
                 .companyName(ql.getCompanyName())
                 .companyType(ql.getCompanyType())
                 .nameOfQuarry(ql.getNameOfQuarry())
+                .ecFileId(ql.getEcFileId())
+                .ecNumber(ql.getEcNumber())
                 .mlaSignedDocId(ql.getMlaSignedDocId())
                 .placeOfActivity(ql.getPlaceOfMiningActivity())
                 .dungkhag(ql.getDungkhag())
@@ -664,6 +707,7 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
                 .proposedAreaRow(sc.getProposedAreaRow())
                 .permitNo(sc.getPermitNo())
                 .ecNo(sc.getEcNo())
+                .ecValidUpto(sc.getEcValidUpto())
                 .attachmentMapFileId(sc.getAttachmentMapFileId())
                 .recommendationLetterFileId(sc.getRecommendationLetterFileId())
                 .scConsentLetterFileId(sc.getConsentLetterFileId())
@@ -802,6 +846,55 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         if (promoter == null || promoter.getEmail() == null) return;
         notificationClient.sendApprovalManualEntryNotification(
                 promoter.getEmail(), promoter.getUsername(), applicationNo);
+    }
+
+    /**
+     * The real (non-manual) flows always identify applicantUserId as the citizen who
+     * submitted the application. Manual entry has no submitting citizen — this looks up
+     * the applicant's auto-provisioned/pre-existing citizen account (same CID/license/
+     * company-reg-no resolution ApplicantAccountProvisioningService uses) so applicantUserId
+     * points at the actual promoter instead of the focal officer who typed the entry in.
+     * Returns null when no such account exists yet (first-ever manual entry for this
+     * promoter, before provisionForApplicant has run) — matches prior behavior for that case.
+     */
+    private Long resolveApplicantUserId(String applicantType, String applicantCid, String licenseNo,
+                                         String businessLicenseNo, String companyRegistrationNo) {
+        String normalizedType = applicantType == null ? "" : applicantType.trim().toLowerCase();
+        String effectiveLicenseNo = businessLicenseNo != null && !businessLicenseNo.isBlank() ? businessLicenseNo : licenseNo;
+        String companyRegNo = companyRegistrationNo == null ? "" : companyRegistrationNo.trim();
+
+        if ("company".equals(normalizedType) || !companyRegNo.isEmpty()) {
+            return applicantAccountRepository.findByCompanyRegistrationNumber(companyRegNo).map(ApplicantAccount::getId).orElse(null);
+        }
+        if ("licensed".equals(normalizedType) || (effectiveLicenseNo != null && !effectiveLicenseNo.isBlank())) {
+            return applicantAccountRepository.findByLicenseNo(effectiveLicenseNo).map(ApplicantAccount::getId).orElse(null);
+        }
+        if (applicantCid == null || applicantCid.isBlank()) return null;
+        return applicantAccountRepository.findByCid(applicantCid).map(ApplicantAccount::getId).orElse(null);
+    }
+
+    /** Mirrors ML/QL's own recordApprovedForThreshold — writes the shared household_permit_threshold table. */
+    private void recordHouseholdThresholdEntry(String serviceType, String applicationNo, String applicantCid) {
+        if (applicantCid == null || applicantCid.isBlank()) return;
+        if (thresholdEntryRepository.existsByServiceTypeAndApplicationNo(serviceType, applicationNo)) return;
+        HouseholdPermitThresholdEntry entry = new HouseholdPermitThresholdEntry();
+        entry.setApplicantCid(applicantCid);
+        entry.setServiceType(serviceType);
+        entry.setApplicationNo(applicationNo);
+        entry.setStatus("ACTIVE");
+        thresholdEntryRepository.save(entry);
+    }
+
+    /** Mirrors ML/QL/SC/SL's own approval-time write to the legacy t_household_permit_threshold table. */
+    private void recordHouseholdThresholdEntity(String serviceType, String applicationNo, String applicantCid, String permitNo) {
+        if (applicantCid == null || applicantCid.isBlank()) return;
+        HouseholdPermitThresholdEntity entity = new HouseholdPermitThresholdEntity();
+        entity.setServiceType(serviceType);
+        entity.setApplicationNo(applicationNo);
+        entity.setPermitNo(permitNo);
+        entity.setApplicantCid(applicantCid);
+        entity.setStatus("ACTIVE");
+        householdPermitThresholdRepository.save(entity);
     }
 
     private Map<String, List<String>> buildFileMapByAppNo(List<String> appNos) {

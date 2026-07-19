@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 /**
  * Auto-provisions a citizen (applicant) login the first time an applicant is seen
  * in a manual-entry submission, and emails them the temporary credentials.
@@ -18,6 +20,11 @@ import org.springframework.transaction.annotation.Transactional;
  * Runs in its own transaction, isolated from the manual-entry submission that
  * triggers it: account provisioning is a best-effort side effect and must never
  * cause (or be caused to roll back by) the application submission itself.
+ *
+ * Also used synchronously (not just fire-and-forget) by callers that need the
+ * resolved citizen account id immediately — e.g. attributing an issued permit
+ * to the actual applicant instead of the staff member who processed it. Returns
+ * the existing or newly-created account id, or null if it couldn't resolve one.
  */
 @Service
 @RequiredArgsConstructor
@@ -31,16 +38,13 @@ public class ApplicantAccountProvisioningService {
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void provisionForApplicant(String applicantType, String applicantCid, String applicantName,
+    public Long provisionForApplicant(String applicantType, String applicantCid, String applicantName,
                                        String applicantContact, String applicantEmail,
                                        String licenseNo, String businessLicenseNo,
                                        String companyRegistrationNo, String companyName, String companyType) {
         try {
             String email = trim(applicantEmail);
-            if (email.isEmpty()) {
-                log.info("Skipping applicant account provisioning - no applicant email supplied");
-                return;
-            }
+            String contact = trim(applicantContact);
 
             String normalizedType = trim(applicantType).toLowerCase();
             String effectiveLicenseNo = firstNonBlank(businessLicenseNo, licenseNo);
@@ -65,31 +69,39 @@ public class ApplicantAccountProvisioningService {
             }
 
             if (identifier.isEmpty()) {
-                log.info("Skipping applicant account provisioning - no CID/license/registration number identifying {}", email);
-                return;
+                log.info("Skipping applicant account provisioning - no CID/license/registration number identifying {}", email.isEmpty() ? contact : email);
+                return null;
             }
 
-            boolean alreadyExists = switch (registrationType) {
-                case "REGISTERED_COMPANY" -> applicantAccountRepository.existsByCompanyRegistrationNumber(identifier);
-                case "BUSINESS_LICENSE" -> applicantAccountRepository.existsByLicenseNo(identifier);
-                default -> applicantAccountRepository.existsByCid(identifier);
+            // Resolve an existing account first — doesn't need email/contact at all,
+            // only needed below when we have to create a brand new account.
+            Optional<ApplicantAccount> existing = switch (registrationType) {
+                case "REGISTERED_COMPANY" -> applicantAccountRepository.findByCompanyRegistrationNumber(identifier);
+                case "BUSINESS_LICENSE" -> applicantAccountRepository.findByLicenseNo(identifier);
+                default -> applicantAccountRepository.findByCid(identifier);
             };
-            if (alreadyExists) {
-                log.info("Applicant account already exists ({}: {}), skipping auto-registration", registrationType, identifier);
-                return;
+            if (existing.isPresent()) {
+                log.info("Applicant account already exists ({}: {}), reusing id {}", registrationType, identifier, existing.get().getId());
+                return existing.get().getId();
             }
-            if (applicantAccountRepository.existsByEmail(email)) {
+
+            if (email.isEmpty() && contact.isEmpty()) {
+                log.info("Skipping applicant account provisioning - no email or contact number supplied, no way to deliver credentials");
+                return null;
+            }
+            if (!email.isEmpty() && applicantAccountRepository.existsByEmail(email)) {
                 log.info("An account already exists with email {}, skipping auto-registration to avoid a conflicting duplicate", email);
-                return;
+                return null;
             }
 
             String tempPassword = PasswordGenerator.generatePassword(12);
 
             ApplicantAccount account = new ApplicantAccount();
             account.setRegistrationType(registrationType);
-            account.setEmail(email);
-            account.setFullName(!trim(fullName).isEmpty() ? fullName : email);
-            account.setContact(applicantContact);
+            account.setUsername(identifier);
+            account.setEmail(email.isEmpty() ? null : email);
+            account.setFullName(!trim(fullName).isEmpty() ? fullName : (!email.isEmpty() ? email : identifier));
+            account.setContact(contact.isEmpty() ? null : contact);
             account.setPassword(passwordEncoder.encode(tempPassword));
             account.setForcePasswordChange(true);
             account.setAccountStatus("ACTIVE");
@@ -111,12 +123,19 @@ public class ApplicantAccountProvisioningService {
             ApplicantAccount saved = applicantAccountRepository.save(account);
             applicantAccountRepository.assignRole(saved.getId(), DEFAULT_ROLE);
 
-            notificationClient.sendApplicantAccountCredentialsEmail(email, account.getFullName(), registrationType, tempPassword);
-            notificationClient.sendApplicantAccountCredentialsSms(applicantContact, email, tempPassword);
-            log.info("Auto-registered applicant account id {} ({}) from manual entry submission and queued credentials email/SMS",
-                    saved.getId(), registrationType);
+            if (!email.isEmpty()) {
+                notificationClient.sendApplicantAccountCredentialsEmail(email, account.getFullName(), registrationType, tempPassword, identifier);
+            }
+            if (!contact.isEmpty()) {
+                notificationClient.sendApplicantAccountCredentialsSms(contact, identifier, tempPassword);
+            }
+            log.info("Auto-registered applicant account id {} ({}, username={}) from manual entry submission and queued credentials via {}",
+                    saved.getId(), registrationType, identifier,
+                    !email.isEmpty() && !contact.isEmpty() ? "email+SMS" : (!email.isEmpty() ? "email" : "SMS"));
+            return saved.getId();
         } catch (Exception e) {
             log.error("Failed to auto-register applicant account for manual entry submission (email={})", applicantEmail, e);
+            return null;
         }
     }
 

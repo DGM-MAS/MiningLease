@@ -51,6 +51,12 @@ public class SurfaceCollectionAuctionApplication {
     @Column(name = "ec_file_id")
     private String fileECid;
 
+    @Column(name = "ec_number")
+    private String ecNumber;
+
+    @Column(name = "ec_valid_upto")
+    private LocalDate ecValidUpto;
+
     @Column(name = "ec_status")
     private String ecStatus; // PENDING / APPROVED / REJECTED
 

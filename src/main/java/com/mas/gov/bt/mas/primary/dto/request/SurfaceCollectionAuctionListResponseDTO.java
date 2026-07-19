@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Getter
@@ -30,6 +31,12 @@ public class SurfaceCollectionAuctionListResponseDTO {
     private BigDecimal area;
 
     private String material;
+
+    private String ecFileId;
+
+    private String ecNumber;
+
+    private LocalDate ecValidUpto;
 
     private String ecStatus;
 

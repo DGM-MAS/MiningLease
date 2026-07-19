@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -28,6 +29,9 @@ public class SurfaceCollectionAuctionResponseDTO {
     private String villageName;
     private String regionName;
 
+    private String ecFileId;
+    private String ecNumber;
+    private LocalDate ecValidUpto;
     private String ecStatus;
     private String fcStatus;
     private String auctionStatus;

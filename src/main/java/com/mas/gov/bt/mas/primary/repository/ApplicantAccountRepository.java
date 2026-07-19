@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 public interface ApplicantAccountRepository extends JpaRepository<ApplicantAccount, Long> {
 
@@ -17,6 +19,12 @@ public interface ApplicantAccountRepository extends JpaRepository<ApplicantAccou
     boolean existsByCompanyRegistrationNumber(String companyRegistrationNumber);
 
     boolean existsByEmail(String email);
+
+    Optional<ApplicantAccount> findByCid(String cid);
+
+    Optional<ApplicantAccount> findByLicenseNo(String licenseNo);
+
+    Optional<ApplicantAccount> findByCompanyRegistrationNumber(String companyRegistrationNumber);
 
     @Modifying
     @Query(value = """
