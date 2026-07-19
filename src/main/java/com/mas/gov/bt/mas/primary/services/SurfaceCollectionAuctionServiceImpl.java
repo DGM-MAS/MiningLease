@@ -424,6 +424,11 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
         // =====================================================
         ApplicationMaster applicationMaster = entity.getApplicationMaster();
         applicationMaster.setCurrentStatus("AUCTION_COMPLETED");
+        // Was left pointing at whichever staff user filed the original auction listing —
+        // must be the winning bidder's own citizen account, since citizen-facing menu/
+        // application-tracking queries (findHeldServiceStatuses, findByApplicantId) filter
+        // on this column. Same root cause as the manual-entry applicant_id bug.
+        applicationMaster.setApplicantUserId(assignedUser.getUserId());
 
         applicationMasterRepository.save(applicationMaster);
 
