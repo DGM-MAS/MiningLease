@@ -33,7 +33,8 @@ public class SecurityConfig {
                     "/swagger-resources/**",
                     "/webjars/**",
                     "/actuator/**",
-                    "/api/mining-lease/payment-callback"
+                    "/api/mining-lease/payment-callback",
+                    "/api/renewal-environmental-clearance/ec-payment-callback"
                 ).permitAll()
                 .anyRequest().authenticated()
             )
