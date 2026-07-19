@@ -52,7 +52,6 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
     @Autowired
     private StockLiftingRepository stockLiftingRepository;
 
-    private static final String SERVICE_CODE = "MANUAL_ENTRY_SERVICE";
     private static final String IS_MANUAL = "TRUE";
 
     // -------------------------------------------------------
@@ -190,10 +189,11 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         ml.setSignedPFSId(req.getSignedPFSId());
         ml.setBankGuarantorDocId(req.getBankGuarantorDocId());
         ml.setWorkOrderDocId(req.getWorkOrderDocId());
+        Long mlApplicantUserId = resolveApplicantUserId(req.getApplicantType(), req.getApplicantCid(),
+                req.getLicenseNo(), req.getBusinessLicenseNo(), req.getCompanyRegistrationNo());
         ml.setApplicationNumber(generateMlAppNumber(prefix));
         ml.setCurrentStatus(status);
-        ml.setApplicantUserId(resolveApplicantUserId(req.getApplicantType(), req.getApplicantCid(),
-                req.getLicenseNo(), req.getBusinessLicenseNo(), req.getCompanyRegistrationNo()));
+        ml.setApplicantUserId(mlApplicantUserId);
         ml.setCreatedBy(userId);
         ml.setIsManualEntry(IS_MANUAL);
         ml.setManualEntryBy(userId);
@@ -207,7 +207,7 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
 
         MiningLeaseApplication saved = mlRepo.save(ml);
         saveAttachments(req.getFileIds(), saved.getApplicationNumber());
-        ApplicationMaster master = createApplicationMaster(saved.getApplicationNumber(), userId, status, now);
+        ApplicationMaster master = createApplicationMaster(saved.getApplicationNumber(), mlApplicantUserId, "MINING_LEASE", status, now);
         saved.setApplicationMaster(master);
         mlRepo.save(saved);
 
@@ -307,10 +307,11 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         ql.setMpcdFileUploadIdMa(req.getMpcdFileUploadIdMa());
         ql.setBankGuarantorDocId(req.getBankGuarantorDocId());
         ql.setWorkOrderDocId(req.getWorkOrderDocId());
+        Long qlApplicantUserId = resolveApplicantUserId(req.getApplicantType(), req.getApplicantCid(),
+                req.getLicenseNo(), req.getBusinessLicenseNo(), req.getCompanyRegistrationNo());
         ql.setApplicationNumber(generateQlAppNumber(prefix));
         ql.setCurrentStatus(status);
-        ql.setApplicantUserId(resolveApplicantUserId(req.getApplicantType(), req.getApplicantCid(),
-                req.getLicenseNo(), req.getBusinessLicenseNo(), req.getCompanyRegistrationNo()));
+        ql.setApplicantUserId(qlApplicantUserId);
         ql.setCreatedBy(userId);
         ql.setIsManualEntry(IS_MANUAL);
         ql.setManualEntryBy(userId);
@@ -323,7 +324,7 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
 
         QuarryLeaseApplication saved = qlRepo.save(ql);
         saveAttachments(req.getFileIds(), saved.getApplicationNumber());
-        ApplicationMaster master = createApplicationMaster(saved.getApplicationNumber(), userId, status, now);
+        ApplicationMaster master = createApplicationMaster(saved.getApplicationNumber(), qlApplicantUserId, "QUARRY_LEASE", status, now);
         saved.setApplicationMaster(master);
         qlRepo.save(saved);
 
@@ -392,10 +393,11 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         sc.setRcReportFileId(req.getRcReportFileId());
         sc.setMiReportFileId(req.getMiReportFileId());
         sc.setEcFileId(req.getScEcFileId());
+        Long scApplicantUserId = resolveApplicantUserId(req.getApplicantType(), req.getApplicantCid(),
+                req.getLicenseNo(), req.getBusinessLicenseNo(), req.getCompanyRegistrationNo());
         sc.setApplicationNo(generateScAppNumber(prefix));
         sc.setStatus(status);
-        sc.setCreatedBy(resolveApplicantUserId(req.getApplicantType(), req.getApplicantCid(),
-                req.getLicenseNo(), req.getBusinessLicenseNo(), req.getCompanyRegistrationNo()));
+        sc.setCreatedBy(scApplicantUserId);
         sc.setIsManualEntry(IS_MANUAL);
         sc.setManualEntryBy(userId);
         sc.setManualEntryOn(now);
@@ -405,7 +407,7 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
 
         SurfaceCollectionPermitEntity saved = scRepo.save(sc);
         saveAttachments(req.getFileIds(), saved.getApplicationNo());
-        ApplicationMaster master = createApplicationMaster(saved.getApplicationNo(), userId, status, now);
+        ApplicationMaster master = createApplicationMaster(saved.getApplicationNo(), scApplicantUserId, "SURFACE_COLLECTION_PERMIT", status, now);
 
         SiteMaster provisionedSite = siteProvisioningService.provisionSiteForSurfaceCollection(saved);
         master.setSiteId(provisionedSite.getId());
@@ -457,14 +459,15 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         sl.setManualEntryBy(userId);
         sl.setIsManualEntry(IS_MANUAL);
 
-        sl.setCreatedBy(resolveApplicantUserId(req.getApplicantType(), req.getApplicantCid(),
-                req.getLicenseNo(), req.getBusinessLicenseNo(), req.getCompanyRegistrationNo()));
+        Long slApplicantUserId = resolveApplicantUserId(req.getApplicantType(), req.getApplicantCid(),
+                req.getLicenseNo(), req.getBusinessLicenseNo(), req.getCompanyRegistrationNo());
+        sl.setCreatedBy(slApplicantUserId);
 
         sl.setIsActive(true);
 
         StockLiftingApplication saved = stockLiftingRepository.save(sl);
         saveAttachments(req.getFileIds(), saved.getApplicationNo());
-        ApplicationMaster master = createApplicationMaster(saved.getApplicationNo(), userId, status, now);
+        ApplicationMaster master = createApplicationMaster(saved.getApplicationNo(), slApplicantUserId, "STOCK_LIFTING", status, now);
 
         SiteMaster provisionedSite = siteProvisioningService.provisionSiteForStockLifting(saved);
         master.setSiteId(provisionedSite.getId());
@@ -833,14 +836,30 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         attachmentRepository.saveAll(attachments);
     }
 
-    private ApplicationMaster createApplicationMaster(String appNo, Long userId, String status, LocalDateTime now) {
+    /**
+     * applicantUserId must be the resolved citizen/promoter account (same value passed to
+     * the lease/permit entity's own applicantUserId/createdBy) — NOT the focal officer's
+     * userId performing the manual entry. citizen tracking (findByApplicantId) filters on
+     * this column, so a wrong value here makes the application invisible to the citizen's
+     * own "my applications" list and, downstream, to the sidebar's per-service approved-
+     * application gating (see CitizenStatusService.computeApprovedServiceCodes on the
+     * frontend), even though the lease/permit/site records themselves are correct.
+     * serviceCode must match the real service's own code (MINING_LEASE / QUARRY_LEASE /
+     * SURFACE_COLLECTION_PERMIT / STOCK_LIFTING) for the same reason — the frontend's
+     * APPROVED_STATUS_BY_SERVICE map keys off it.
+     * Manual entries have no review step and land directly on a terminal status, so this
+     * also marks them completed immediately (real flows only do this at final approval).
+     */
+    private ApplicationMaster createApplicationMaster(String appNo, Long applicantUserId, String serviceCode,
+                                                       String status, LocalDateTime now) {
         ApplicationMaster master = new ApplicationMaster();
         master.setApplicationNumber(appNo);
-        master.setServiceCode(SERVICE_CODE);
-        master.setApplicantUserId(userId);
+        master.setServiceCode(serviceCode);
+        master.setApplicantUserId(applicantUserId);
         master.setCurrentStatus(status);
         master.setSubmittedAt(now);
         master.setApprovedAt(now);
+        master.setCompletedAt(now);
         return applicationMasterRepository.save(master);
     }
 

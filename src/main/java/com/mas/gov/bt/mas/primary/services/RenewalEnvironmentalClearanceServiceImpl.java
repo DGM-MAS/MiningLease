@@ -1515,7 +1515,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         }
 
         if (Boolean.TRUE.equals(request.getForwardToDECC())) {
-            entity.setStatus("FORWARDED_TO_DECC"); a
+            entity.setStatus("FORWARDED_TO_DECC");
         } else {
             entity.setStatus("EC_RENEWED");
             // Terminal state — mark completion so the citizen tracking dashboard archives it
