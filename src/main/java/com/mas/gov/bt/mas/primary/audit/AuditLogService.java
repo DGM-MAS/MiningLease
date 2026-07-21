@@ -74,11 +74,20 @@ public class AuditLogService {
         HttpServletRequest request = currentRequest();
         if (request == null) return null;
         String header = request.getHeader("X-User-Id");
+        Long userId;
         try {
-            return header != null ? Long.parseLong(header) : null;
+            userId = header != null ? Long.parseLong(header) : null;
         } catch (NumberFormatException e) {
             return null;
         }
+        // A still-valid JWT can outlive the user it was issued to (deletion, cleanup, etc.);
+        // audit_logs.user_id has a FK into users, so an insert for a stale id would otherwise
+        // fail and roll back the caller's transaction too. Drop the id rather than the entry.
+        if (userId != null && !auditLogRepository.userExists(userId)) {
+            log.warn("Audit actor user_id={} no longer exists in users table; logging entry with null user_id", userId);
+            return null;
+        }
+        return userId;
     }
 
     private String currentUsername() {
