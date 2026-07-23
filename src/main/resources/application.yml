@@ -1,14 +1,12 @@
 app:
   masters:
-    # TEMP (local testing only, revert before real deploy): points WorkflowAssignmentClient
-    # (and MastersPaymentClient) at the local masters instance instead of the K8s-deployed one.
-    base-url: http://localhost:8082
-    citizen-register-url: http://localhost:8080/master/api/auth/citizen/register
+    base-url: http://172.30.3.10:30082
+    citizen-register-url: http://172.30.3.10:30081/master/api/auth/citizen/register
   self:
     base-url: http://172.30.3.10:30085
   notification:
-    api-url: http://localhost:8080/master/api/notifications
-    email-builder-url: http://localhost:8080/master/api/notifications/send
+    api-url: http://172.30.3.10:30081/master/api/notifications
+    email-builder-url: http://172.30.3.10:30081/master/api/notifications/send
 
 # Set to false to bypass payment and let applications flow through directly (dev/testing only)
 payment:
@@ -231,14 +229,12 @@ spring:
         format_sql: false
 app:
   masters:
-    # TEMP (local testing only, revert before real deploy): points WorkflowAssignmentClient
-    # (and MastersPaymentClient) at the local masters instance instead of the K8s-deployed one.
-    base-url: http://localhost:8082
+    base-url: http://172.30.3.10:30082
   self:
     base-url: http://172.30.3.10:30085
   notification:
-    api-url: http://localhost:8080/master/api/notifications
-    email-builder-url: http://localhost:8080/master/api/notifications/send
+    api-url: http://172.30.3.10:30081/master/api/notifications
+    email-builder-url: http://172.30.3.10:30081/master/api/notifications/send
 
 springdoc:
   swagger-ui:
