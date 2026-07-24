@@ -10,4 +10,5 @@ public class ReviewSampleTransportClearanceRequestDTO {
     private String applicationNo;
     private String status;
     private String remarks;
+    private String sampleTransportClearanceCertificateFileId;
 }

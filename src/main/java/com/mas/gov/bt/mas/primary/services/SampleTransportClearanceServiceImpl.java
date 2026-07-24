@@ -333,6 +333,7 @@ public class SampleTransportClearanceServiceImpl
                 }
                 case "APPROVED" -> {
                     sampleTransportClearanceEntity.setStatus("APPROVED");
+                    sampleTransportClearanceEntity.setSampleTransportClearanceCertificateFileId(request.getSampleTransportClearanceCertificateFileId());
                     sampleTransportClearanceEntity.setAssignedGSDChiefRemarks(request.getRemarks());
 
                     repository.save(sampleTransportClearanceEntity);
