@@ -44,4 +44,9 @@ public class SampleTransportClearanceResponseDTO {
     private String gewogName;
     private String villageName;
     private String regionName;
+
+    private String sampleTransportClearanceCertificateFileId;
+
+    private String assignedGSDChiefRemarks;
+    private String assignedGSDFocalRemarks;
 }
