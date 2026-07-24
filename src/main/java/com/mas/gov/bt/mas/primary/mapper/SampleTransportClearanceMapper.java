@@ -27,5 +27,16 @@ public interface SampleTransportClearanceMapper {
     SampleTransportClearanceResponseDTO toResponseDTO(
             SampleTransportClearanceEntity entity);
 
+    @Mapping(target = "dzongkhagName",
+            source = "dzongkhagId.dzongkhagName")
+
+    @Mapping(target = "gewogName",
+            source = "gewogId.gewogName")
+
+    @Mapping(target = "villageName",
+            source = "villageId.villageName")
+
+    @Mapping(target = "regionName",
+            source = "regionMaster.regionName")
     SampleTransportClearanceResponseDTO toListResponse(SampleTransportClearanceEntity sampleTransportClearanceEntity);
 }

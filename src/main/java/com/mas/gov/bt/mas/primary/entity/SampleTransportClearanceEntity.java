@@ -131,6 +131,9 @@ public class SampleTransportClearanceEntity {
     @JoinColumn(name = "region_master")
     private RegionMaster regionMaster;
 
+    @Column(name = "sample_transport_clearance_certificate_file_id")
+    private String sampleTransportClearanceCertificateFileId;
+
     @PrePersist
     protected void onCreate() {
         this.createdOn = LocalDateTime.now();

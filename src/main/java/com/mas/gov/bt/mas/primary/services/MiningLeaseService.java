@@ -2080,10 +2080,19 @@ public class MiningLeaseService {
     public SuccessResponse<List<MiningLeaseResponse>> getAssignedToMPCD(Long userId, Pageable pageable, String search) {
         Page<MiningLeaseApplication> page;
 
+        List<String> ApplicationStatus = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION"
+        );
+
         if (search == null || search.isBlank()) {
 
             page = miningLeaseApplicationRepository
-                    .findAssignedToUserMPCD(userId, pageable);
+                    .findAssignedToUserMPCD(userId, ApplicationStatus, pageable);
 
         } else {
 
@@ -2091,6 +2100,7 @@ public class MiningLeaseService {
                     .findAssignedToUserAndSearchMPCD(
                             userId,
                             search.trim(),
+                            ApplicationStatus,
                             pageable
                     );
         }
@@ -2273,10 +2283,19 @@ public class MiningLeaseService {
     public SuccessResponse<List<MiningLeaseResponse>> getAssignedToMiningChief(Long userId, Pageable pageable, String search) {
         Page<MiningLeaseApplication> page;
 
+        List<String> ApplicationStatus = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION"
+        );
+
         if (search == null || search.isBlank()) {
 
             page = miningLeaseApplicationRepository
-                    .findAssignedToUserMPCD(userId, pageable);
+                    .findAssignedToUserMPCD(userId, ApplicationStatus, pageable);
 
         } else {
 
@@ -2284,6 +2303,7 @@ public class MiningLeaseService {
                     .findAssignedToUserAndSearchMPCD(
                             userId,
                             search.trim(),
+                            ApplicationStatus,
                             pageable
                     );
         }
@@ -2581,10 +2601,19 @@ public class MiningLeaseService {
     public SuccessResponse<List<MiningLeaseResponse>> getAssignedToMineEngineer(Long userId, Pageable pageable, String search) {
         Page<MiningLeaseApplication> page;
 
+        List<String> archivedStatuses = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION"
+        );
+
         if (search == null || search.isBlank()) {
 
             page = miningLeaseApplicationRepository
-                    .findAssignedToUserMineEngineer(userId, pageable);
+                    .findAssignedToUserMineEngineer(userId, archivedStatuses, pageable);
 
         } else {
 
@@ -2592,6 +2621,7 @@ public class MiningLeaseService {
                     .findAssignedToUserIdAndSearchMineEngineer(
                             userId,
                             search.trim(),
+                            archivedStatuses,
                             pageable
                     );
         }
