@@ -169,12 +169,12 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                 assignedMPCD = assignMPCD(9L);
             }
 
-            log.info(
-                    "Assigned MPCD: id={}, username={}, email={}",
-                    assignedMPCD.getUserId(),
-                    assignedMPCD.getUsername(),
-                    assignedMPCD.getEmail()
-            );
+//            log.info(
+//                    "Assigned MPCD: id={}, username={}, email={}",
+//                    assignedMPCD.getUserId(),
+//                    assignedMPCD.getUsername(),
+//                    assignedMPCD.getEmail()
+//            );
 
             createTask(master, entity, "MPCD", userId, assignedMPCD.getUserId());
             entity.setAssignedMPCDId(assignedMPCD.getUserId());
