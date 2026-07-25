@@ -207,11 +207,6 @@ springdoc:
 jwt:
   secret: ${JWT_SECRET:ui+E7GSXc420QM93wD/FuYOZ3UzlDQ314bckuPN1zJQUCN69FpFLc7Ex6XwbY2PXmXM5JNNtYR9mDQoUS0w9KA==}
 
-# Eureka Client — defaults to local; override with -Dspring.profiles.active=prod for Kubernetes
-eureka:
-  client:
-    enabled: false
-
 ---
 # ── Production profile ── activate with SPRING_PROFILES_ACTIVE=prod in Kubernetes
 spring:
@@ -241,11 +236,4 @@ springdoc:
     enabled: false
   api-docs:
     enabled: false
-eureka:
-  client:
-    enabled: false
-
-
-
-
 

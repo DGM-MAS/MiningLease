@@ -143,12 +143,6 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
-        <!-- Eureka Client -->
-        <dependency>
-            <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
-        </dependency>
-
 <!--        QR Code-->
         <!-- Source: https://mvnrepository.com/artifact/com.google.zxing/core -->
         <dependency>
