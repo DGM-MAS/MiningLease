@@ -223,6 +223,8 @@ public class SurfaceCollectionReviewServiceImpl
 
         auctionRepository.save(entity);
 
+        master.setCurrentStatus("PERMIT_ISSUED");
+
         SurfaceCollectionBankGuarantee surfaceCollectionBankGuarantee = new SurfaceCollectionBankGuarantee();
 
         Optional<SurfaceCollectionBankGuarantee> surfaceCollectionBankGuarantee1 = bgRepository.findByAuctionApplicationId(reviewId);
