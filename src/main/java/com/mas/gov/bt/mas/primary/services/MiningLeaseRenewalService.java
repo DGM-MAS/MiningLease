@@ -77,6 +77,10 @@ public class MiningLeaseRenewalService {
 
     private final MastersPaymentClient mastersPaymentClient;
 
+    private final QuarryLeaseApplicationRepository quarryLeaseApplicationRepository;
+
+    private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
+
     private final com.mas.gov.bt.mas.primary.client.WorkflowAssignmentClient workflowAssignmentClient;
 
     /** payment_master.service_code for Mining Lease fee rows — deliberately the same value
@@ -142,6 +146,7 @@ public class MiningLeaseRenewalService {
             // IF THE DATA IS PRESENT
             miningLeaseRenewalApplication.setApplicationNumber(request.getApplicationNumber());
             miningLeaseRenewalApplication.setApplicantCid(request.getApplicantCid());
+            miningLeaseRenewalApplication.setApplicantName(request.getApplicantName());
             miningLeaseRenewalApplication.setApplicantContact(request.getApplicantContact());
             miningLeaseRenewalApplication.setApplicantEmail(request.getApplicantEmail());
             miningLeaseRenewalApplication.setApplicantType(request.getApplicantType());
@@ -1464,6 +1469,8 @@ public class MiningLeaseRenewalService {
 
                 siteProvisioningService.refreshSiteLocationForRenewal(miningLeaseRenewalApplication);
 
+                updateLeaseApplicationStatus(miningLeaseRenewalApplication, request.getApplicationNo(), "MINING RENEWAL APPROVED", "MINING RENEWAL APPROVED");
+
                 if(miningLeaseRenewalApplication.getCreatedBy() != null) {
                     String title = "Work order has been uploaded by mine engineer.";
                     String message = "Work order for your application has been uploaded by mine engineer. Your application " + miningLeaseRenewalApplication.getApplicationNumber() + " for Mining Lease Renewal has been approved.";
@@ -1471,11 +1478,56 @@ public class MiningLeaseRenewalService {
                     notificationClient.sendUserNotification(title, message, miningLeaseRenewalApplication.getCreatedBy(), serviceId, "CITIZEN", false, miningLeaseRenewalApplication.getApplicationNumber());
                 }
 
+
+
             }else {
                 throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
             }
         }
         return mapper.toRenewalResponse(miningLeaseRenewalApplication);
+    }
+
+
+    private void updateLeaseApplicationStatus(MiningLeaseRenewalApplication miningLeaseRenewalApplication, String appNo, String miningStatus, String quarryStatus) {
+        String serviceType = "";
+        ApplicationMaster master = null;
+
+        Optional<MiningLeaseApplication> miningLeaseApplication =
+                miningLeaseApplicationRepository.findByApplicationNumber(appNo);
+
+        LocalDate now = LocalDate.now();
+        LocalDate endDate = now.plusYears(miningLeaseRenewalApplication.getProposedLeaseRenewalPeriod());
+
+        if (miningLeaseApplication.isPresent()) {
+            MiningLeaseApplication application = miningLeaseApplication.get();
+            application.setApplicantEmail(miningLeaseRenewalApplication.getApplicantEmail());
+            application.setApplicantContact(miningLeaseRenewalApplication.getApplicantContact());
+            application.setLlcDocId(miningLeaseRenewalApplication.getLlcMineEngineerDocId());
+            application.setFmfsDocId(miningLeaseRenewalApplication.getFmfsDocId());
+            application.setNotesheetDocId(miningLeaseRenewalApplication.getNoteSheetDocId());
+            application.setWorkOrderDocId(miningLeaseRenewalApplication.getWorkOrderDocId());
+            application.setMlaDocId(miningLeaseRenewalApplication.getMlaDocId());
+            application.setApprovedLeasePeriod(String.valueOf(miningLeaseRenewalApplication.getProposedLeaseRenewalPeriod()));
+            application.setLeaseStartDate(now);
+            application.setLeaseEndDate(endDate);
+            application.setCurrentStatus(miningStatus);
+            master = application.getApplicationMaster();
+            master.setCurrentStatus(miningStatus);
+            serviceType = "MINING_LEASE";
+            applicationMasterRepository.save(master);
+            miningLeaseApplicationRepository.save(application);
+        }
+
+        Optional<HouseholdPermitThresholdEntity> householdPermitThresholdEntity = householdPermitThresholdRepository.findByApplicationNoAndServiceType(appNo, serviceType);
+
+        if (householdPermitThresholdEntity.isPresent()) {
+            HouseholdPermitThresholdEntity thresholdEntity = householdPermitThresholdEntity.get();
+            thresholdEntity.setStatus(quarryStatus);
+
+            householdPermitThresholdRepository.save(thresholdEntity);
+        }else {
+            throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION, "The application is not present in household permit table.");
+        }
     }
 
     @Transactional
