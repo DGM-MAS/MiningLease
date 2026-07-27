@@ -2114,4 +2114,31 @@ public class MiningLeaseRenewalService {
 
         log.info("Task {} reassigned to user {}", firstTask.getId(), request.getNewAssigneeUserId());
     }
+
+    public SuccessResponse<List<MiningLeaseResponse>> getMyArchivedApplication(Long userId, Pageable pageable, String search) {
+        Page<MiningLeaseRenewalApplication> page;
+
+        if (search == null || search.isBlank()) {
+
+            page = miningLeaseRenewalApplicationRepository
+                    .findArchivedAssignedToUserPromoter(userId, pageable);
+
+        } else {
+
+            page = miningLeaseRenewalApplicationRepository
+                    .findArchivedAssignedToUserAndSearchPromoter(
+                            userId,
+                            search.trim(),
+                            pageable
+                    );
+        }
+
+        Page<MiningLeaseResponse> responsePage =
+                page.map(mapper::toRenewalResponse);
+
+        return SuccessResponse.fromPage(
+                "Assigned applications fetched successfully",
+                responsePage
+        );
+    }
 }
