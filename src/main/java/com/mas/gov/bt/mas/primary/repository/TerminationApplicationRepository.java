@@ -40,7 +40,7 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     SELECT q
     FROM TerminationApplicationEntity q
     JOIN TaskManagement t
-        ON t.applicationNumber = q.applicationNumber
+        ON t.applicationNumber = q.terminationId
     WHERE t.assignedToUserId = :userId
     AND q.currentStatus NOT IN ('TERMINATED', 'TERMINATION CANCELED')
 """)
@@ -50,7 +50,7 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     SELECT q
     FROM TerminationApplicationEntity q
     JOIN TaskManagement t
-        ON t.applicationNumber = q.applicationNumber
+        ON t.applicationNumber = q.terminationId
     WHERE t.assignedToUserId = :userId
     AND q.currentStatus NOT IN ('TERMINATED', 'TERMINATION CANCELED')
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
@@ -88,7 +88,7 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     SELECT q
     FROM TerminationApplicationEntity q
     JOIN TaskManagement t
-        ON t.applicationNumber = q.applicationNumber
+        ON t.applicationNumber = q.terminationId
     WHERE q.currentStatus IN :archivedStatuses
     AND q.createdBy = :userId
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
@@ -165,7 +165,7 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     SELECT q
     FROM TerminationApplicationEntity q
     JOIN TaskManagement t
-        ON t.applicationNumber = q.applicationNumber
+        ON t.applicationNumber = q.terminationId
     WHERE q.createdBy = :currentUserId
     AND q.currentStatus NOT IN ('TERMINATED', 'TERMINATION CANCELED')
 """)
@@ -175,7 +175,7 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     SELECT q
     FROM TerminationApplicationEntity q
     JOIN TaskManagement t
-        ON t.applicationNumber = q.applicationNumber
+        ON t.applicationNumber = q.terminationId
     WHERE q.createdBy = :currentUserId
     AND q.currentStatus NOT IN ('TERMINATED', 'TERMINATION CANCELED')
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
@@ -186,7 +186,7 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     SELECT q
     FROM TerminationApplicationEntity q
     JOIN TaskManagement t
-        ON t.applicationNumber = q.applicationNumber
+        ON t.applicationNumber = q.terminationId
     WHERE q.currentStatus IN :archivedStatuses
     AND t.assignedToUserId = :userId
 """)
@@ -196,7 +196,7 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     SELECT q
     FROM TerminationApplicationEntity q
     JOIN TaskManagement t
-        ON t.applicationNumber = q.applicationNumber
+        ON t.applicationNumber = q.terminationId
     WHERE t.assignedToUserId = :userId
     AND q.currentStatus IN :archivedStatuses
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
