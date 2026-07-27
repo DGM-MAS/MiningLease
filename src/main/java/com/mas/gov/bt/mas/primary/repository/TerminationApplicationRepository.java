@@ -166,7 +166,7 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     FROM TerminationApplicationEntity q
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
-    WHERE t.createdBy = :currentUserId
+    WHERE q.createdBy = :currentUserId
     AND q.currentStatus NOT IN ('TERMINATED', 'TERMINATION CANCELED')
 """)
     Page<TerminationApplicationEntity> findAssignedToUserChiefMD(Long currentUserId, Pageable pageable);
@@ -176,7 +176,7 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     FROM TerminationApplicationEntity q
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
-    WHERE t.createdBy = :currentUserId
+    WHERE q.createdBy = :currentUserId
     AND q.currentStatus NOT IN ('TERMINATED', 'TERMINATION CANCELED')
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
