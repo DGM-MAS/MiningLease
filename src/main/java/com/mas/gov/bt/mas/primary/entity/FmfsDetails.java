@@ -96,7 +96,10 @@ public class FmfsDetails {
 
     private Long mpcdFileUploadIdPa;
 
+    @Column(name = "remarks_mpcd", columnDefinition = "TEXT")
     private String remarksMpcd;
+
+    @Column(name = "remarks_geologist", columnDefinition = "TEXT")
     private String remarksGeologist;
 
     private String approvedArea;
@@ -158,6 +161,7 @@ public class FmfsDetails {
 
     private Long workOrderDocId;
 
+    @Column(name = "work_order_remarks", columnDefinition = "TEXT")
     private String workOrderRemarks;
 
     private String dzongkhagId;

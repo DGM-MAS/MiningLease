@@ -62,7 +62,7 @@ public class TemporaryClosureEntity {
     @Column(name = "number_of_months_for_closure")
     private Long numberOfMonthsForClosure;
 
-    @Column(name = "remarks_applicant")
+    @Column(name = "remarks_applicant", columnDefinition = "TEXT")
     private String remarksApplicant;
 
     // ========== Status & Workflow ==========

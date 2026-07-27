@@ -75,8 +75,10 @@ public class ApplicationMaster {
     @Column(name = "completed_on")
     private LocalDateTime completedOn;
 
+    @Column(name = "remarks", columnDefinition = "TEXT")
     private String remarks;
 
+    @Column(name = "rejection_remarks", columnDefinition = "TEXT")
     private String rejectionRemarks;
 
     @Column(name = "expiry_date")
