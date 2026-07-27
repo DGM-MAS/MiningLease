@@ -89,9 +89,11 @@ public class MiningLeaseRenewalController {
                 Sort.Direction.fromString(sortDirection), sortBy);
 
         Long userId = userContext.getCurrentUserId();
-        return ResponseEntity.ok(
-                miningLeaseRenewalService.getArchivedApplication(userId, pageable, search)
-        );
+        if(userContext.isAgencyUser()){
+            return ResponseEntity.ok( miningLeaseRenewalService.getArchivedApplication(userId, pageable, search));
+        }else {
+            return ResponseEntity.ok( miningLeaseRenewalService.getMyArchivedApplication(userId, pageable, search));
+        }
     }
 
 

@@ -20,7 +20,7 @@ public interface MiningLeaseRenewalApplicationRepository extends JpaRepository<M
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('RENEWAL APPLICATION')
+    AND q.currentStatus IN ('RENEWAL APPLICATION')
 """)
     Page<MiningLeaseRenewalApplication> findAssignedToUserDirector(Long userId, Pageable pageable);
 
@@ -30,7 +30,7 @@ public interface MiningLeaseRenewalApplicationRepository extends JpaRepository<M
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('RENEWAL APPLICATION')
+    AND q.currentStatus IN ('RENEWAL APPLICATION')
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseRenewalApplication> findAssignedToUserAndSearchDirector(Long userId, String search, Pageable pageable);
@@ -41,7 +41,7 @@ public interface MiningLeaseRenewalApplicationRepository extends JpaRepository<M
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('ASSIGNED')
+    AND q.currentStatus IN ('ASSIGNED')
 """)
     Page<MiningLeaseRenewalApplication> findAssignedToUserMineEngineer(Long userId, Pageable pageable);
 
@@ -51,7 +51,7 @@ public interface MiningLeaseRenewalApplicationRepository extends JpaRepository<M
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('ASSIGNED')
+    AND q.currentStatus IN ('ASSIGNED')
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseRenewalApplication> findAssignedToUserIdAndSearchMineEngineer(Long userId, String search, Pageable pageable);
@@ -62,7 +62,7 @@ public interface MiningLeaseRenewalApplicationRepository extends JpaRepository<M
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('ASSIGNED','GEOLOGIST_REVIEW', 'ACCEPTED PFS', 'FMFS SUBMITTED', 'GR SUBMITTED', 'ACCEPTED PFS MPCD')
+    AND q.currentStatus IN ('ASSIGNED','GEOLOGIST_REVIEW', 'ACCEPTED PFS', 'FMFS SUBMITTED', 'GR SUBMITTED', 'ACCEPTED PFS MPCD')
 """)
     Page<MiningLeaseRenewalApplication> findAssignedToUserGeologist(Long userId, Pageable pageable);
 
@@ -72,7 +72,7 @@ public interface MiningLeaseRenewalApplicationRepository extends JpaRepository<M
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('ASSIGNED','GEOLOGIST_REVIEW', 'ACCEPTED PFS', 'FMFS SUBMITTED', 'GR SUBMITTED')
+    AND q.currentStatus IN ('ASSIGNED','GEOLOGIST_REVIEW', 'ACCEPTED PFS', 'FMFS SUBMITTED', 'GR SUBMITTED')
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseRenewalApplication> findAssignedToUserAndSearchGeologist(Long userId, String search, Pageable pageable);
@@ -83,7 +83,7 @@ public interface MiningLeaseRenewalApplicationRepository extends JpaRepository<M
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('MINING_CHIEF', 'MINING_CHIEF_REVIEW')
+    AND q.currentStatus IN ('MINING_CHIEF', 'MINING_CHIEF_REVIEW')
 """)
     Page<MiningLeaseRenewalApplication> findAssignedToUserMiningChief(Long userId, Pageable pageable);
 
@@ -93,7 +93,7 @@ public interface MiningLeaseRenewalApplicationRepository extends JpaRepository<M
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('MINING_CHIEF', 'MINING_CHIEF_REVIEW')
+    AND q.currentStatus IN ('MINING_CHIEF', 'MINING_CHIEF_REVIEW')
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseRenewalApplication> findAssignedToUserAndSearchMiningChief(Long userId, String search, Pageable pageable);
@@ -136,7 +136,7 @@ public interface MiningLeaseRenewalApplicationRepository extends JpaRepository<M
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('PENDING', 'ASSIGNED', 'APPROVED', 'ACCEPTED PFS', 'MINING_CHIEF_REVIEW')
+    AND q.currentStatus IN ('PENDING', 'ASSIGNED', 'APPROVED', 'ACCEPTED PFS', 'MINING_CHIEF_REVIEW')
 """)
     Page<MiningLeaseRenewalApplication> findAssignedToUserMPCD(
             Long userId,
@@ -149,7 +149,7 @@ public interface MiningLeaseRenewalApplicationRepository extends JpaRepository<M
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ("PENDING", "ASSIGNED", "APPROVED", "ACCEPTED PFS", 'MINING_CHIEF_REVIEW')
+    AND q.currentStatus IN ("PENDING", "ASSIGNED", "APPROVED", "ACCEPTED PFS", 'MINING_CHIEF_REVIEW')
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseRenewalApplication> findAssignedToUserAndSearchMPCD(
@@ -165,7 +165,7 @@ public interface MiningLeaseRenewalApplicationRepository extends JpaRepository<M
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('MINING LEASE APPROVED')
+    AND q.currentStatus IN ('MINING RENEWAL APPROVED')
 """)
     Page<MiningLeaseRenewalApplication> findArchivedAssignedToUserMPCD(Long userId, Pageable pageable);
 
@@ -175,9 +175,29 @@ public interface MiningLeaseRenewalApplicationRepository extends JpaRepository<M
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND t.taskStatus IN ('MINING LEASE APPROVED', 'REJECTED')
+    AND q.currentStatus IN ('MINING RENEWAL APPROVED')
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseRenewalApplication> findArchivedAssignedToUserAndSearchMPCD(Long userId, String search, Pageable pageable);
 
+    @Query("""
+    SELECT q
+    FROM MiningLeaseRenewalApplication q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE q.createdBy = :userId
+    AND q.currentStatus IN ('MINING RENEWAL APPROVED')
+""")
+    Page<MiningLeaseRenewalApplication> findArchivedAssignedToUserPromoter(Long userId, Pageable pageable);
+
+    @Query("""
+    SELECT q
+    FROM MiningLeaseRenewalApplication q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE q.createdBy = :userId
+    AND q.currentStatus IN ('MINING RENEWAL APPROVED')
+    AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
+""")
+    Page<MiningLeaseRenewalApplication> findArchivedAssignedToUserAndSearchPromoter(Long userId, String trim, Pageable pageable);
 }
