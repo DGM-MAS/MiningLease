@@ -54,7 +54,7 @@ public class ImmediateSuspensionApplication {
     @JoinColumn(name = "suspension_reason_master_id")
     private ImmediateSuspensionReasonMaster suspensionReasonMaster;
 
-    @Column(name = "remarks_rc_mi")
+    @Column(name = "remarks_rc_mi", columnDefinition = "TEXT")
     private String remarksRcMi;
 
     @Column(name = "rc_mi_reviewed_at")
@@ -66,7 +66,7 @@ public class ImmediateSuspensionApplication {
     @Column(name = "promoter_file_id")
     private Long promoterFileId;
 
-    @Column(name = "promoter_remarks")
+    @Column(name = "promoter_remarks", columnDefinition = "TEXT")
     private String promoterRemarks;
 
     @Column(name = "mi_reviewed_at")
@@ -75,7 +75,7 @@ public class ImmediateSuspensionApplication {
     @Column(name = "mi_file_id")
     private Long miFileId;
 
-    @Column(name = "mi_remarks")
+    @Column(name = "mi_remarks", columnDefinition = "TEXT")
     private String miRemarks;
 
     // ========== Status & Workflow ==========

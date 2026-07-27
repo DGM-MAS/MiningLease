@@ -116,7 +116,7 @@ public class MiningLeaseRenewalApplication {
     @Column(name = "work_order_doc_id")
     private Long workOrderDocId;
 
-    @Column(name = "work_order_remarks")
+    @Column(name = "work_order_remarks", columnDefinition = "TEXT")
     private String workOrderRemarks;
 
     @Column(name = "mla_doc_id", length = 100)
@@ -137,7 +137,7 @@ public class MiningLeaseRenewalApplication {
 
     // ========== GEOLOGIST FOCAL =============== //
 
-    @Column(name = "remarks_geologist")
+    @Column(name = "remarks_geologist", columnDefinition = "TEXT")
     private String remarksGeologist;
 
     @Column(name = "geologist_reviewed_at")
