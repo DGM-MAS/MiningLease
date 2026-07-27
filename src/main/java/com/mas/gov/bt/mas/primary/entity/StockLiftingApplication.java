@@ -62,18 +62,18 @@ public class StockLiftingApplication {
     @Column(name = "rc_report_file_id")
     private String rcReportFileId;
 
-    @Column(name = "rc_remarks", length = 1000)
+    @Column(name = "rc_remarks", columnDefinition = "TEXT")
     private String rcRemarks;
 
     // ── MPCD ─────────────────────────────────────────────────────────────────────
-    @Column(name = "mpcd_remarks", length = 1000)
+    @Column(name = "mpcd_remarks", columnDefinition = "TEXT")
     private String mpcdRemarks;
 
     @Column(name = "iom_file_id")
     private String iomFileId;
 
     // ── Mining Engineer ──────────────────────────────────────────────────────────
-    @Column(name = "me_remarks", length = 1000)
+    @Column(name = "me_remarks", columnDefinition = "TEXT")
     private String meRemarks;
 
     @Column(name = "permit_file_id")
