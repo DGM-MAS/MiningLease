@@ -103,7 +103,7 @@ public class StockLiftingTransportPermit {
 
     private LocalDateTime reviewedOn;
 
-    @Column(length = 500)
+    @Column(name = "remarks", columnDefinition = "TEXT")
     private String remarks;
 
     @Column(name = "adjustment_reason", length = 1000)

@@ -150,10 +150,10 @@ public class QuarryLeaseApplication {
     @Column(name = "mpcd_file_upload_id_ma")
     private Long mpcdFileUploadIdMa;
 
-    @Column(name = "remarks_mpcd")
+    @Column(name = "remarks_mpcd", columnDefinition = "TEXT")
     private String remarksMPCD;
 
-    @Column(name = "remarks_geologist")
+    @Column(name = "remarks_geologist", columnDefinition = "TEXT")
     private String remarksGeologist;
 
     @Column(name = "geological_report_status", length = 30)
@@ -316,7 +316,7 @@ public class QuarryLeaseApplication {
     @Column(name = "work_order_doc_id")
     private Long workOrderDocId;
 
-    @Column(name = "work_order_remarks")
+    @Column(name = "work_order_remarks", columnDefinition = "TEXT")
     private String workOrderRemarks;
 
     @Column(name = "is_manual_entry")

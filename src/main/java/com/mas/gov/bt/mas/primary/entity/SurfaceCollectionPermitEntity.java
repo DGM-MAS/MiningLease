@@ -120,7 +120,7 @@ public class SurfaceCollectionPermitEntity {
     @Column(name = "assigned_mpcd_id")
     private Long assignedMpcdId;
 
-    @Column(name = "mpcd_remarks")
+    @Column(name = "mpcd_remarks", columnDefinition = "TEXT")
     private String mpcdRemarks;
 
     @Column(name = "mpcd_report_file_id")
@@ -136,7 +136,7 @@ public class SurfaceCollectionPermitEntity {
     @Column(name = "assigned_rc_id")
     private Long assignedRcId;
 
-    @Column(name = "rc_remarks")
+    @Column(name = "rc_remarks", columnDefinition = "TEXT")
     private String rcRemarks;
 
     @Column(name = "rc_report_file_id")
@@ -146,7 +146,7 @@ public class SurfaceCollectionPermitEntity {
     @Column(name = "assigned_mi_id")
     private Long assignedMiId;
 
-    @Column(name = "mi_remarks")
+    @Column(name = "mi_remarks", columnDefinition = "TEXT")
     private String miRemarks;
 
     @Column(name = "mi_report_file_id")
@@ -156,7 +156,7 @@ public class SurfaceCollectionPermitEntity {
     @Column(name = "assigned_me_id")
     private Long assignedMeId;
 
-    @Column(name = "me_remarks")
+    @Column(name = "me_remarks", columnDefinition = "TEXT")
     private String meRemarks;
 
     @Column(name = "ec_file_id")
@@ -173,7 +173,7 @@ public class SurfaceCollectionPermitEntity {
     @Column(name = "assigned_md_id")
     private Long assignedMdId;
 
-    @Column(name = "md_remarks")
+    @Column(name = "md_remarks", columnDefinition = "TEXT")
     private String mdRemarks;
 
     // ── Permit Type ───────────────────────────────────────────────────────────

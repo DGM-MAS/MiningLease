@@ -59,13 +59,13 @@ public class TerminationApplicationEntity {
     @Column(name = "termination_end_date")
     private LocalDate terminationEndDate;
 
-    @Column(name = "remarks_chief")
+    @Column(name = "remarks_chief", columnDefinition = "TEXT")
     private String remarksChief;
 
     @Column(name = "chief_reviewed_at")
     private LocalDateTime chiefReviewedAt;
 
-    @Column(name = "remarks_cms_head")
+    @Column(name = "remarks_cms_head", columnDefinition = "TEXT")
     private String remarksCMSHead;
 
     @Column(name = "cms_head_reviewed_at")
