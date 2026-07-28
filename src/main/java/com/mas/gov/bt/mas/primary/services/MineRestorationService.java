@@ -8,6 +8,7 @@ import com.mas.gov.bt.mas.primary.dto.response.MineRestorationResponse;
 import com.mas.gov.bt.mas.primary.entity.*;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
 import com.mas.gov.bt.mas.primary.exception.ResourceNotFoundException;
+import com.mas.gov.bt.mas.primary.integration.MenuIdResolver;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.repository.*;
 import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
@@ -37,9 +38,9 @@ public class MineRestorationService {
     // NOT the same thing as SERVICE_CODE above, which is an unrelated t_application_master.service_code value.
     // No ServiceMenuMapping.java entry exists for this service; these were resolved directly against
     // the live `permissions` table (parent_menu_id = 120, "Mine Restoration") — flagged for human review.
-    private static final String MENU_ID_APPLICANT       = "121"; // "Promoter Application List" (/MineRestorationappliantlist)
-    private static final String MENU_ID_MINING_ENGINEER = "122"; // "Mining Division Application List"
-    private static final String MENU_ID_RC              = "123"; // "Regional Coordinator Application List"
+    private String MENU_ID_APPLICANT       = "121"; // "Promoter Application List" (/MineRestorationappliantlist)
+    private String MENU_ID_MINING_ENGINEER = "122"; // "Mining Division Application List" (/MineRestorationminingdivisionapplist)
+    private String MENU_ID_RC              = "123"; // "Regional Coordinator Application List" (/MineRestorationregionalCoordinatorapplist)
 
     // Statuses
     public static final String STATUS_MRP_DRAFT = "MRP_DRAFT";
@@ -64,9 +65,18 @@ public class MineRestorationService {
     private final MiningLeaseApplicationRepository miningLeaseApplicationRepository;
     private final NotificationClient notificationClient;
 
+    private final MenuIdResolver menuIdResolver;
+
     private final QuarryLeaseApplicationRepository queryLeaseApplicationRepository;
 
     private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
+
+    @jakarta.annotation.PostConstruct
+    private void resolveMenuIds() {
+        MENU_ID_APPLICANT       = menuIdResolver.resolve("/MineRestorationappliantlist", MENU_ID_APPLICANT);
+        MENU_ID_MINING_ENGINEER = menuIdResolver.resolve("/MineRestorationminingdivisionapplist", MENU_ID_MINING_ENGINEER);
+        MENU_ID_RC              = menuIdResolver.resolve("/MineRestorationregionalCoordinatorapplist", MENU_ID_RC);
+    }
 
     // =====================================================
     // PROMOTER — MRP Submission

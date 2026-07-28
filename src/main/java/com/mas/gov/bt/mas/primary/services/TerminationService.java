@@ -12,6 +12,7 @@ import com.mas.gov.bt.mas.primary.dto.response.TerminationApplicationResponse;
 import com.mas.gov.bt.mas.primary.entity.*;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
 import com.mas.gov.bt.mas.primary.exception.ResourceNotFoundException;
+import com.mas.gov.bt.mas.primary.integration.MenuIdResolver;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.mapper.TerminationMapper;
 import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
@@ -39,7 +40,10 @@ public class TerminationService {
     // Real sidebar menu ids (permissions.id) per recipient role for this service — used to target
     // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
     // NOT the same thing as SERVICE_CODE above, which is an unrelated t_application_master.service_code value.
-    private static final String MENU_ID_CMS_HEAD = "114"; // "CMS HEAD" — TERMINATION_SERVICE
+    // Resolved against the live permissions table at startup (see MenuIdResolver); the string
+    // literals below are only fallbacks if masters is unreachable.
+    private String MENU_ID_CMS_HEAD;  // "CMS Termination Application List" (/mtcdecisionlist)
+    private String MENU_ID_APPLICANT; // "Promoter Termination Application List" (/promoterrectificationlist)
 
     private final TerminationApplicationRepository terminationApplicationRepository;
 
@@ -48,6 +52,8 @@ public class TerminationService {
     private final TaskManagementRepository taskManagementRepository;
 
     private final NotificationClient notificationClient;
+
+    private final MenuIdResolver menuIdResolver;
 
     private final TerminationMapper terminationMapper;
 
@@ -60,6 +66,12 @@ public class TerminationService {
     private final QuarryLeaseApplicationRepository quarryLeaseApplicationRepository;
 
     private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
+
+    @jakarta.annotation.PostConstruct
+    private void resolveMenuIds() {
+        MENU_ID_CMS_HEAD = menuIdResolver.resolve("/mtcdecisionlist", "114");
+        MENU_ID_APPLICANT = menuIdResolver.resolve("/promoterrectificationlist", "115");
+    }
 
     @Transactional
     public List<TerminationApplicationResponse> submitTerminationApplication(
@@ -381,6 +393,12 @@ public class TerminationService {
                                 app.getTerminationId()
                         );
                     }
+                    if (app.getPromoterUserId() != null) {
+                        String title = "Termination Application Approved";
+                        String message = "Your termination application " + app.getTerminationId()
+                                + " has been approved. The lease has been terminated.";
+                        notificationClient.sendUserNotification(title, message, app.getPromoterUserId(), MENU_ID_APPLICANT, "CITIZEN", false, app.getTerminationId());
+                    }
                     assert master != null;
                     createTask( master, app, "DIRECTOR CMS APPROVED", userId, app.getCreatedBy());
 
@@ -406,6 +424,12 @@ public class TerminationService {
                                 app.getTerminationId(),
                                 app.getCurrentStatus(),
                                 app.getRemarksCMSHead());
+                    }
+                    if (app.getPromoterUserId() != null) {
+                        String title = "Termination Application Needs Rectification";
+                        String message = "Your termination application " + app.getTerminationId()
+                                + " requires rectification. Please review and resubmit.";
+                        notificationClient.sendUserNotification(title, message, app.getPromoterUserId(), MENU_ID_APPLICANT, "CITIZEN", true, app.getTerminationId());
                     }
 
                     assert master != null;
@@ -434,6 +458,12 @@ public class TerminationService {
                                 app.getApplicantName(),
                                 app.getTerminationId()
                         );
+                    }
+                    if (app.getPromoterUserId() != null) {
+                        String title = "Termination Cancelled";
+                        String message = "The termination for application " + app.getTerminationId()
+                                + " has been cancelled; your lease remains active.";
+                        notificationClient.sendUserNotification(title, message, app.getPromoterUserId(), MENU_ID_APPLICANT, "CITIZEN", false, app.getTerminationId());
                     }
                     assert master != null;
                     createTask( master, app, "TERMINATION CANCELED", userId, app.getCreatedBy());
@@ -512,6 +542,12 @@ public class TerminationService {
                             app.getCurrentStatus(),
                             app.getRemarksCMSHead()
                     );
+                }
+                if (taskManagement.getAssignedToUserId() != null) {
+                    String title = "Termination Rectification Submitted";
+                    String message = "Promoter has resubmitted rectification for termination application "
+                            + app.getTerminationId() + ". Please review.";
+                    notificationClient.sendUserNotification(title, message, taskManagement.getAssignedToUserId(), MENU_ID_CMS_HEAD, "STAFF", true, app.getTerminationId());
                 }
 
                 assert master != null;

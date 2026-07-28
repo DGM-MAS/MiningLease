@@ -9,6 +9,7 @@ import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
 import com.mas.gov.bt.mas.primary.dto.request.*;
 import com.mas.gov.bt.mas.primary.dto.response.SampleTransportClearanceResponseDTO;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
+import com.mas.gov.bt.mas.primary.integration.MenuIdResolver;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.mapper.SampleTransportClearanceMapper;
 import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
@@ -36,15 +37,23 @@ public class SampleTransportClearanceServiceImpl
     // Real sidebar menu ids (permissions.id) per recipient role for this service — used to target
     // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
     // NOT the same thing as SERVICE_CODE above, which is an unrelated t_application_master.service_code value.
-    private static final String MENU_ID_APPLICANT = "150"; // "APPLICANT" — SAMPLE_TRANSPORT_CLEARANCE
-    private static final String MENU_ID_GSD_CHIEF  = "151"; // "GSD_CHIEF"
-    private static final String MENU_ID_GSD_FOCAL  = "152"; // "GSD_FOCAL"
+    private String MENU_ID_APPLICANT = "150"; // "APPLICANT" — SAMPLE_TRANSPORT_CLEARANCE (/SampleTransportClearancesappliantapplist)
+    private String MENU_ID_GSD_CHIEF  = "151"; // "GSD_CHIEF" (/SampleTransportClearancegsdapplist)
+    private String MENU_ID_GSD_FOCAL  = "152"; // "GSD_FOCAL" (/SampleTransportClearancegsdfocalapplist)
 
     private final SampleTransportClearanceRepository repository;
     private final SampleTransportClearanceMapper sampleTransportClearanceMapper;
     private final ApplicationMasterRepository applicationMasterRepository;
     private final TaskManagementRepository taskManagementRepository;
     private final NotificationClient notificationClient;
+    private final MenuIdResolver menuIdResolver;
+
+    @jakarta.annotation.PostConstruct
+    private void resolveMenuIds() {
+        MENU_ID_APPLICANT = menuIdResolver.resolve("/SampleTransportClearancesappliantapplist", MENU_ID_APPLICANT);
+        MENU_ID_GSD_CHIEF  = menuIdResolver.resolve("/SampleTransportClearancegsdapplist", MENU_ID_GSD_CHIEF);
+        MENU_ID_GSD_FOCAL  = menuIdResolver.resolve("/SampleTransportClearancegsdfocalapplist", MENU_ID_GSD_FOCAL);
+    }
 
 
     private final DzongkhagLookupRepository dzongkhagLookupRepository;

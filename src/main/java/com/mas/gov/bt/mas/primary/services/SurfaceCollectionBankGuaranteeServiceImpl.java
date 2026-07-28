@@ -12,6 +12,7 @@ import com.mas.gov.bt.mas.primary.dto.response.BGInstructionViewResponseDTO;
 import com.mas.gov.bt.mas.primary.dto.response.BGResponseDTO;
 import com.mas.gov.bt.mas.primary.entity.*;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
+import com.mas.gov.bt.mas.primary.integration.MenuIdResolver;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.repository.*;
 import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
@@ -43,14 +44,21 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
 
     private final NotificationClient notificationClient;
 
+    private final MenuIdResolver menuIdResolver;
+
     private static final String SERVICE_CODE = "SURFACE_COLLECTION_AUCTION";
 
     // Real sidebar menu ids (permissions.id) per recipient role — used to target
     // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
     // Same SURFACE_COLLECTION_AUCTION menu tree as SurfaceCollectionAuctionServiceImpl.java.
-    private static final String MENU_ID_MINING_DIRECTOR = "74"; // "MINING_DIRECTOR"
+    private String MENU_ID_MINING_DIRECTOR = "74"; // "MINING_DIRECTOR" (/mdauctionsurfacecollectionlist)
 
     private static final int DEFAULT_TAT_DAYS = 2;
+
+    @jakarta.annotation.PostConstruct
+    private void resolveMenuIds() {
+        MENU_ID_MINING_DIRECTOR = menuIdResolver.resolve("/mdauctionsurfacecollectionlist", MENU_ID_MINING_DIRECTOR);
+    }
 
     @Override
     public BGInstructionViewResponseDTO viewInstructions(Long promoterId) {
