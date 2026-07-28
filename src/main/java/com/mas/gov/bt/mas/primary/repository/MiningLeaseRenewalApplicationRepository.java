@@ -41,7 +41,7 @@ public interface MiningLeaseRenewalApplicationRepository extends JpaRepository<M
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND q.currentStatus IN ('ASSIGNED')
+    AND q.currentStatus IN ('ASSIGNED', 'GEOLOGIST-APPROVED')
 """)
     Page<MiningLeaseRenewalApplication> findAssignedToUserMineEngineer(Long userId, Pageable pageable);
 
@@ -51,7 +51,7 @@ public interface MiningLeaseRenewalApplicationRepository extends JpaRepository<M
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
-    AND q.currentStatus IN ('ASSIGNED')
+    AND q.currentStatus IN ('ASSIGNED', 'GEOLOGIST-APPROVED')
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)
     Page<MiningLeaseRenewalApplication> findAssignedToUserIdAndSearchMineEngineer(Long userId, String search, Pageable pageable);
