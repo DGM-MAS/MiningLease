@@ -7,6 +7,8 @@ app:
   notification:
     api-url: http://172.30.3.10:30081/master/api/notifications
     email-builder-url: http://172.30.3.10:30081/master/api/notifications/send
+  menu-resolution:
+    api-url: http://172.30.3.10:30081/master/api/menu-resolution
 
 # Set to false to bypass payment and let applications flow through directly (dev/testing only)
 payment:
@@ -230,6 +232,8 @@ app:
   notification:
     api-url: http://172.30.3.10:30081/master/api/notifications
     email-builder-url: http://172.30.3.10:30081/master/api/notifications/send
+  menu-resolution:
+    api-url: http://172.30.3.10:30081/master/api/menu-resolution
 
 springdoc:
   swagger-ui:

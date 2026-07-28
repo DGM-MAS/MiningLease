@@ -12,6 +12,7 @@ import com.mas.gov.bt.mas.primary.dto.payment.PaymentInitiationResponse;
 import com.mas.gov.bt.mas.primary.dto.request.*;
 import com.mas.gov.bt.mas.primary.dto.response.EnvironmentClearanceRenewalResponseDTO;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
+import com.mas.gov.bt.mas.primary.integration.MenuIdResolver;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.mapper.EnvironmentClearanceRenewalMapper;
 import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
@@ -43,9 +44,11 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
     // Real sidebar menu ids (permissions.id) per recipient role for this service — used to target
     // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
     // NOT the same thing as SERVICE_CODE above, which is an unrelated t_application_master.service_code value.
-    private static final String MENU_ID_MPCD            = "94"; // "MPCD" — RENEWAL_ENV_CLEARANCE
-    private static final String MENU_ID_MINING_ENGINEER  = "95"; // "MINING ENGINEER"
-    private static final String MENU_ID_APPLICANT        = "92"; // "Promoter Application List" (citizen-facing /renewalapplicationlist)
+    private String MENU_ID_MPCD            = "94"; // "MPCD" — RENEWAL_ENV_CLEARANCE (/mpcdrenewaleclist)
+    private String MENU_ID_MINING_ENGINEER  = "95"; // "MINING ENGINEER" (/mdrenewalecapprovedlist)
+    private String MENU_ID_APPLICANT        = "92"; // "Promoter Application List" (citizen-facing /renewalapplicationlist)
+    private String MENU_ID_RC              = "93"; // "RC Application List" (/rc-renewaleclist)
+    private String MENU_ID_MI              = "96"; // "Mining Inspector List" (/mirenewallist)
 
     // payment_master lookup keys for the EC renewal fee — matches the existing
     // (currently disabled, pending a real BIRMS wire code) payment_master row.
@@ -62,11 +65,22 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
 
     private final NotificationClient notificationClient;
 
+    private final MenuIdResolver menuIdResolver;
+
     private final MiningLeaseApplicationRepository miningLeaseApplicationRepository;
 
     private final QuarryLeaseApplicationRepository queryLeaseApplicationRepository;
 
     private final SurfaceCollectionPermitRepository surfaceCollectionPermitRepository;
+
+    @jakarta.annotation.PostConstruct
+    private void resolveMenuIds() {
+        MENU_ID_MPCD           = menuIdResolver.resolve("/mpcdrenewaleclist", MENU_ID_MPCD);
+        MENU_ID_MINING_ENGINEER = menuIdResolver.resolve("/mdrenewalecapprovedlist", MENU_ID_MINING_ENGINEER);
+        MENU_ID_APPLICANT      = menuIdResolver.resolve("/renewalapplicationlist", MENU_ID_APPLICANT);
+        MENU_ID_RC             = menuIdResolver.resolve("/rc-renewaleclist", MENU_ID_RC);
+        MENU_ID_MI             = menuIdResolver.resolve("/mirenewallist", MENU_ID_MI);
+    }
 
     private final PaymentMasterRepository paymentMasterRepository;
 
@@ -953,30 +967,45 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         );
 
         String pendingRevisionStage = entity.getPendingRevisionStage();
+        String resubmitTitle = "Environmental Clearance Renewal Resubmitted";
+        String resubmitMessage = "Applicant has resubmitted environmental clearance renewal application "
+                + entity.getApplicationNo() + ". Please review.";
 
         if ("RC".equals(pendingRevisionStage)) {
 
             entity.setStatus("ASSIGNED_TO_RC");
             entity.getApplicationMaster()
                     .setCurrentStatus("ASSIGNED_TO_RC");
+            if (entity.getAssignedRCId() != null) {
+                notificationClient.sendUserNotification(resubmitTitle, resubmitMessage, entity.getAssignedRCId(), MENU_ID_RC, "STAFF", true, entity.getApplicationNo());
+            }
 
         } else if ("MI".equals(pendingRevisionStage)) {
 
             entity.setStatus("ASSIGNED_TO_MI");
             entity.getApplicationMaster()
                     .setCurrentStatus("ASSIGNED_TO_MI");
+            if (entity.getAssignedMIId() != null) {
+                notificationClient.sendUserNotification(resubmitTitle, resubmitMessage, entity.getAssignedMIId(), MENU_ID_MI, "STAFF", true, entity.getApplicationNo());
+            }
 
         } else if ("MD".equals(pendingRevisionStage)) {
 
             entity.setStatus("UNDER_MD_REVIEW");
             entity.getApplicationMaster()
                     .setCurrentStatus("UNDER_MD_REVIEW");
+            if (entity.getAssignedMDId() != null) {
+                notificationClient.sendUserNotification(resubmitTitle, resubmitMessage, entity.getAssignedMDId(), MENU_ID_MINING_ENGINEER, "STAFF", true, entity.getApplicationNo());
+            }
 
         } else {
 
             routeApplication(entity);
             entity.getApplicationMaster()
                     .setCurrentStatus(entity.getStatus());
+            if (entity.getAssignedMPCDId() != null) {
+                notificationClient.sendUserNotification(resubmitTitle, resubmitMessage, entity.getAssignedMPCDId(), MENU_ID_MPCD, "STAFF", true, entity.getApplicationNo());
+            }
         }
 
         entity.setPendingRevisionStage(null);
@@ -1052,6 +1081,13 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         entity.getApplicationMaster()
                 .setCurrentStatus("RESUBMISSION_REQUIRED");
 
+        if (entity.getCreatedBy() != null) {
+            String title = "Environmental Clearance Renewal Resubmission Required";
+            String message = "Your environmental clearance renewal application " + entity.getApplicationNo()
+                    + " requires resubmission. Remarks: " + request.getRemarks();
+            notificationClient.sendUserNotification(title, message, entity.getCreatedBy(), MENU_ID_APPLICANT, "CITIZEN", true, entity.getApplicationNo());
+        }
+
         EnvironmentClearanceRenewal saved =
                 renewalEnvironmentalClearanceRepository
                         .save(entity);
@@ -1082,6 +1118,13 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
 
         entity.getApplicationMaster()
                 .setCurrentStatus("RESUBMISSION_REQUIRED");
+
+        if (entity.getCreatedBy() != null) {
+            String title = "Environmental Clearance Renewal Resubmission Required";
+            String message = "Your environmental clearance renewal application " + entity.getApplicationNo()
+                    + " requires resubmission. Remarks: " + request.getRemarks();
+            notificationClient.sendUserNotification(title, message, entity.getCreatedBy(), MENU_ID_APPLICANT, "CITIZEN", true, entity.getApplicationNo());
+        }
 
         EnvironmentClearanceRenewal saved =
                 renewalEnvironmentalClearanceRepository
@@ -1114,6 +1157,13 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         entity.getApplicationMaster()
                 .setCurrentStatus("RESUBMISSION_REQUIRED");
 
+        if (entity.getCreatedBy() != null) {
+            String title = "Environmental Clearance Renewal Resubmission Required";
+            String message = "Your environmental clearance renewal application " + entity.getApplicationNo()
+                    + " requires resubmission. Remarks: " + request.getRemarks();
+            notificationClient.sendUserNotification(title, message, entity.getCreatedBy(), MENU_ID_APPLICANT, "CITIZEN", true, entity.getApplicationNo());
+        }
+
         EnvironmentClearanceRenewal saved =
                 renewalEnvironmentalClearanceRepository
                         .save(entity);
@@ -1144,6 +1194,13 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
 
         entity.getApplicationMaster()
                 .setCurrentStatus("RESUBMISSION_REQUIRED");
+
+        if (entity.getCreatedBy() != null) {
+            String title = "Environmental Clearance Renewal Resubmission Required";
+            String message = "Your environmental clearance renewal application " + entity.getApplicationNo()
+                    + " requires resubmission. Remarks: " + request.getRemarks();
+            notificationClient.sendUserNotification(title, message, entity.getCreatedBy(), MENU_ID_APPLICANT, "CITIZEN", true, entity.getApplicationNo());
+        }
 
         EnvironmentClearanceRenewal saved =
                 renewalEnvironmentalClearanceRepository
@@ -1181,6 +1238,13 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         entity.getApplicationMaster()
                 .setCompletedOn(LocalDateTime.now());
 
+        if (entity.getCreatedBy() != null) {
+            String title = "Environmental Clearance Renewal Rejected";
+            String message = "Your environmental clearance renewal application " + entity.getApplicationNo()
+                    + " has been rejected. Reason: " + request.getRejectionRemarks();
+            notificationClient.sendUserNotification(title, message, entity.getCreatedBy(), MENU_ID_APPLICANT, "CITIZEN", false, entity.getApplicationNo());
+        }
+
         EnvironmentClearanceRenewal saved =
                 renewalEnvironmentalClearanceRepository
                         .save(entity);
@@ -1217,6 +1281,12 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                 userId,
                 request.getRcUserId()
         );
+
+        if (request.getRcUserId() != null) {
+            String title = "Environmental Clearance Renewal Assigned for Site Review";
+            String message = "An environmental clearance renewal application has been assigned to you for site review. Application No. " + entity.getApplicationNo();
+            notificationClient.sendUserNotification(title, message, request.getRcUserId(), MENU_ID_RC, "STAFF", true, entity.getApplicationNo());
+        }
 
         EnvironmentClearanceRenewal saved =
                 renewalEnvironmentalClearanceRepository.save(entity);
@@ -1300,6 +1370,13 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         entity.getApplicationMaster()
                 .setCurrentStatus("RC_REPORT_SUBMITTED");
 
+        if (entity.getAssignedMPCDId() != null) {
+            String title = "RC Site Report Submitted";
+            String message = "RC has submitted the site report for environmental clearance renewal application "
+                    + entity.getApplicationNo() + ". Please review and proceed.";
+            notificationClient.sendUserNotification(title, message, entity.getAssignedMPCDId(), MENU_ID_MPCD, "STAFF", true, entity.getApplicationNo());
+        }
+
         EnvironmentClearanceRenewal saved =
                 renewalEnvironmentalClearanceRepository.save(entity);
 
@@ -1334,6 +1411,12 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                 userId,
                 request.getMiUserId()
         );
+
+        if (request.getMiUserId() != null) {
+            String title = "Environmental Clearance Renewal Assigned for Site Verification";
+            String message = "An environmental clearance renewal application has been assigned to you for site verification. Application No. " + entity.getApplicationNo();
+            notificationClient.sendUserNotification(title, message, request.getMiUserId(), MENU_ID_MI, "STAFF", true, entity.getApplicationNo());
+        }
 
         EnvironmentClearanceRenewal saved =
                 renewalEnvironmentalClearanceRepository.save(entity);
@@ -1418,6 +1501,13 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
 
         entity.getApplicationMaster()
                 .setCurrentStatus("MI_REPORT_SUBMITTED");
+
+        if (entity.getAssignedRCId() != null) {
+            String title = "MI Site Verification Report Submitted";
+            String message = "MI has submitted the site verification report for environmental clearance renewal application "
+                    + entity.getApplicationNo() + ". Please review and proceed.";
+            notificationClient.sendUserNotification(title, message, entity.getAssignedRCId(), MENU_ID_RC, "STAFF", true, entity.getApplicationNo());
+        }
 
         EnvironmentClearanceRenewal saved =
                 renewalEnvironmentalClearanceRepository
@@ -1561,6 +1651,21 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
 
         entity.getApplicationMaster()
                 .setCurrentStatus(entity.getStatus());
+
+        if (entity.getCreatedBy() != null) {
+            String title;
+            String message;
+            if ("FORWARDED_TO_DECC".equals(entity.getStatus())) {
+                title = "Environmental Clearance Forwarded to DECC";
+                message = "Your environmental clearance renewal application " + entity.getApplicationNo()
+                        + " has been approved and forwarded to DECC.";
+            } else {
+                title = "Environmental Clearance Renewed";
+                message = "Your environmental clearance renewal application " + entity.getApplicationNo()
+                        + " has been approved. EC Number: " + entity.getEcNumber() + ".";
+            }
+            notificationClient.sendUserNotification(title, message, entity.getCreatedBy(), MENU_ID_APPLICANT, "CITIZEN", false, entity.getApplicationNo());
+        }
 
         EnvironmentClearanceRenewal saved =
                 renewalEnvironmentalClearanceRepository.save(entity);

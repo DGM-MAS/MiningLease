@@ -13,6 +13,7 @@ import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
 import com.mas.gov.bt.mas.primary.entity.*;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
 import com.mas.gov.bt.mas.primary.exception.ResourceNotFoundException;
+import com.mas.gov.bt.mas.primary.integration.MenuIdResolver;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.mapper.MiningLeaseMapper;
 import com.mas.gov.bt.mas.primary.repository.*;
@@ -45,11 +46,11 @@ public class MiningLeaseRenewalService {
     // Real sidebar menu ids (permissions.id) per recipient role for this service — used to target
     // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
     // NOT the same thing as SERVICE_CODE above, which is an unrelated t_application_master.service_code value.
-    private static final String MENU_ID_APPLICANT      = "86"; // "APPLICANT" — MINING LEASE RENEWAL
-    private static final String MENU_ID_MINE_ENGINEER   = "87"; // "MINE ENGINEER"
-    private static final String MENU_ID_GEOLOGIST       = "88"; // "GEOLOGIST"
-    private static final String MENU_ID_MINING_CHIEF    = "89"; // "MINING_CHIEF_REVIEW"
-    private static final String MENU_ID_DIRECTOR        = "90"; // "DIRECTOR" / "DIRECTOR APPROVED FMFS"
+    private String MENU_ID_APPLICANT      = "86"; // "APPLICANT" — MINING LEASE RENEWAL (/renewalleaseapplicationlist)
+    private String MENU_ID_MINE_ENGINEER   = "87"; // "MINE ENGINEER" (/mdrenewalleaseapproverejectlist)
+    private String MENU_ID_GEOLOGIST       = "88"; // "GEOLOGIST" (/reviewdepositreassetreportlist)
+    private String MENU_ID_MINING_CHIEF    = "89"; // "MINING_CHIEF_REVIEW" (/cheifmdrenewallist)
+    private String MENU_ID_DIRECTOR        = "90"; // "DIRECTOR" / "DIRECTOR APPROVED FMFS" (/directorrenewalleaselist)
 
     private final MiningLeaseMapper mapper;
 
@@ -66,6 +67,8 @@ public class MiningLeaseRenewalService {
     private final TaskManagementRepository taskManagementRepository;
 
     private final NotificationClient notificationClient;
+
+    private final MenuIdResolver menuIdResolver;
 
     private final ApplicationRevisionHistoryRepository revisionHistoryRepository;
 
@@ -96,6 +99,15 @@ public class MiningLeaseRenewalService {
 
     @Value("${payment.enabled:true}")
     private boolean paymentEnabled;
+
+    @jakarta.annotation.PostConstruct
+    private void resolveMenuIds() {
+        MENU_ID_APPLICANT     = menuIdResolver.resolve("/renewalleaseapplicationlist", MENU_ID_APPLICANT);
+        MENU_ID_MINE_ENGINEER = menuIdResolver.resolve("/mdrenewalleaseapproverejectlist", MENU_ID_MINE_ENGINEER);
+        MENU_ID_GEOLOGIST     = menuIdResolver.resolve("/reviewdepositreassetreportlist", MENU_ID_GEOLOGIST);
+        MENU_ID_MINING_CHIEF  = menuIdResolver.resolve("/cheifmdrenewallist", MENU_ID_MINING_CHIEF);
+        MENU_ID_DIRECTOR      = menuIdResolver.resolve("/directorrenewalleaselist", MENU_ID_DIRECTOR);
+    }
 
     public Page<ApplicationListResponse> getApplicationByApplicantId(Long userId, Pageable pageable, String search) {
         List<String> statusIns = new ArrayList<>();
