@@ -11,6 +11,7 @@ import com.mas.gov.bt.mas.primary.dto.response.ReviewResponseDTO;
 import com.mas.gov.bt.mas.primary.dto.response.SurfaceCollectionAuctionResponseDTO;
 import com.mas.gov.bt.mas.primary.entity.*;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
+import com.mas.gov.bt.mas.primary.integration.MenuIdResolver;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.repository.*;
 import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
@@ -45,6 +46,7 @@ public class SurfaceCollectionReviewServiceImpl
     private final ApplicationMasterRepository applicationMasterRepository;
     private final TaskManagementRepository taskManagementRepository;
     private final NotificationClient notificationClient;
+    private final MenuIdResolver menuIdResolver;
 
     private final SiteProvisioningService siteProvisioningService;
 
@@ -61,9 +63,16 @@ public class SurfaceCollectionReviewServiceImpl
     // Real sidebar menu ids (permissions.id) per recipient role — used to target
     // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
     // Same SURFACE_COLLECTION_AUCTION menu tree as SurfaceCollectionAuctionServiceImpl.java.
-    private static final String MENU_ID_PROMOTER = "73"; // "PROMOTER"
+    // Resolved against the live permissions table at startup (see MenuIdResolver); the string
+    // literal below is only a fallback if masters is unreachable.
+    private String MENU_ID_PROMOTER; // "Promoter Application List" (/auctionsurfacecollectionlist)
 
     private static final int DEFAULT_TAT_DAYS = 2;
+
+    @jakarta.annotation.PostConstruct
+    private void resolveMenuIds() {
+        MENU_ID_PROMOTER = menuIdResolver.resolve("/auctionsurfacecollectionlist", "73");
+    }
 
 
     @Override
@@ -300,6 +309,17 @@ public class SurfaceCollectionReviewServiceImpl
         applicationMasterRepository.save(master);
 
         recordApprovedForThreshold(entity, bidWinner, surfaceCollectionAuctionPermit.getPermitNo());
+
+        // This was the one citizen-visible milestone in the whole auction flow with no
+        // in-app notification at all (email-only elsewhere in this class) — issuePermit
+        // never called sendUserNotification, so the sidebar dot never lit up for it.
+        Long notifyUserId = promoterId != null ? promoterId : master.getApplicantUserId();
+        if (notifyUserId != null) {
+            String title = "Surface Collection Permit Issued";
+            String message = "Your Surface Collection Permit for application " + entity.getApplicationNo()
+                    + " has been issued. Permit No: " + surfaceCollectionAuctionPermit.getPermitNo() + ".";
+            notificationClient.sendUserNotification(title, message, notifyUserId, MENU_ID_PROMOTER, "CITIZEN", false, entity.getApplicationNo());
+        }
 
         return mapToResponse(entity);
     }

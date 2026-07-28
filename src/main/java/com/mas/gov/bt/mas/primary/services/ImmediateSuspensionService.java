@@ -8,6 +8,7 @@ import com.mas.gov.bt.mas.primary.dto.response.ImmediateSuspensionApplicationRes
 import com.mas.gov.bt.mas.primary.entity.*;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
 import com.mas.gov.bt.mas.primary.exception.ResourceNotFoundException;
+import com.mas.gov.bt.mas.primary.integration.MenuIdResolver;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.mapper.ImmediateSuspensionMapper;
 import com.mas.gov.bt.mas.primary.repository.*;
@@ -36,8 +37,10 @@ public class ImmediateSuspensionService {
     // Real sidebar menu ids (permissions.id) per recipient role for this service — used to target
     // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
     // NOT the same thing as SERVICE_CODE above, which is an unrelated t_application_master.service_code value.
-    private static final String MENU_ID_APPLICANT = "117"; // "APPLICANT" — IMMEDIATE_SUSPENSION
-    private static final String MENU_ID_MI         = "119"; // "MI"
+    // Resolved against the live permissions table at startup (see MenuIdResolver); the string
+    // literals below are only fallbacks if masters is unreachable.
+    private String MENU_ID_APPLICANT; // "Promoter Application List" (/Immediatesuspensionapplist)
+    private String MENU_ID_MI;        // "MI Application List" (/Immediatesuspensionmineinspectorapplist)
 
     private final ImmediateSuspensionApplicationRepository immediateSuspensionApplicationRepository;
 
@@ -51,6 +54,8 @@ public class ImmediateSuspensionService {
 
     private final NotificationClient notificationClient;
 
+    private final MenuIdResolver menuIdResolver;
+
     private final ImmediateSuspensionMapper immediateSuspensionMapper;
 
     private final ImmediateSuspensionReasonRepository immediateSuspensionReasonRepository;
@@ -60,6 +65,12 @@ public class ImmediateSuspensionService {
     private final TerminationApplicationRepository terminationApplicationRepository;
 
     private final SurfaceCollectionPermitRepository surfaceCollectionPermitRepository;
+
+    @jakarta.annotation.PostConstruct
+    private void resolveMenuIds() {
+        MENU_ID_APPLICANT = menuIdResolver.resolve("/Immediatesuspensionapplist", "117");
+        MENU_ID_MI = menuIdResolver.resolve("/Immediatesuspensionmineinspectorapplist", "119");
+    }
 
     @Transactional
     public ImmediateSuspensionApplicationResponse submitImmediateSuspensionApplication(@Valid ImmediateSuspensionApplicationRequest request, Long userId) {
@@ -360,6 +371,12 @@ public class ImmediateSuspensionService {
                             app.getCurrentStatus(),
                             "Rectification Submitted");
                 }
+                if (app.getCreatedBy() != null) {
+                    String title = "Immediate Suspension Rectification Submitted";
+                    String message = "Promoter has resubmitted rectification for suspension application "
+                            + app.getApplicationNumber() + ". Please review.";
+                    notificationClient.sendUserNotification(title, message, app.getCreatedBy(), MENU_ID_MI, "STAFF", true, app.getApplicationNumber());
+                }
 
                 assert master != null;
                 createTask(master, app, "RC/MI", userId, app.getCreatedBy());
@@ -486,6 +503,12 @@ public class ImmediateSuspensionService {
                             app.getCurrentStatus(),
                             "Rectification Needed");
                 }
+                if (app.getPromoterUserId() != null) {
+                    String title = "Immediate Suspension Rectification Needed";
+                    String message = "Your immediate suspension application " + app.getApplicationNumber()
+                            + " requires rectification. Please review and resubmit.";
+                    notificationClient.sendUserNotification(title, message, app.getPromoterUserId(), MENU_ID_APPLICANT, "CITIZEN", true, app.getApplicationNumber());
+                }
 
                 assert master != null;
                 createTask(master, app, "APPLICANT", userId, app.getPromoterUserId());
@@ -506,6 +529,12 @@ public class ImmediateSuspensionService {
                             app.getApplicantEmail(),
                             app.getApplicantName(),
                             app.getApplicationNumber());
+                }
+                if (app.getPromoterUserId() != null) {
+                    String title = "Immediate Suspension Being Lifted";
+                    String message = "The suspension for application " + app.getApplicationNumber()
+                            + " is being lifted, pending final review.";
+                    notificationClient.sendUserNotification(title, message, app.getPromoterUserId(), MENU_ID_APPLICANT, "CITIZEN", false, app.getApplicationNumber());
                 }
 
                 assert master != null;
@@ -573,6 +602,12 @@ public class ImmediateSuspensionService {
                                 app.getApplicantName(),
                                 app.getApplicationNumber());
                     }
+                    if (app.getPromoterUserId() != null) {
+                        String title = "Lease Suspended";
+                        String message = "Your lease under application " + app.getApplicationNumber()
+                                + " has been suspended.";
+                        notificationClient.sendUserNotification(title, message, app.getPromoterUserId(), MENU_ID_APPLICANT, "CITIZEN", false, app.getApplicationNumber());
+                    }
 
                     assert master != null;
                     createTask(master, app, "APPLICANT", userId, app.getPromoterUserId());
@@ -597,6 +632,12 @@ public class ImmediateSuspensionService {
                                 app.getCurrentStatus(),
                                 "Rectification Needed");
                     }
+                    if (app.getPromoterUserId() != null) {
+                        String title = "Immediate Suspension Rectification Needed";
+                        String message = "Your immediate suspension application " + app.getApplicationNumber()
+                                + " requires rectification. Please review and resubmit.";
+                        notificationClient.sendUserNotification(title, message, app.getPromoterUserId(), MENU_ID_APPLICANT, "CITIZEN", true, app.getApplicationNumber());
+                    }
 
                     assert master != null;
                     createTask(master, app, "APPLICANT", userId, app.getPromoterUserId());
@@ -619,6 +660,12 @@ public class ImmediateSuspensionService {
                                 app.getApplicantEmail(),
                                 app.getApplicantName(),
                                 app.getApplicationNumber());
+                    }
+                    if (app.getPromoterUserId() != null) {
+                        String title = "Immediate Suspension Lifted";
+                        String message = "The suspension for application " + app.getApplicationNumber()
+                                + " has been lifted; your lease is active again.";
+                        notificationClient.sendUserNotification(title, message, app.getPromoterUserId(), MENU_ID_APPLICANT, "CITIZEN", false, app.getApplicationNumber());
                     }
 
                     assert master != null;

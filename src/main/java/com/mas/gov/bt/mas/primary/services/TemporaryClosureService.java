@@ -8,6 +8,7 @@ import com.mas.gov.bt.mas.primary.dto.response.TemporaryClosureNotificationRespo
 import com.mas.gov.bt.mas.primary.entity.*;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
 import com.mas.gov.bt.mas.primary.exception.ResourceNotFoundException;
+import com.mas.gov.bt.mas.primary.integration.MenuIdResolver;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.mapper.TemporaryClosureMapper;
 import com.mas.gov.bt.mas.primary.repository.*;
@@ -39,24 +40,31 @@ public class TemporaryClosureService {
     // NOT the same thing as SERVICE_ID above, which is an unrelated t_application_master.service_id
     // value (108 is actually the parent "Temporary Closure" folder /temporaryClosure, not a leaf).
     // Confirmed via DB: children of permissions.id=108 are
-    //   109 = "Temporary Closure Application" (/temporaryclosurelist) — PROMOTOR/citizen (no
-    //         sendUserNotification call site in this file currently targets the citizen, so no
-    //         constant is defined for 109 — add one here if/when that changes)
+    //   109 = "Temporary Closure Application" (/temporaryclosurelist) — PROMOTOR/citizen
     //   110 = "RC Closure Application List"   (/rcapproverejectlist)  — RC
     //   111 = "MI Closure Application List"   (/miverifiactionlist)   — MI
-    private static final String MENU_ID_RC = "110";
-    private static final String MENU_ID_MI = "111";
+    private String MENU_ID_APPLICANT = "109";
+    private String MENU_ID_RC = "110";
+    private String MENU_ID_MI = "111";
 
     private final TemporaryClosureRepository temporaryClosureRepository;
     private final TaskManagementRepository taskManagementRepository;
     private final ApplicationMasterRepository  applicationMasterRepository;
     private final NotificationClient notificationClient;
+    private final MenuIdResolver menuIdResolver;
     private  final TemporaryClosureMapper TemporaryClosureMapper;
     private final MiningLeaseApplicationRepository miningLeaseApplicationRepository;
     private final QuarryLeaseApplicationRepository queryLeaseApplicationRepository;
     private final ApplicationRevisionHistoryRepository revisionHistoryRepository;
 
     private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
+
+    @jakarta.annotation.PostConstruct
+    private void resolveMenuIds() {
+        MENU_ID_APPLICANT = menuIdResolver.resolve("/temporaryclosurelist", MENU_ID_APPLICANT);
+        MENU_ID_RC = menuIdResolver.resolve("/rcapproverejectlist", MENU_ID_RC);
+        MENU_ID_MI = menuIdResolver.resolve("/miverifiactionlist", MENU_ID_MI);
+    }
 
     private final SiteProvisioningService siteProvisioningService;
 
@@ -356,6 +364,12 @@ public class TemporaryClosureService {
                                 app.getApplicantName(),
                                 app.getApplicationId());
                     }
+                    if (app.getApplicantUserId() != null) {
+                        String title = "Temporary Closure Approved";
+                        String message = "Your temporary closure application " + app.getApplicationId()
+                                + " has been approved.";
+                        notificationClient.sendUserNotification(title, message, app.getApplicantUserId(), MENU_ID_APPLICANT, "CITIZEN", false, app.getApplicationId());
+                    }
 
                     if(app.getApplicationType().equalsIgnoreCase("MINING_LEASE")){
                         Optional<MiningLeaseApplication> miningLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(app.getApplicationId());
@@ -417,6 +431,12 @@ public class TemporaryClosureService {
                                 request.getRemarks()
                                 );
                     }
+                    if (app.getApplicantUserId() != null) {
+                        String title = "Temporary Closure Rectification Needed";
+                        String message = "Your temporary closure application " + app.getApplicationId()
+                                + " requires rectification. Please review and resubmit.";
+                        notificationClient.sendUserNotification(title, message, app.getApplicantUserId(), MENU_ID_APPLICANT, "CITIZEN", true, app.getApplicationId());
+                    }
                     assert master != null;
                     createTask(master, app, "APPLICANT", userId, app.getApplicantUserId());
                 }
@@ -456,6 +476,13 @@ public class TemporaryClosureService {
                 }
                 assert master != null;
                 createTask(master, app, "RC", userId, RCUserId);
+
+                if (RCUserId != null) {
+                    String title = "Temporary Closure Reviewed by MI";
+                    String message = "MI has reviewed temporary closure application " + app.getApplicationId()
+                            + ". Please proceed with your review.";
+                    notificationClient.sendUserNotification(title, message, RCUserId, MENU_ID_RC, "STAFF", true, app.getApplicationId());
+                }
             } else {
                 throw new IllegalArgumentException("Application status not recognized");
             }
