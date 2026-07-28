@@ -687,22 +687,27 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             String search
     ) {
 
+        List<String> ApplicationStatus = List.of(
+                "EC_RENEWED");
+
         Page<EnvironmentClearanceRenewal> page;
 
         if (search == null || search.isBlank()) {
 
             page = renewalEnvironmentalClearanceRepository
-                    .findByAssignedMPCDId(
+                    .findByAssignedMPCDIdAndStatusNotIn(
                             userId,
+                            ApplicationStatus,
                             pageable
                     );
 
         } else {
 
             page = renewalEnvironmentalClearanceRepository
-                    .findByAssignedMPCDIdAndApplicationNoContainingIgnoreCase(
+                    .findByAssignedMPCDIdAndApplicationNoContainingIgnoreCaseAndStatusNotIn(
                             userId,
                             search,
+                            ApplicationStatus,
                             pageable
                     );
         }
@@ -782,26 +787,11 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
     @Override
     public Page<EnvironmentClearanceRenewalResponseDTO> getMyApplications(Long userId, Pageable pageable, String search) {
         List<String> ApplicationStatus = List.of(
-                "DRAFT",
-                "ASSIGNED TO MD",
-                "ASSIGNED TO MPCD",
-                "UNDER_MPCD_REVIEW",
-                "UNDER_MPCD_REVIEW",
-                "APPROVED_BY_MPCD",
-                "PAYMENT_PENDING",
-                "IOM_SUBMITTED_TO_MD",
-                "RESUBMISSION_REQUIRED",
-                "ASSIGNED_TO_RC",
-                "RC_REPORT_SUBMITTED",
-                "ASSIGNED_TO_MI",
-                "MI_REPORT_SUBMITTED",
-                "UNDER_MD_REVIEW",
-                "PAID",
-                "FORWARDED_TO_DECC");
+                "EC_RENEWED");
         Page<EnvironmentClearanceRenewal> applications;
 
         if (search == null || search.isBlank()) {
-            applications = renewalEnvironmentalClearanceRepository.findByApplicantUserIdAndStatusIn(
+            applications = renewalEnvironmentalClearanceRepository.findByApplicantUserIdAndStatusNotIn(
                     userId,
                     ApplicationStatus,
                     pageable);
@@ -1245,14 +1235,13 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         Page<EnvironmentClearanceRenewal> page;
 
         List<String> applicationStatuses = List.of(
-                "ASSIGNED_TO_RC",
-                "MI_REPORT_SUBMITTED"
+                "EC_RENEWED"
         );
 
         if (search == null || search.isBlank()) {
 
             page = renewalEnvironmentalClearanceRepository
-                    .findByAssignedRCIdAndStatusIn(
+                    .findByAssignedRCIdAndStatusNotIn(
                             userId,
                             applicationStatuses,
                             pageable
@@ -1261,7 +1250,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         } else {
 
             page = renewalEnvironmentalClearanceRepository
-                    .findByAssignedRCIdAndApplicationNoContainingIgnoreCaseAndStatusIn(
+                    .findByAssignedRCIdAndApplicationNoContainingIgnoreCaseAndStatusNotIn(
                             userId,
                             search.trim(),
                             applicationStatuses,
@@ -1363,13 +1352,13 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         Page<EnvironmentClearanceRenewal> page;
 
         List<String> applicationStatuses = List.of(
-                "ASSIGNED_TO_MI"
+                "EC_RENEWED"
         );
 
         if (search == null || search.isBlank()) {
 
             page = renewalEnvironmentalClearanceRepository
-                    .findByAssignedMIIdAndStatusIn(
+                    .findByAssignedMIIdAndStatusNotIn(
                             userId,
                             applicationStatuses,
                             pageable
@@ -1378,7 +1367,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         } else {
 
             page = renewalEnvironmentalClearanceRepository
-                    .findByAssignedMIIdAndApplicationNoContainingIgnoreCaseAndStatusIn(
+                    .findByAssignedMIIdAndApplicationNoContainingIgnoreCaseAndStatusNotIn(
                             userId,
                             search.trim(),
                             applicationStatuses,
@@ -1445,21 +1434,18 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         Page<EnvironmentClearanceRenewal> page;
 
         List<String> statuses = List.of(
-                "ASSIGNED TO MD",
-                "UNDER_MD_REVIEW",
-                "IOM_SUBMITTED_TO_MD",
-                "PAID"
+                "EC_RENEWED"
         );
 
         if (search == null || search.isBlank()) {
 
             page = renewalEnvironmentalClearanceRepository
-                    .findByAssignedMDIdAndStatusIn(userId, statuses, pageable);
+                    .findByAssignedMDIdAndStatusNotIn(userId, statuses, pageable);
 
         } else {
 
             page = renewalEnvironmentalClearanceRepository
-                    .findByAssignedMDIdAndApplicationNoContainingIgnoreCaseAndStatusIn(
+                    .findByAssignedMDIdAndApplicationNoContainingIgnoreCaseAndStatusNotIn(
                             userId,
                             search.trim(),
                             statuses,
