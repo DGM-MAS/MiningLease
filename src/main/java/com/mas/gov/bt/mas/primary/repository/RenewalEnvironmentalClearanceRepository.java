@@ -108,7 +108,7 @@ public interface RenewalEnvironmentalClearanceRepository extends JpaRepository<E
     @Query("""
     SELECT q FROM EnvironmentClearanceRenewal q
     WHERE q.createdBy = :userId
-    AND q.status IN :applicationStatus
+    AND q.status NOT IN :applicationStatus
     AND LOWER(q.applicationNo) LIKE LOWER(CONCAT('%', :trim, '%'))
 """)
     Page<EnvironmentClearanceRenewal> findByAssignedToUserAndSearch(Long userId, List<String> applicationStatus, String trim, Pageable pageable);
@@ -164,4 +164,23 @@ public interface RenewalEnvironmentalClearanceRepository extends JpaRepository<E
             List<String> status,
             Pageable pageable
     );
+
+    Page<EnvironmentClearanceRenewal> findByAssignedRCIdAndStatusNotIn(Long userId, List<String> applicationStatuses, Pageable pageable);
+
+    Page<EnvironmentClearanceRenewal> findByAssignedRCIdAndApplicationNoContainingIgnoreCaseAndStatusNotIn(Long userId, String trim, List<String> applicationStatuses, Pageable pageable);
+
+    @Query("SELECT a FROM EnvironmentClearanceRenewal a WHERE a.status NOT IN :applicationStatus AND a.createdBy = :userId ORDER BY a.createdOn DESC")
+    Page<EnvironmentClearanceRenewal> findByApplicantUserIdAndStatusNotIn(Long userId, List<String> applicationStatus, Pageable pageable);
+
+    Page<EnvironmentClearanceRenewal> findByAssignedMDIdAndStatusNotIn(Long userId, List<String> statuses, Pageable pageable);
+
+    Page<EnvironmentClearanceRenewal> findByAssignedMDIdAndApplicationNoContainingIgnoreCaseAndStatusNotIn(Long userId, String trim, List<String> statuses, Pageable pageable);
+
+    Page<EnvironmentClearanceRenewal> findByAssignedMIIdAndStatusNotIn(Long userId, List<String> applicationStatuses, Pageable pageable);
+
+    Page<EnvironmentClearanceRenewal> findByAssignedMIIdAndApplicationNoContainingIgnoreCaseAndStatusNotIn(Long userId, String trim, List<String> applicationStatuses, Pageable pageable);
+
+    Page<EnvironmentClearanceRenewal> findByAssignedMPCDIdAndStatusNotIn(Long userId, List<String> applicationStatus, Pageable pageable);
+
+    Page<EnvironmentClearanceRenewal> findByAssignedMPCDIdAndApplicationNoContainingIgnoreCaseAndStatusNotIn(Long userId, String search, List<String> applicationStatus, Pageable pageable);
 }
