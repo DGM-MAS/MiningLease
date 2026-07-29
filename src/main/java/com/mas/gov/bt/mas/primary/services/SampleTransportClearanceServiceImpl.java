@@ -265,13 +265,15 @@ public class SampleTransportClearanceServiceImpl
             UserWorkloadProjection assignedGHDFocal = repository.findUserDetails(request.getGsdFocalId());
 
             if (sampleTransportClearanceEntity.getCreatedBy() != null) {
-                notificationClient.sendStatusUpdateNotification(
-                        applicantDetails.getEmail(),
-                        applicantDetails.getUsername(),
-                        sampleTransportClearanceEntity.getApplicationNo(),
-                        sampleTransportClearanceEntity.getStatus(),
-                        "ASSIGNED"
-                );
+                if (applicantDetails != null) {
+                    notificationClient.sendStatusUpdateNotification(
+                            applicantDetails.getEmail(),
+                            applicantDetails.getUsername(),
+                            sampleTransportClearanceEntity.getApplicationNo(),
+                            sampleTransportClearanceEntity.getStatus(),
+                            "ASSIGNED"
+                    );
+                }
 
                 String title = "Application has been status has been updated.";
                 String message = "Application number " + sampleTransportClearanceEntity.getApplicationNo() + "GHD focal has been assigned.";
@@ -517,7 +519,7 @@ public class SampleTransportClearanceServiceImpl
                         applicationMasterRepository.save(applicationMaster);
                     }
 
-                    if (applicantDetails.getUserId() != null) {
+                    if (assignedChiefDetails != null) {
                         assert applicationMaster != null;
                         createTask(
                                 applicationMaster,
@@ -534,14 +536,14 @@ public class SampleTransportClearanceServiceImpl
                         throw new BusinessException("Assigned GHD Chief details not found for notification");
                     }
 
-                    if (assignedChiefDetails.getUserId() != null) {
+                    if (assignedChiefDetails != null) {
 
                         String title = "Sample Transport clearance Application has been accepted. Application No. "+ sampleTransportClearanceEntity.getApplicationNo();
                         String message = "GSD Focal has accepted this application. Please review and approve the application to end the process.";
                         String serviceId = MENU_ID_GSD_CHIEF;
                         notificationClient.sendUserNotification(title, message, assignedChiefDetails.getUserId(), serviceId, "STAFF", true, sampleTransportClearanceEntity.getApplicationNo());
                     } else {
-                        throw new BusinessException("Applicant details not found for notification");
+                        throw new BusinessException("Assigned GHD Chief details not found for notification");
                     }
                 }
                 default -> throw new BusinessException("Invalid status value");
