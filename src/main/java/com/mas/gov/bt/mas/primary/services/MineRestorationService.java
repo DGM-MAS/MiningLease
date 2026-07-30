@@ -466,6 +466,9 @@ public class MineRestorationService {
                 );
             }
             case "REJECTED" -> {
+                if (request.getRemarks() == null || request.getRemarks().trim().isEmpty()) {
+                    throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Remarks are mandatory for rejection.");
+                }
                 restoration.setCurrentStatus(STATUS_MRP_REJECTED);
                 restoration.setRejectionReason(request.getRemarks());
                 notificationClient.sendRejectionNotification(
