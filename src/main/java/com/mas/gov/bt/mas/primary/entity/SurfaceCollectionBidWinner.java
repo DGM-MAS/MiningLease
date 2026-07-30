@@ -67,4 +67,10 @@ public class SurfaceCollectionBidWinner {
 
     @Column(name = "bid_amount")
     private String bidAmount;
+
+    @Column(name = "bank_guarantee_amount")
+    private String bankGuaranteeAmount;
+
+    @Column(name = "upfront_amount")
+    private String upfrontAmount;
 }

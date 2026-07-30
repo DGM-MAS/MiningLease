@@ -25,6 +25,8 @@ public class BidWinnerRequestDTO {
 
     private Long promoterId;
     private String bidAmount;
+    private String bankGuaranteeAmount;
+    private String upfrontAmount;
 
     private String dzongkhagId;
     private String gewogId;

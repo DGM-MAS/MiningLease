@@ -312,6 +312,9 @@ public class SampleTransportClearanceServiceImpl
         if (request.getStatus() != null) {
             switch (request.getStatus()) {
                 case "REJECTED" -> {
+                    if (request.getRemarks() == null || request.getRemarks().trim().isEmpty()) {
+                        throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Remarks are mandatory for rejection.");
+                    }
                     sampleTransportClearanceEntity.setStatus("REJECTED");
                     sampleTransportClearanceEntity.setAssignedGSDChiefRemarks(request.getRemarks());
                     repository.save(sampleTransportClearanceEntity);
@@ -477,6 +480,9 @@ public class SampleTransportClearanceServiceImpl
         if (request.getStatus() != null) {
             switch (request.getStatus()) {
                 case "REJECTED" -> {
+                    if (request.getRemarksGSDFocal() == null || request.getRemarksGSDFocal().trim().isEmpty()) {
+                        throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Remarks are mandatory for rejection.");
+                    }
                     sampleTransportClearanceEntity.setStatus("REJECTED");
                     sampleTransportClearanceEntity.setAssignedGSDFocalRemarks(request.getRemarksGSDFocal());
                     repository.save(sampleTransportClearanceEntity);

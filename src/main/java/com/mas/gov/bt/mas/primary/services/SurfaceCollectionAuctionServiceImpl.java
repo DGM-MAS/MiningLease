@@ -424,6 +424,8 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                         .promoterId(assignedUser.getUserId())
                         .cidNumber(dto.getCidNumber())
                         .bidAmount(dto.getBidAmount())
+                        .bankGuaranteeAmount(dto.getBankGuaranteeAmount())
+                        .upfrontAmount(dto.getUpfrontAmount())
                         .auctionApplication(entity)
                         .build();
 
@@ -582,6 +584,8 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                 .villageId(bidWinner.getVillageId().getVillageName())
                 .regionId(bidWinner.getRegionId().getRegionName())
                 .bidAmount(bidWinner.getBidAmount())
+                .bankGuaranteeAmount(bidWinner.getBankGuaranteeAmount())
+                .upfrontAmount(bidWinner.getUpfrontAmount())
                 .build();
     }
 

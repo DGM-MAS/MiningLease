@@ -574,6 +574,9 @@ public class MiningLeaseRenewalService {
                     }
                 }
                 case "Rejected" -> {
+                    if (request.getRemarks() == null || request.getRemarks().trim().isEmpty()) {
+                        throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Remarks are mandatory for rejection.");
+                    }
                     app.setCurrentStatus("REJECTED");
                     app.setRemarksDirector(request.getRemarks());
                     app.setDirectorReviewedAt(LocalDateTime.now());
@@ -828,6 +831,9 @@ public class MiningLeaseRenewalService {
                     }
                 }
                 case "Rejected" -> {
+                    if (request.getRemarks() == null || request.getRemarks().trim().isEmpty()) {
+                        throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Remarks are mandatory for rejection.");
+                    }
                     app.setCurrentStatus("REJECTED");
                     app.setRemarksME(request.getRemarks());
                     app.setMeReviewedAt(LocalDateTime.now());
@@ -1086,6 +1092,10 @@ public class MiningLeaseRenewalService {
                     }
                 }
                 case "Rejected" -> {
+                    if (reviewQuarryLeaseApplicationGeologist.getGeologistRemarks() == null
+                            || reviewQuarryLeaseApplicationGeologist.getGeologistRemarks().trim().isEmpty()) {
+                        throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Remarks are mandatory for rejection.");
+                    }
                     miningLeaseRenewalApplication.setCurrentStatus("REJECTED");
                     miningLeaseRenewalApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     miningLeaseRenewalApplication.setGeologistReviewedAt(LocalDateTime.now());
@@ -1361,6 +1371,9 @@ public class MiningLeaseRenewalService {
                     }
                 }
                 case "Rejected" -> {
+                    if (request.getRemarks() == null || request.getRemarks().trim().isEmpty()) {
+                        throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Remarks are mandatory for rejection.");
+                    }
                     app.setCurrentStatus("REJECTED");
                     app.setRemarksChief(request.getRemarks());
                     app.setChiefReviewedAt(LocalDateTime.now());

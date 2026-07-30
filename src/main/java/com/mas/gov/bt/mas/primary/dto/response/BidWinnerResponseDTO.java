@@ -20,6 +20,8 @@ public class BidWinnerResponseDTO {
     private String companyType;
     private String cidNumber;
     private String bidAmount;
+    private String bankGuaranteeAmount;
+    private String upfrontAmount;
 
     private String dzongkhagId;
     private String gewogId;
