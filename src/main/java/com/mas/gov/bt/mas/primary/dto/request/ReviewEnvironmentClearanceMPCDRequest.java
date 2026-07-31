@@ -22,4 +22,8 @@ public class ReviewEnvironmentClearanceMPCDRequest {
     private Long iomFileId;
 
     private Boolean submitIOM;
+
+    private String signedEcFileId;
+
+    private Long ecFeeAmount;
 }

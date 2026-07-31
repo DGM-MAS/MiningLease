@@ -40,6 +40,12 @@ public class EnvironmentClearanceRenewal {
     @Column(name = "ec_file_id")
     private String ecFileId;
 
+    @Column(name = "signed_ec_file_id")
+    private String signedEcFileId;
+
+    @Column(name = "ec_fee_amount")
+    private Long ecFeeAmount;
+
     // Reference to master application
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "application_master_id")
