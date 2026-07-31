@@ -126,6 +126,9 @@ public class SurfaceCollectionAuctionApplication {
     @Column(name = "created_by")
     private Long createdBy;
 
+    @Column(name = "submitted_by")
+    private String submittedBy;
+
     @Column(name = "created_on")
     private LocalDateTime createdOn;
 
