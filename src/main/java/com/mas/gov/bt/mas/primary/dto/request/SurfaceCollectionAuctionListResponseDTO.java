@@ -32,6 +32,8 @@ public class SurfaceCollectionAuctionListResponseDTO {
 
     private String material;
 
+    private BigDecimal reserveMt;
+
     private String ecFileId;
 
     private String ecNumber;
