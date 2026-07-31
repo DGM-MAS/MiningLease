@@ -113,6 +113,16 @@ public class ImmediateSuspensionService {
             throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
         }
 
+        String regionName = "";
+
+        if (miningLeaseApplication.getDzongkhag() != null ) {
+            DzongkhagLookup dzongkhag = dzongkhagLookupRepository
+                    .findById(String.valueOf(miningLeaseApplication.getDzongkhag()))
+                    .orElseThrow(() -> new RuntimeException("Invalid Dzongkhag ID"));
+
+            regionName = dzongkhag.getRegion().getRegionName();
+        }
+
         ImmediateSuspensionApplication suspension =
                 buildSuspensionApplication(
                         request,
@@ -124,6 +134,7 @@ public class ImmediateSuspensionService {
                         miningLeaseApplication.getApplicationNumber(),
                         miningLeaseApplication.getNameOfMine(),
                         miningLeaseApplication.getRegionId(),
+                        regionName,
                         miningLeaseApplication.getDzongkhag().getDzongkhagName(),
                         miningLeaseApplication.getGewog().getGewogName(),
                         miningLeaseApplication.getNearestVillage().getVillageName(),
@@ -161,6 +172,17 @@ public class ImmediateSuspensionService {
             throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
         }
 
+        String regionName = "";
+
+        if (quarryLeaseApplication.getDzongkhag() != null ) {
+            DzongkhagLookup dzongkhag = dzongkhagLookupRepository
+                    .findById(String.valueOf(quarryLeaseApplication.getDzongkhag()))
+                    .orElseThrow(() -> new RuntimeException("Invalid Dzongkhag ID"));
+
+            regionName = dzongkhag.getRegion().getRegionName();
+        }
+
+        assert quarryLeaseApplication.getDzongkhag() != null;
         ImmediateSuspensionApplication suspension =
                 buildSuspensionApplication(request, userId,
                         quarryLeaseApplication.getApplicantUserId(),
@@ -170,11 +192,12 @@ public class ImmediateSuspensionService {
                         quarryLeaseApplication.getApplicationNumber(),
                         quarryLeaseApplication.getNameOfQuarry(),
                         quarryLeaseApplication.getRegionId(),
+                        regionName,
                         quarryLeaseApplication.getDzongkhag().getDzongkhagName(),
                         quarryLeaseApplication.getGewog().getGewogName(),
                         quarryLeaseApplication.getNearestVillage().getVillageName(),
                         quarryLeaseApplication.getPlaceOfMiningActivity()
-                        );
+                );
 
         ApplicationMaster master = updateApplicationMaster(quarryLeaseApplication.getApplicationMaster(), userId);
 
@@ -208,6 +231,7 @@ public class ImmediateSuspensionService {
             throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
         }
 
+        String regionName = "";
         String dzongkhagName = "";
         String gewogName = "";
         String villageName = "";
@@ -217,6 +241,8 @@ public class ImmediateSuspensionService {
                     .findById(surfaceCollectionPermitEntity.getDzongkhag())
                     .orElseThrow(() -> new RuntimeException("Invalid Dzongkhag ID"));
             dzongkhagName = dzongkhag.getDzongkhagName();
+
+            regionName = dzongkhag.getRegion().getRegionName();
         }
 
         if (surfaceCollectionPermitEntity.getGewog() != null && !surfaceCollectionPermitEntity.getGewog().isEmpty()) {
@@ -243,10 +269,11 @@ public class ImmediateSuspensionService {
                         surfaceCollectionPermitEntity.getApplicationNo(),
                         surfaceCollectionPermitEntity.getNameOfSurfaceCollection(),
                         surfaceCollectionPermitEntity.getRegionId(),
+                        regionName,
                         dzongkhagName,
                         gewogName,
                         villageName,
-                        "NULL"
+                        placeOfMiningActivity
                         );
 
         Optional<ApplicationMaster> applicationMaster = applicationMasterRepository.findByApplicationNumberAndServiceCode(request.getApplicationNumber(), "SURFACE_COLLECTION_PERMIT");
@@ -286,6 +313,7 @@ public class ImmediateSuspensionService {
             String applicationNumber,
             String nameOfMine,
             Long regionId,
+            String regionName,
             String dzongkhagName,
             String gewogName,
             String villageName,
@@ -305,6 +333,7 @@ public class ImmediateSuspensionService {
         suspension.setCreatedAt(LocalDateTime.now());
         suspension.setCurrentStatus("SUBMITTED");
         suspension.setRegionId(regionId);
+        suspension.setRegionName(regionName);
         suspension.setDzongkhagName(dzongkhagName);
         suspension.setGewogName(gewogName);
         suspension.setVillageName(villageName);
