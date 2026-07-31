@@ -81,14 +81,17 @@ public class ApplicationListResponse {
 
     // MPCD Review
     private String remarksMPCD;
+
     private Long mpcdFileUploadIdPA;
 
     // Geologist Review
     private String remarksGeologist;
+
     private String geologicalReportStatus;
 
     // Mining Engineer Review
     private String remarksME;
+
     private String fmfsStatus;
     private String eCStatus;
     private Date eCExpiryDate;
@@ -107,6 +110,7 @@ public class ApplicationListResponse {
 
     // Director Review
     private String remarksDirector;
+
     private String mlaSignedDocId;
 
     // Stage Timestamps
