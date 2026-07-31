@@ -51,6 +51,20 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     Page<MiningLeaseApplication> findByStatusIn(@Param("statuses") List<String> statuses, Pageable pageable);
 
     @Query("""
+        SELECT a FROM MiningLeaseApplication a
+        WHERE a.currentStatus IN :statuses
+        AND a.applicantUserId = :applicantUserId
+        AND a.applicationNumber = :applicationNumber
+        AND (:search IS NULL OR LOWER(a.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%')))
+    """)
+    Page<MiningLeaseApplication> findByStatusInAndOwnerAndApplicationNumber(
+            @Param("statuses") List<String> statuses,
+            @Param("applicantUserId") Long applicantUserId,
+            @Param("applicationNumber") String applicationNumber,
+            @Param("search") String search,
+            Pageable pageable);
+
+    @Query("""
     SELECT q
     FROM MiningLeaseApplication q
     JOIN TaskManagement t

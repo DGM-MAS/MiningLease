@@ -330,4 +330,16 @@ public class MiningLeaseController {
         );
     }
 
+    @GetMapping("/approvedMiningApplication/mine")
+    @Operation(summary = "Get the logged-in promotor's own approved mining lease applications, scoped to their currently active site")
+    public ResponseEntity<SuccessResponse<List<MiningLeaseResponse>>> myArchivedApproved(
+            @RequestParam(required = false) String search,
+            Pageable pageable) {
+
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(
+                miningLeaseService.getMyApprovedApplicationsForActiveSite(userId, pageable, search)
+        );
+    }
+
 }

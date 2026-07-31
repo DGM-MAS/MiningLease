@@ -193,6 +193,18 @@ public class SurfaceCollectionAuctionController {
         );
     }
 
+    /**
+     * Full auction detail by application number, for any authenticated focal user
+     * (e.g. the Track Applications "View Details" deep link).
+     */
+    @GetMapping("/by-application-no/{applicationNo}")
+    public ResponseEntity<SuccessResponse<SurfaceCollectionAuctionResponseDTO>> getByApplicationNo(
+            @PathVariable String applicationNo
+    ) {
+        SurfaceCollectionAuctionResponseDTO response = auctionService.getByApplicationNo(applicationNo);
+        return ResponseEntity.ok(new SuccessResponse<>("Application retrieved successfully", response));
+    }
+
     @GetMapping
     public ResponseEntity<
             SuccessResponse<Page<SurfaceCollectionAuctionListResponseDTO>>> getAllApplications(

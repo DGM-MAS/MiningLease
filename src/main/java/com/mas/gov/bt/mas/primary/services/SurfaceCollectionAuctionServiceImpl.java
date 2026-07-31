@@ -7,6 +7,7 @@ import com.mas.gov.bt.mas.primary.dto.response.*;
 import com.mas.gov.bt.mas.primary.entity.*;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
 import com.mas.gov.bt.mas.primary.integration.CitizenRegistrationClient;
+import com.mas.gov.bt.mas.primary.integration.MenuIdResolver;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.repository.*;
 import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
@@ -44,6 +45,8 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
 
     private final NotificationClient notificationClient;
 
+    private final MenuIdResolver menuIdResolver;
+
     private final DzongkhagLookupRepository dzongkhagLookupRepository;
 
     private final GewogLookupRepository gewogLookupRepository;
@@ -63,15 +66,22 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
     // Real sidebar menu ids (permissions.id) per recipient role for this service — used to target
     // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
     // NOT the same thing as SERVICE_CODE above, which is an unrelated t_application_master.service_code value.
-    private static final String MENU_ID_MPCD            = "72"; // "MPCD" — SURFACE_COLLECTION_AUCTION
-    private static final String MENU_ID_PROMOTER         = "73"; // "PROMOTER"
-    private static final String MENU_ID_MINING_DIRECTOR  = "74"; // "MINING_DIRECTOR"
+    private String MENU_ID_MPCD            = "72"; // "MPCD" — SURFACE_COLLECTION_AUCTION (/mpcdauctionsurfacecoltionlist)
+    private String MENU_ID_PROMOTER         = "73"; // "PROMOTER" (/auctionsurfacecollectionlist)
+    private String MENU_ID_MINING_DIRECTOR  = "74"; // "MINING_DIRECTOR" (/mdauctionsurfacecollectionlist)
 
     private static final int DEFAULT_TAT_DAYS = 2;
 
     private static final int DEFAULT_MAX_APPLICATIONS = 2;
 
     private final CitizenRegistrationClient citizenRegistrationClient;
+
+    @jakarta.annotation.PostConstruct
+    private void resolveMenuIds() {
+        MENU_ID_MPCD           = menuIdResolver.resolve("/mpcdauctionsurfacecoltionlist", MENU_ID_MPCD);
+        MENU_ID_PROMOTER       = menuIdResolver.resolve("/auctionsurfacecollectionlist", MENU_ID_PROMOTER);
+        MENU_ID_MINING_DIRECTOR = menuIdResolver.resolve("/mdauctionsurfacecollectionlist", MENU_ID_MINING_DIRECTOR);
+    }
 
     @Override
     @Transactional
@@ -352,6 +362,12 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
 
         auctionRepository.save(entity);
 
+        if (entity.getCreatedBy() != null) {
+            String title = "FC for Surface Collection Auction application has been approved.";
+            String message = "FC for surface collection auction has been APPROVED. Application No. " + entity.getApplicationNo();
+            notificationClient.sendUserNotification(title, message, entity.getCreatedBy(), MENU_ID_MPCD, "STAFF", false, entity.getApplicationNo());
+        }
+
         return mapToResponse(entity);
     }
 
@@ -408,6 +424,8 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                         .promoterId(assignedUser.getUserId())
                         .cidNumber(dto.getCidNumber())
                         .bidAmount(dto.getBidAmount())
+                        .bankGuaranteeAmount(dto.getBankGuaranteeAmount())
+                        .upfrontAmount(dto.getUpfrontAmount())
                         .auctionApplication(entity)
                         .build();
 
@@ -470,9 +488,12 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
 
         auctionRepository.save(entity);
 
-        /**
-         * Send notification/email here
-         */
+        if (entity.getBidWinner() != null && entity.getBidWinner().getPromoterId() != null) {
+            String title = "Bank Guarantee Requested";
+            String message = "A Bank Guarantee is required for surface collection auction application "
+                    + entity.getApplicationNo() + ". " + (dto.getBgInstruction() != null ? dto.getBgInstruction() : "Please submit it to proceed.");
+            notificationClient.sendUserNotification(title, message, entity.getBidWinner().getPromoterId(), MENU_ID_PROMOTER, "CITIZEN", true, entity.getApplicationNo());
+        }
 
         return mapToResponse(entity);
     }
@@ -487,6 +508,29 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
 
         auctionRepository.save(entity);
 
+        ApplicationMaster master = entity.getApplicationMaster();
+        if (master != null && master.getApplicantUserId() != null) {
+            String title = "Surface Collection Permit Generated";
+            String message = "Your permit for surface collection auction application " + entity.getApplicationNo()
+                    + " has been generated.";
+            notificationClient.sendUserNotification(title, message, master.getApplicantUserId(), MENU_ID_PROMOTER, "CITIZEN", false, entity.getApplicationNo());
+        }
+
+        return mapToResponse(entity);
+    }
+
+    /**
+     * Full auction detail looked up by its public application number — used by the
+     * Track Applications "View Details" deep link, which only knows the application
+     * number, not the entry's own numeric id.
+     */
+    @Override
+    public SurfaceCollectionAuctionResponseDTO getByApplicationNo(String applicationNo) {
+        SurfaceCollectionAuctionApplication entity = auctionRepository.findByApplicationNo(applicationNo)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCodes.RECORD_NOT_FOUND,
+                        "Auction data not found. Application number is missing"
+                ));
         return mapToResponse(entity);
     }
 
@@ -555,6 +599,8 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                 .villageId(bidWinner.getVillageId().getVillageName())
                 .regionId(bidWinner.getRegionId().getRegionName())
                 .bidAmount(bidWinner.getBidAmount())
+                .bankGuaranteeAmount(bidWinner.getBankGuaranteeAmount())
+                .upfrontAmount(bidWinner.getUpfrontAmount())
                 .build();
     }
 
