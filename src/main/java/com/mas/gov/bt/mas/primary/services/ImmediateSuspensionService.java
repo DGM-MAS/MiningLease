@@ -61,6 +61,12 @@ public class ImmediateSuspensionService {
 
     private final SurfaceCollectionPermitRepository surfaceCollectionPermitRepository;
 
+    private final DzongkhagLookupRepository dzongkhagLookupRepository;
+
+    private final GewogLookupRepository  gewogLookupRepository;
+
+    private final VillageLookupRepository villageLookupRepository;
+
     @Transactional
     public ImmediateSuspensionApplicationResponse submitImmediateSuspensionApplication(@Valid ImmediateSuspensionApplicationRequest request, Long userId) {
         switch (request.getApplicationFrom().toUpperCase()) {
@@ -97,14 +103,20 @@ public class ImmediateSuspensionService {
         }
 
         ImmediateSuspensionApplication suspension =
-                buildSuspensionApplication(request, userId,
+                buildSuspensionApplication(
+                        request,
+                        userId,
                         miningLeaseApplication.getApplicantUserId(),
                         miningLeaseApplication.getApplicantName(),
                         miningLeaseApplication.getApplicantCid(),
                         miningLeaseApplication.getApplicantEmail(),
                         miningLeaseApplication.getApplicationNumber(),
                         miningLeaseApplication.getNameOfMine(),
-                        miningLeaseApplication.getRegionId());
+                        miningLeaseApplication.getRegionId(),
+                        miningLeaseApplication.getDzongkhag().getDzongkhagName(),
+                        miningLeaseApplication.getGewog().getGewogName(),
+                        miningLeaseApplication.getNearestVillage().getVillageName(),
+                        miningLeaseApplication.getPlaceOfMiningActivity());
 
         ApplicationMaster master = updateApplicationMaster(miningLeaseApplication.getApplicationMaster(), userId);
 
@@ -139,14 +151,21 @@ public class ImmediateSuspensionService {
         }
 
         ImmediateSuspensionApplication suspension =
-                buildSuspensionApplication(request, userId,
+                buildSuspensionApplication(
+                        request,
+                        userId,
                         quarryLeaseApplication.getApplicantUserId(),
                         quarryLeaseApplication.getApplicantName(),
                         quarryLeaseApplication.getApplicantCid(),
                         quarryLeaseApplication.getApplicantEmail(),
                         quarryLeaseApplication.getApplicationNumber(),
                         quarryLeaseApplication.getNameOfQuarry(),
-                        quarryLeaseApplication.getRegionId());
+                        quarryLeaseApplication.getRegionId(),
+                        quarryLeaseApplication.getDzongkhag().getDzongkhagName(),
+                        quarryLeaseApplication.getGewog().getGewogName(),
+                        quarryLeaseApplication.getNearestVillage().getVillageName(),
+                        quarryLeaseApplication.getPlaceOfMiningActivity()
+                );
 
         ApplicationMaster master = updateApplicationMaster(quarryLeaseApplication.getApplicationMaster(), userId);
 
@@ -180,6 +199,31 @@ public class ImmediateSuspensionService {
             throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
         }
 
+        String dzongkhagName = "";
+        String gewogName = "";
+        String nearestVillage = "";
+
+        if (surfaceCollectionPermitEntity.getDzongkhag() != null && !surfaceCollectionPermitEntity.getDzongkhag().isEmpty()) {
+            DzongkhagLookup dzongkhag = dzongkhagLookupRepository
+                    .findById(surfaceCollectionPermitEntity.getDzongkhag())
+                    .orElseThrow(() -> new RuntimeException("Invalid Dzongkhag ID"));
+            dzongkhagName = dzongkhag.getDzongkhagName();
+        }
+
+        if (surfaceCollectionPermitEntity.getGewog() != null && !surfaceCollectionPermitEntity.getGewog().isEmpty()) {
+            GewogLookup gewog = (GewogLookup) gewogLookupRepository
+                    .findByGewogId(surfaceCollectionPermitEntity.getGewog())
+                    .orElseThrow(() -> new RuntimeException("Invalid gewog ID"));
+            gewogName = gewog.getGewogName();
+        }
+
+        if (surfaceCollectionPermitEntity.getPlaceVillage() != null && !surfaceCollectionPermitEntity.getPlaceVillage().isEmpty()) {
+            VillageLookup villageLookup = villageLookupRepository
+                    .findByVillageSerialNo(Integer.parseInt(surfaceCollectionPermitEntity.getPlaceVillage()))
+                    .orElseThrow(() -> new RuntimeException("Invalid village ID"));
+            nearestVillage = villageLookup.getVillageName();
+        }
+
         ImmediateSuspensionApplication suspension =
                 buildSuspensionApplication(request, userId,
                         surfaceCollectionPermitEntity.getCreatedBy(),
@@ -188,7 +232,13 @@ public class ImmediateSuspensionService {
                         surfaceCollectionPermitEntity.getEmail(),
                         surfaceCollectionPermitEntity.getApplicationNo(),
                         surfaceCollectionPermitEntity.getNameOfSurfaceCollection(),
-                        surfaceCollectionPermitEntity.getRegionId());
+                        surfaceCollectionPermitEntity.getRegionId(),
+                        dzongkhagName,
+                        gewogName,
+                        nearestVillage,
+                        "NULL"
+                )
+                ;
 
         Optional<ApplicationMaster> applicationMaster = applicationMasterRepository.findByApplicationNumberAndServiceCode(request.getApplicationNumber(), "SURFACE_COLLECTION_PERMIT");
 
@@ -226,7 +276,11 @@ public class ImmediateSuspensionService {
             String email,
             String applicationNumber,
             String nameOfMine,
-            Long regionId) {
+            Long regionId,
+            String dzongkhagId,
+            String gewogId,
+            String villageId,
+            String placeOfActivity) {
 
         ImmediateSuspensionApplication suspension = new ImmediateSuspensionApplication();
 
@@ -242,6 +296,10 @@ public class ImmediateSuspensionService {
         suspension.setCreatedAt(LocalDateTime.now());
         suspension.setCurrentStatus("SUBMITTED");
         suspension.setRegionId(regionId);
+        suspension.setDzongkhagName(dzongkhagId);
+        suspension.setGewogName(gewogId);
+        suspension.setVillageName(villageId);
+        suspension.setPlaceOfActivity(placeOfActivity);
 
         ImmediateSuspensionReasonMaster reason =
                 immediateSuspensionReasonRepository
