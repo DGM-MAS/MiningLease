@@ -421,6 +421,8 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         } else if (Boolean.TRUE.equals(request.getApproveApplication())) {
 
             entity.setStatus("APPROVED_BY_MPCD");
+            entity.setSignedEcFileId(request.getSignedEcFileId());
+            entity.setEcFeeAmount(request.getEcFeeAmount());
             entity.setMpcdApprovedOn(LocalDateTime.now());
 
         } else {
