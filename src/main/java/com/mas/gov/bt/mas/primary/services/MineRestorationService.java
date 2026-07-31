@@ -390,6 +390,19 @@ public class MineRestorationService {
         return toResponse(findById(id));
     }
 
+    /**
+     * Full application detail looked up by its public application number — used by the
+     * Track Applications "View Details" deep link, which only knows the application number
+     * and not the reviewer's own role (getApplicationById's role-prefixed routes are all
+     * backed by this same open lookup, just keyed by numeric id).
+     */
+    public MineRestorationResponse getApplicationByApplicationNumber(String applicationNumber) {
+        MineRestorationApplication application = restorationApplicationRepository
+                .findByApplicationNumber(applicationNumber)
+                .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
+        return toResponse(application);
+    }
+
     public SuccessResponse<List<MineRestorationProgressReportResponse>> getProgressReports(
             String applicationNumber, Pageable pageable) {
         Page<MineRestorationProgressReport> page =

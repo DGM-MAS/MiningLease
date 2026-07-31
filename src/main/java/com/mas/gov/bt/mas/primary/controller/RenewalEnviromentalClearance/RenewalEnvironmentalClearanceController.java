@@ -201,6 +201,26 @@ public class RenewalEnvironmentalClearanceController {
         );
     }
 
+    @GetMapping("/by-application-no/{applicationNo}")
+    @Operation(
+            summary = "Get EC renewal application by application number",
+            description = "Full application detail looked up by its public application number, for any authenticated focal user (e.g. the Track Applications 'View Details' deep link)"
+    )
+    public ResponseEntity<SuccessResponse<EnvironmentClearanceRenewalResponseDTO>> getApplicationByApplicationNo(
+            @PathVariable String applicationNo
+    ) {
+        EnvironmentClearanceRenewalResponseDTO response =
+                renewalEnvironmentalClearanceService
+                        .getApplicationByApplicationNo(applicationNo);
+
+        return ResponseEntity.ok(
+                new SuccessResponse<>(
+                        "Application retrieved successfully",
+                        response
+                )
+        );
+    }
+
     // The agency user path will be taken by super admin as all application
     // in Approved and Rejected will be pulled regardless of assignment
     @GetMapping("/archived-applications")

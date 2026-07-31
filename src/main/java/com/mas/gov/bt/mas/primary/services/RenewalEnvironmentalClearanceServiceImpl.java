@@ -844,6 +844,25 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                 .toResponseDTO(entity);
     }
 
+    /**
+     * Full application detail looked up by its public application number, open to any
+     * authenticated focal user — used by the Track Applications "View Details" deep link,
+     * which must work regardless of who's currently assigned or what stage the application
+     * is in, unlike getApplicationById above (which restricts to the creator/currently
+     * assigned MPCD/RC/MI/MD).
+     */
+    @Override
+    public EnvironmentClearanceRenewalResponseDTO getApplicationByApplicationNo(String applicationNo) {
+        EnvironmentClearanceRenewal entity =
+                renewalEnvironmentalClearanceRepository
+                        .findByApplicationNo(applicationNo)
+                        .orElseThrow(() ->
+                                new RuntimeException("Application not found"));
+
+        return environmentClearanceRenewalMapper
+                .toResponseDTO(entity);
+    }
+
     @Override
     public Page<EnvironmentClearanceRenewalResponseDTO> getArchivedApplications(Pageable pageable, String search, Long userId) {
         Page<EnvironmentClearanceRenewal> page;
