@@ -61,6 +61,8 @@ public class TerminationService {
 
     private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
 
+    private final SurfaceCollectionPermitRepository surfaceCollectionPermitRepository;
+
     @Transactional
     public List<TerminationApplicationResponse> submitTerminationApplication(
             @Valid TerminationApplicationRequest request, Long userId) {
@@ -190,6 +192,26 @@ public class TerminationService {
                     "QUARRY_LEASE"
             );
         }
+
+        Optional<SurfaceCollectionPermitEntity> surfaceCollectionPermitEntity =
+                surfaceCollectionPermitRepository.findByApplicationNo(appNo);
+
+//        if (surfaceCollectionPermitEntity.isPresent()) {
+//            SurfaceCollectionPermitEntity application = surfaceCollectionPermitEntity.get();
+//            if (!"PERMIT_ISSUED".equalsIgnoreCase(application.getStatus())) {
+//                throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
+//            }
+//            application.setStatus("UNDER-REVIEW-TERMINATION");
+//            surfaceCollectionPermitRepository.save(application);
+//            return new LeaseApplicationRef(
+//                    application.getApplicantName(),
+//                    application.getEmail(),
+//                    application.getAppli(),
+//                    application.getNameOfSurfaceCollection(),
+//                    "QUARRY_LEASE"
+//            );
+//        }
+
 
         throw new CustomRuntimeException("Invalid application number: " + appNo);
     }

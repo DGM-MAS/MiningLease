@@ -47,6 +47,18 @@ public class ImmediateSuspensionApplication {
     @Column(name = "applicant_name")
     private String applicantName;
 
+    @Column(name = "dzongkhag_name")
+    private String dzongkhagName;
+
+    @Column(name = "gewog_name")
+    private String gewogName;
+
+    @Column(name = "village_name")
+    private String villageName;
+
+    @Column(name = "place_of_activity")
+    private String placeOfActivity;
+
     @Column(name = "suspension_reason_id")
     private Long suspensionReasonId;
 
