@@ -12,7 +12,6 @@ import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.repository.*;
 import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
 import com.mas.gov.bt.mas.primary.utility.LookupHelper;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -20,8 +19,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.LocalDateTime;
 import java.time.Year;
@@ -87,8 +84,8 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
     @Transactional
     public SurfaceCollectionAuctionResponseDTO createAuction(
             SurfaceCollectionAuctionRequestDTO dto,
-            Long userId
-    )
+            Long userId,
+            String userName)
     {
 
         Long regionId;
@@ -129,6 +126,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                         .gewogId(gewogLookup)
                         .villageId(villageLookup)
                         .regionId(regionMaster)
+                        .submittedBy(userName)
                         .createdOn(LocalDateTime.now())
                         .build();
 
