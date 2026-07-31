@@ -43,10 +43,12 @@ public class TemporaryClosureNotificationResponse {
 
     // MI Review
     private String remarksMI;
+    private LocalDateTime miReviewedAt;
     private Long fileIdMI;
 
     // RC Review
     private String remarksRC;
+    private LocalDateTime rcReviewedAt;
     private Long fileUploadIdRC;
 
 

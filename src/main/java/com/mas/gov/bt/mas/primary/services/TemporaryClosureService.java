@@ -287,6 +287,7 @@ public class TemporaryClosureService {
         if (request.getMIFocalId() != null ) {
             temporaryClosureEntity.setCurrentStatus("MI ASSIGNED");
             temporaryClosureEntity.setRemarksRC(request.getRemarksRC());
+            temporaryClosureEntity.setRcReviewedAt(LocalDateTime.now());
             applicationMaster.setCurrentStatus("MI ASSIGNED");
         }
         applicationMasterRepository.save(applicationMaster);
