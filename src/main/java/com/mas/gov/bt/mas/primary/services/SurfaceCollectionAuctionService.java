@@ -13,8 +13,8 @@ public interface SurfaceCollectionAuctionService {
 
     SurfaceCollectionAuctionResponseDTO createAuction(
             SurfaceCollectionAuctionRequestDTO dto,
-            Long userId
-    );
+            Long userId,
+            String userName);
 
     SurfaceCollectionAuctionResponseDTO submitForEC(Long auctionId, String fileECid);
 

@@ -23,6 +23,7 @@ import com.mas.gov.bt.mas.primary.utility.SuccessResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -117,6 +118,9 @@ public class MiningLeaseService {
     private static final String THRESHOLD_SERVICE_TYPE = "MINING_LEASE";
 
     private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
+
+    @Autowired
+    private ExplorationPermitRepository explorationPermitRepository;
 
     @Value("${app.self.base-url}")
     private String selfBaseUrl;
@@ -583,7 +587,7 @@ public class MiningLeaseService {
         MiningLeaseApplication miningLeaseApplication = new MiningLeaseApplication();
 
         // Validate input
-        validateApplicationRequest(request);
+        validateApplicationRequest(request, userId);
 
 //         ============================================================
 //         0. Checking the applicant hasn't exceeded the configured cap
@@ -713,7 +717,35 @@ public class MiningLeaseService {
     /**
      * Validate application request data
      */
-    private void validateApplicationRequest(MiningLeaseGRRequest request) {
+    private void validateApplicationRequest(MiningLeaseGRRequest request, Long userId) {
+
+        ExplorationPermit permit = explorationPermitRepository.findByPermitNumber(request.getExpPermitNo());
+
+        Long permitIssuedTo = null;
+
+        if(permit == null ){
+            throw new BusinessException(
+                    ErrorCodes.RECORD_NOT_FOUND,
+                    "The Exploration permit number provided is not present in approved permit."
+            );
+        }
+
+        permitIssuedTo = Long.valueOf(permit.getPermitIssuedTo());
+        LocalDate today = LocalDate.now();
+
+        boolean isValid = !permit.getExpiryDate().isBefore(today);
+
+        if (!isValid) {
+            // Permit is still valid
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND,
+                    "The exploration permit provided has expired.");
+        }
+
+        if(!Objects.equals(userId, permitIssuedTo)){
+            throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION,
+                    "The exploration permit does not belong to you.");
+        }
+
         if (request == null) {
             throw new BusinessException(
                     ErrorCodes.INVALID_INPUT_DATA,
