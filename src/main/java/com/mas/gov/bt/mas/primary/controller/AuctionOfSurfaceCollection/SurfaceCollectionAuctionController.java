@@ -36,9 +36,10 @@ public class SurfaceCollectionAuctionController {
             @RequestBody SurfaceCollectionAuctionRequestDTO dto
     ) {
         Long userId = userContext.getCurrentUserId();
+        String userName = userContext.getCurrentUsername();
 
         SurfaceCollectionAuctionResponseDTO response =
-                auctionService.createAuction(dto, userId);
+                auctionService.createAuction(dto, userId, userName);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new SuccessResponse<>(

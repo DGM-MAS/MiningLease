@@ -117,4 +117,7 @@ public class ImmediateSuspensionApplication {
 
     @Column(name = "region_id")
     private Long regionId;
+
+    @Column(name = "region_name")
+    private String regionName;
 }
