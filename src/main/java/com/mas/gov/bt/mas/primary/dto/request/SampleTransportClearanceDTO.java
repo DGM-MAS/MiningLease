@@ -12,7 +12,9 @@ public class SampleTransportClearanceDTO {
     private String applicantName;
     private String contactNo;
     private String emailAddress;
+    private String applicantScope;
     private String rockMineralName;
+    private String rockMineralNameSpecify;
     private Integer sampleCount;
     private String sampleForm;
     private String sampleFormSpecify;
@@ -21,8 +23,12 @@ public class SampleTransportClearanceDTO {
     private String shippingPurpose;
     private String shippingMode;
     private String destination;
+    private String destinationCountry;
 
     private String dzongkhagID;
     private String gewogID;
     private String villageID;
+
+    private String samplePhotoFileId;
+    private String othersFileId;
 }

@@ -14,6 +14,7 @@ public class SurfaceCollectionAuctionRequestDTO {
     private String location;
     private BigDecimal area;
     private String material;
+    private BigDecimal reserveMt;
 
     private String dzongkhagId;
     private String gewogId;

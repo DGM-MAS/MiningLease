@@ -44,9 +44,17 @@ public class SampleTransportClearanceEntity {
     @Column(name = "email_address", length = 255)
     private String emailAddress;
 
+    // In-country / Ex-country
+    @Column(name = "applicant_scope", length = 50)
+    private String applicantScope;
+
     // Name of the rock/Mineral
     @Column(name = "rock_mineral_name", nullable = false, length = 255)
     private String rockMineralName;
+
+    // Specify (only if rock/mineral name = Other)
+    @Column(name = "rock_mineral_name_specify", length = 255)
+    private String rockMineralNameSpecify;
 
     // Number of Samples
     @Column(name = "sample_count", nullable = false)
@@ -79,6 +87,18 @@ public class SampleTransportClearanceEntity {
     // Destination
     @Column(name = "destination", nullable = false, length = 255)
     private String destination;
+
+    // Destination country (Ex-country applications only)
+    @Column(name = "destination_country", length = 100)
+    private String destinationCountry;
+
+    // Sample photo (mandatory)
+    @Column(name = "sample_photo_file_id", length = 100)
+    private String samplePhotoFileId;
+
+    // Others attachment (optional)
+    @Column(name = "others_file_id", length = 100)
+    private String othersFileId;
 
 
     // Assigned Focal and remarks

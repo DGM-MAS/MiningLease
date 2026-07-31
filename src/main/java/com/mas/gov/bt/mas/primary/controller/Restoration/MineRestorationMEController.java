@@ -129,4 +129,15 @@ public class MineRestorationMEController {
                 mineRestorationService.issueERBReleaseLetter(request.getRestorationApplicationId(), request.getErbReleaseLetterDocId(), userId);
         return ResponseEntity.ok(new SuccessResponse<>("ERB Release Letter issued successfully", response));
     }
+
+    @PostMapping("/erb-utilization-letter")
+    @Operation(summary = "Issue ERB Utilization Letter",
+            description = "Upload and attach the ERB Utilization Letter after deciding the completion report was not satisfactory (ERB_UTILIZED).")
+    public ResponseEntity<SuccessResponse<MineRestorationResponse>> issueERBUtilizationLetter(
+            @Valid @RequestBody IssueERBUtilizationLetterRequest request) {
+        Long userId = userContext.getCurrentUserId();
+        MineRestorationResponse response =
+                mineRestorationService.issueERBUtilizationLetter(request.getRestorationApplicationId(), request.getErbUtilizationLetterDocId(), userId);
+        return ResponseEntity.ok(new SuccessResponse<>("ERB Utilization Letter issued successfully", response));
+    }
 }
