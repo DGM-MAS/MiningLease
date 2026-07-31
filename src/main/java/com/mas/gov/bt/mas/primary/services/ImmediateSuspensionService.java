@@ -249,6 +249,7 @@ public class ImmediateSuspensionService {
         suspension.setApplicantCid(cid);
         suspension.setApplicantEmail(email);
         suspension.setRemarksRcMi(request.getRcMiRemark());
+        suspension.setRcMiReviewedAt(LocalDateTime.now());
         suspension.setCreatedBy(userId);
         suspension.setCreatedAt(LocalDateTime.now());
         suspension.setCurrentStatus("SUBMITTED");
@@ -406,6 +407,7 @@ public class ImmediateSuspensionService {
         if (request.getMIFocalId() != null ) {
             immediateSuspensionApplication.setCurrentStatus("MI ASSIGNED");
             immediateSuspensionApplication.setRemarksRcMi(request.getRemarksRC());
+            immediateSuspensionApplication.setRcMiReviewedAt(LocalDateTime.now());
             applicationMaster.setCurrentStatus("MI ASSIGNED");
         }
         applicationMasterRepository.save(applicationMaster);
@@ -791,6 +793,7 @@ public class ImmediateSuspensionService {
         if (request.getMIFocalId() != null ) {
             immediateSuspensionApplication.setCurrentStatus("MI ASSIGNED");
             immediateSuspensionApplication.setMiRemarks(request.getRemarksMI());
+            immediateSuspensionApplication.setMiReviewedAt(LocalDateTime.now());
             applicationMaster.setCurrentStatus("MI ASSIGNED");
         }
         applicationMasterRepository.save(applicationMaster);

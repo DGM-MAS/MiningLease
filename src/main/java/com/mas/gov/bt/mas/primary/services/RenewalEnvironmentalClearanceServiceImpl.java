@@ -840,8 +840,18 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             throw new CustomRuntimeException("You are not authorized to access this application");
         }
 
-        return environmentClearanceRenewalMapper
-                .toResponseDTO(entity);
+        EnvironmentClearanceRenewalResponseDTO dto = environmentClearanceRenewalMapper.toResponseDTO(entity);
+
+        // The RC/MI/MPCD site assessment reports and the IOM are the reviewers' internal
+        // working documents — never returned to the applicant/promoter, at any stage.
+        if (isCreator) {
+            dto.setRcSiteReportFileId(null);
+            dto.setMiSiteReportFileId(null);
+            dto.setMpcdSiteReportFileId(null);
+            dto.setIomFileId(null);
+        }
+
+        return dto;
     }
 
     /**

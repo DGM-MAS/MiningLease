@@ -408,7 +408,24 @@ public class MineRestorationService {
         Page<MineRestorationProgressReport> page =
                 progressReportRepository.findByRestorationApplicationNumber(applicationNumber, pageable);
         return SuccessResponse.fromPage("Progress reports retrieved successfully",
-                page.map(this::toProgressReportResponse));
+                page.map(this::toPromoterProgressReportResponse));
+    }
+
+    /**
+     * Progress report view for the promoter's own dashboard (getProgressReports above). The
+     * RC/MI verification report and remarks, and the ME's remarks, are the reviewers'
+     * internal working notes — stripped here rather than in the shared toProgressReportResponse
+     * mapper, which is also used by the RC-facing view (getProgressReportsForRC) that does
+     * need them.
+     */
+    private MineRestorationProgressReportResponse toPromoterProgressReportResponse(MineRestorationProgressReport r) {
+        MineRestorationProgressReportResponse res = toProgressReportResponse(r);
+        res.setVerificationReportDocId(null);
+        res.setVerificationSubmittedAt(null);
+        res.setVerificationRemarks(null);
+        res.setMeRemarks(null);
+        res.setMeReviewedAt(null);
+        return res;
     }
 
     public MineRestorationCompletionReportResponse getCompletionReport(String applicationNumber) {
