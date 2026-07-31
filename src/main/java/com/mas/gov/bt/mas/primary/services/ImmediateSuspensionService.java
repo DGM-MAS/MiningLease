@@ -8,6 +8,7 @@ import com.mas.gov.bt.mas.primary.dto.response.ImmediateSuspensionApplicationRes
 import com.mas.gov.bt.mas.primary.entity.*;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
 import com.mas.gov.bt.mas.primary.exception.ResourceNotFoundException;
+import com.mas.gov.bt.mas.primary.integration.MenuIdResolver;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.mapper.ImmediateSuspensionMapper;
 import com.mas.gov.bt.mas.primary.repository.*;
@@ -36,8 +37,10 @@ public class ImmediateSuspensionService {
     // Real sidebar menu ids (permissions.id) per recipient role for this service — used to target
     // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
     // NOT the same thing as SERVICE_CODE above, which is an unrelated t_application_master.service_code value.
-    private static final String MENU_ID_APPLICANT = "117"; // "APPLICANT" — IMMEDIATE_SUSPENSION
-    private static final String MENU_ID_MI         = "119"; // "MI"
+    // Resolved against the live permissions table at startup (see MenuIdResolver); the string
+    // literals below are only fallbacks if masters is unreachable.
+    private String MENU_ID_APPLICANT; // "Promoter Application List" (/Immediatesuspensionapplist)
+    private String MENU_ID_MI;        // "MI Application List" (/Immediatesuspensionmineinspectorapplist)
 
     private final ImmediateSuspensionApplicationRepository immediateSuspensionApplicationRepository;
 
@@ -51,6 +54,8 @@ public class ImmediateSuspensionService {
 
     private final NotificationClient notificationClient;
 
+    private final MenuIdResolver menuIdResolver;
+
     private final ImmediateSuspensionMapper immediateSuspensionMapper;
 
     private final ImmediateSuspensionReasonRepository immediateSuspensionReasonRepository;
@@ -61,11 +66,11 @@ public class ImmediateSuspensionService {
 
     private final SurfaceCollectionPermitRepository surfaceCollectionPermitRepository;
 
-    private final DzongkhagLookupRepository dzongkhagLookupRepository;
-
-    private final GewogLookupRepository  gewogLookupRepository;
-
-    private final VillageLookupRepository villageLookupRepository;
+    @jakarta.annotation.PostConstruct
+    private void resolveMenuIds() {
+        MENU_ID_APPLICANT = menuIdResolver.resolve("/Immediatesuspensionapplist", "117");
+        MENU_ID_MI = menuIdResolver.resolve("/Immediatesuspensionmineinspectorapplist", "119");
+    }
 
     @Transactional
     public ImmediateSuspensionApplicationResponse submitImmediateSuspensionApplication(@Valid ImmediateSuspensionApplicationRequest request, Long userId) {
@@ -103,20 +108,14 @@ public class ImmediateSuspensionService {
         }
 
         ImmediateSuspensionApplication suspension =
-                buildSuspensionApplication(
-                        request,
-                        userId,
+                buildSuspensionApplication(request, userId,
                         miningLeaseApplication.getApplicantUserId(),
                         miningLeaseApplication.getApplicantName(),
                         miningLeaseApplication.getApplicantCid(),
                         miningLeaseApplication.getApplicantEmail(),
                         miningLeaseApplication.getApplicationNumber(),
                         miningLeaseApplication.getNameOfMine(),
-                        miningLeaseApplication.getRegionId(),
-                        miningLeaseApplication.getDzongkhag().getDzongkhagName(),
-                        miningLeaseApplication.getGewog().getGewogName(),
-                        miningLeaseApplication.getNearestVillage().getVillageName(),
-                        miningLeaseApplication.getPlaceOfMiningActivity());
+                        miningLeaseApplication.getRegionId());
 
         ApplicationMaster master = updateApplicationMaster(miningLeaseApplication.getApplicationMaster(), userId);
 
@@ -151,21 +150,14 @@ public class ImmediateSuspensionService {
         }
 
         ImmediateSuspensionApplication suspension =
-                buildSuspensionApplication(
-                        request,
-                        userId,
+                buildSuspensionApplication(request, userId,
                         quarryLeaseApplication.getApplicantUserId(),
                         quarryLeaseApplication.getApplicantName(),
                         quarryLeaseApplication.getApplicantCid(),
                         quarryLeaseApplication.getApplicantEmail(),
                         quarryLeaseApplication.getApplicationNumber(),
                         quarryLeaseApplication.getNameOfQuarry(),
-                        quarryLeaseApplication.getRegionId(),
-                        quarryLeaseApplication.getDzongkhag().getDzongkhagName(),
-                        quarryLeaseApplication.getGewog().getGewogName(),
-                        quarryLeaseApplication.getNearestVillage().getVillageName(),
-                        quarryLeaseApplication.getPlaceOfMiningActivity()
-                );
+                        quarryLeaseApplication.getRegionId());
 
         ApplicationMaster master = updateApplicationMaster(quarryLeaseApplication.getApplicationMaster(), userId);
 
@@ -199,31 +191,6 @@ public class ImmediateSuspensionService {
             throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
         }
 
-        String dzongkhagName = "";
-        String gewogName = "";
-        String nearestVillage = "";
-
-        if (surfaceCollectionPermitEntity.getDzongkhag() != null && !surfaceCollectionPermitEntity.getDzongkhag().isEmpty()) {
-            DzongkhagLookup dzongkhag = dzongkhagLookupRepository
-                    .findById(surfaceCollectionPermitEntity.getDzongkhag())
-                    .orElseThrow(() -> new RuntimeException("Invalid Dzongkhag ID"));
-            dzongkhagName = dzongkhag.getDzongkhagName();
-        }
-
-        if (surfaceCollectionPermitEntity.getGewog() != null && !surfaceCollectionPermitEntity.getGewog().isEmpty()) {
-            GewogLookup gewog = (GewogLookup) gewogLookupRepository
-                    .findByGewogId(surfaceCollectionPermitEntity.getGewog())
-                    .orElseThrow(() -> new RuntimeException("Invalid gewog ID"));
-            gewogName = gewog.getGewogName();
-        }
-
-        if (surfaceCollectionPermitEntity.getPlaceVillage() != null && !surfaceCollectionPermitEntity.getPlaceVillage().isEmpty()) {
-            VillageLookup villageLookup = villageLookupRepository
-                    .findByVillageSerialNo(Integer.parseInt(surfaceCollectionPermitEntity.getPlaceVillage()))
-                    .orElseThrow(() -> new RuntimeException("Invalid village ID"));
-            nearestVillage = villageLookup.getVillageName();
-        }
-
         ImmediateSuspensionApplication suspension =
                 buildSuspensionApplication(request, userId,
                         surfaceCollectionPermitEntity.getCreatedBy(),
@@ -232,13 +199,7 @@ public class ImmediateSuspensionService {
                         surfaceCollectionPermitEntity.getEmail(),
                         surfaceCollectionPermitEntity.getApplicationNo(),
                         surfaceCollectionPermitEntity.getNameOfSurfaceCollection(),
-                        surfaceCollectionPermitEntity.getRegionId(),
-                        dzongkhagName,
-                        gewogName,
-                        nearestVillage,
-                        "NULL"
-                )
-                ;
+                        surfaceCollectionPermitEntity.getRegionId());
 
         Optional<ApplicationMaster> applicationMaster = applicationMasterRepository.findByApplicationNumberAndServiceCode(request.getApplicationNumber(), "SURFACE_COLLECTION_PERMIT");
 
@@ -276,11 +237,7 @@ public class ImmediateSuspensionService {
             String email,
             String applicationNumber,
             String nameOfMine,
-            Long regionId,
-            String dzongkhagId,
-            String gewogId,
-            String villageId,
-            String placeOfActivity) {
+            Long regionId) {
 
         ImmediateSuspensionApplication suspension = new ImmediateSuspensionApplication();
 
@@ -296,10 +253,6 @@ public class ImmediateSuspensionService {
         suspension.setCreatedAt(LocalDateTime.now());
         suspension.setCurrentStatus("SUBMITTED");
         suspension.setRegionId(regionId);
-        suspension.setDzongkhagName(dzongkhagId);
-        suspension.setGewogName(gewogId);
-        suspension.setVillageName(villageId);
-        suspension.setPlaceOfActivity(placeOfActivity);
 
         ImmediateSuspensionReasonMaster reason =
                 immediateSuspensionReasonRepository
@@ -417,6 +370,12 @@ public class ImmediateSuspensionService {
                             app.getApplicationNumber(),
                             app.getCurrentStatus(),
                             "Rectification Submitted");
+                }
+                if (app.getCreatedBy() != null) {
+                    String title = "Immediate Suspension Rectification Submitted";
+                    String message = "Promoter has resubmitted rectification for suspension application "
+                            + app.getApplicationNumber() + ". Please review.";
+                    notificationClient.sendUserNotification(title, message, app.getCreatedBy(), MENU_ID_MI, "STAFF", true, app.getApplicationNumber());
                 }
 
                 assert master != null;
@@ -544,6 +503,12 @@ public class ImmediateSuspensionService {
                             app.getCurrentStatus(),
                             "Rectification Needed");
                 }
+                if (app.getPromoterUserId() != null) {
+                    String title = "Immediate Suspension Rectification Needed";
+                    String message = "Your immediate suspension application " + app.getApplicationNumber()
+                            + " requires rectification. Please review and resubmit.";
+                    notificationClient.sendUserNotification(title, message, app.getPromoterUserId(), MENU_ID_APPLICANT, "CITIZEN", true, app.getApplicationNumber());
+                }
 
                 assert master != null;
                 createTask(master, app, "APPLICANT", userId, app.getPromoterUserId());
@@ -564,6 +529,12 @@ public class ImmediateSuspensionService {
                             app.getApplicantEmail(),
                             app.getApplicantName(),
                             app.getApplicationNumber());
+                }
+                if (app.getPromoterUserId() != null) {
+                    String title = "Immediate Suspension Being Lifted";
+                    String message = "The suspension for application " + app.getApplicationNumber()
+                            + " is being lifted, pending final review.";
+                    notificationClient.sendUserNotification(title, message, app.getPromoterUserId(), MENU_ID_APPLICANT, "CITIZEN", false, app.getApplicationNumber());
                 }
 
                 assert master != null;
@@ -631,6 +602,12 @@ public class ImmediateSuspensionService {
                                 app.getApplicantName(),
                                 app.getApplicationNumber());
                     }
+                    if (app.getPromoterUserId() != null) {
+                        String title = "Lease Suspended";
+                        String message = "Your lease under application " + app.getApplicationNumber()
+                                + " has been suspended.";
+                        notificationClient.sendUserNotification(title, message, app.getPromoterUserId(), MENU_ID_APPLICANT, "CITIZEN", false, app.getApplicationNumber());
+                    }
 
                     assert master != null;
                     createTask(master, app, "APPLICANT", userId, app.getPromoterUserId());
@@ -655,6 +632,12 @@ public class ImmediateSuspensionService {
                                 app.getCurrentStatus(),
                                 "Rectification Needed");
                     }
+                    if (app.getPromoterUserId() != null) {
+                        String title = "Immediate Suspension Rectification Needed";
+                        String message = "Your immediate suspension application " + app.getApplicationNumber()
+                                + " requires rectification. Please review and resubmit.";
+                        notificationClient.sendUserNotification(title, message, app.getPromoterUserId(), MENU_ID_APPLICANT, "CITIZEN", true, app.getApplicationNumber());
+                    }
 
                     assert master != null;
                     createTask(master, app, "APPLICANT", userId, app.getPromoterUserId());
@@ -677,6 +660,12 @@ public class ImmediateSuspensionService {
                                 app.getApplicantEmail(),
                                 app.getApplicantName(),
                                 app.getApplicationNumber());
+                    }
+                    if (app.getPromoterUserId() != null) {
+                        String title = "Immediate Suspension Lifted";
+                        String message = "The suspension for application " + app.getApplicationNumber()
+                                + " has been lifted; your lease is active again.";
+                        notificationClient.sendUserNotification(title, message, app.getPromoterUserId(), MENU_ID_APPLICANT, "CITIZEN", false, app.getApplicationNumber());
                     }
 
                     assert master != null;

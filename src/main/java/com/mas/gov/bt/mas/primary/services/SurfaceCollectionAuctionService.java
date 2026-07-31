@@ -36,6 +36,8 @@ public interface SurfaceCollectionAuctionService {
 
     SurfaceCollectionAuctionResponseDTO generatePermit(Long auctionId);
 
+    SurfaceCollectionAuctionResponseDTO getByApplicationNo(String applicationNo);
+
     Page<SurfaceCollectionAuctionListResponseDTO> getAllApplications(
             String search,
             Pageable pageable);

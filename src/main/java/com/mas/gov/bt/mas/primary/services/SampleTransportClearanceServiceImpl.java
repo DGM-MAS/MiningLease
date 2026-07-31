@@ -9,6 +9,7 @@ import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
 import com.mas.gov.bt.mas.primary.dto.request.*;
 import com.mas.gov.bt.mas.primary.dto.response.SampleTransportClearanceResponseDTO;
 import com.mas.gov.bt.mas.primary.exception.BusinessException;
+import com.mas.gov.bt.mas.primary.integration.MenuIdResolver;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
 import com.mas.gov.bt.mas.primary.mapper.SampleTransportClearanceMapper;
 import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
@@ -36,15 +37,23 @@ public class SampleTransportClearanceServiceImpl
     // Real sidebar menu ids (permissions.id) per recipient role for this service — used to target
     // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
     // NOT the same thing as SERVICE_CODE above, which is an unrelated t_application_master.service_code value.
-    private static final String MENU_ID_APPLICANT = "150"; // "APPLICANT" — SAMPLE_TRANSPORT_CLEARANCE
-    private static final String MENU_ID_GSD_CHIEF  = "151"; // "GSD_CHIEF"
-    private static final String MENU_ID_GSD_FOCAL  = "152"; // "GSD_FOCAL"
+    private String MENU_ID_APPLICANT = "150"; // "APPLICANT" — SAMPLE_TRANSPORT_CLEARANCE (/SampleTransportClearancesappliantapplist)
+    private String MENU_ID_GSD_CHIEF  = "151"; // "GSD_CHIEF" (/SampleTransportClearancegsdapplist)
+    private String MENU_ID_GSD_FOCAL  = "152"; // "GSD_FOCAL" (/SampleTransportClearancegsdfocalapplist)
 
     private final SampleTransportClearanceRepository repository;
     private final SampleTransportClearanceMapper sampleTransportClearanceMapper;
     private final ApplicationMasterRepository applicationMasterRepository;
     private final TaskManagementRepository taskManagementRepository;
     private final NotificationClient notificationClient;
+    private final MenuIdResolver menuIdResolver;
+
+    @jakarta.annotation.PostConstruct
+    private void resolveMenuIds() {
+        MENU_ID_APPLICANT = menuIdResolver.resolve("/SampleTransportClearancesappliantapplist", MENU_ID_APPLICANT);
+        MENU_ID_GSD_CHIEF  = menuIdResolver.resolve("/SampleTransportClearancegsdapplist", MENU_ID_GSD_CHIEF);
+        MENU_ID_GSD_FOCAL  = menuIdResolver.resolve("/SampleTransportClearancegsdfocalapplist", MENU_ID_GSD_FOCAL);
+    }
 
 
     private final DzongkhagLookupRepository dzongkhagLookupRepository;
@@ -256,13 +265,15 @@ public class SampleTransportClearanceServiceImpl
             UserWorkloadProjection assignedGHDFocal = repository.findUserDetails(request.getGsdFocalId());
 
             if (sampleTransportClearanceEntity.getCreatedBy() != null) {
-                notificationClient.sendStatusUpdateNotification(
-                        applicantDetails.getEmail(),
-                        applicantDetails.getUsername(),
-                        sampleTransportClearanceEntity.getApplicationNo(),
-                        sampleTransportClearanceEntity.getStatus(),
-                        "ASSIGNED"
-                );
+                if (applicantDetails != null) {
+                    notificationClient.sendStatusUpdateNotification(
+                            applicantDetails.getEmail(),
+                            applicantDetails.getUsername(),
+                            sampleTransportClearanceEntity.getApplicationNo(),
+                            sampleTransportClearanceEntity.getStatus(),
+                            "ASSIGNED"
+                    );
+                }
 
                 String title = "Application has been status has been updated.";
                 String message = "Application number " + sampleTransportClearanceEntity.getApplicationNo() + "GHD focal has been assigned.";
@@ -301,6 +312,9 @@ public class SampleTransportClearanceServiceImpl
         if (request.getStatus() != null) {
             switch (request.getStatus()) {
                 case "REJECTED" -> {
+                    if (request.getRemarks() == null || request.getRemarks().trim().isEmpty()) {
+                        throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Remarks are mandatory for rejection.");
+                    }
                     sampleTransportClearanceEntity.setStatus("REJECTED");
                     sampleTransportClearanceEntity.setAssignedGSDChiefRemarks(request.getRemarks());
                     repository.save(sampleTransportClearanceEntity);
@@ -466,6 +480,9 @@ public class SampleTransportClearanceServiceImpl
         if (request.getStatus() != null) {
             switch (request.getStatus()) {
                 case "REJECTED" -> {
+                    if (request.getRemarksGSDFocal() == null || request.getRemarksGSDFocal().trim().isEmpty()) {
+                        throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Remarks are mandatory for rejection.");
+                    }
                     sampleTransportClearanceEntity.setStatus("REJECTED");
                     sampleTransportClearanceEntity.setAssignedGSDFocalRemarks(request.getRemarksGSDFocal());
                     repository.save(sampleTransportClearanceEntity);
@@ -508,7 +525,7 @@ public class SampleTransportClearanceServiceImpl
                         applicationMasterRepository.save(applicationMaster);
                     }
 
-                    if (applicantDetails.getUserId() != null) {
+                    if (assignedChiefDetails != null) {
                         assert applicationMaster != null;
                         createTask(
                                 applicationMaster,
@@ -525,14 +542,14 @@ public class SampleTransportClearanceServiceImpl
                         throw new BusinessException("Assigned GHD Chief details not found for notification");
                     }
 
-                    if (assignedChiefDetails.getUserId() != null) {
+                    if (assignedChiefDetails != null) {
 
                         String title = "Sample Transport clearance Application has been accepted. Application No. "+ sampleTransportClearanceEntity.getApplicationNo();
                         String message = "GSD Focal has accepted this application. Please review and approve the application to end the process.";
                         String serviceId = MENU_ID_GSD_CHIEF;
                         notificationClient.sendUserNotification(title, message, assignedChiefDetails.getUserId(), serviceId, "STAFF", true, sampleTransportClearanceEntity.getApplicationNo());
                     } else {
-                        throw new BusinessException("Applicant details not found for notification");
+                        throw new BusinessException("Assigned GHD Chief details not found for notification");
                     }
                 }
                 default -> throw new BusinessException("Invalid status value");

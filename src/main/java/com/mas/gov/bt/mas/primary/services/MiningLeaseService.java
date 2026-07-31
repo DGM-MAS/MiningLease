@@ -97,6 +97,10 @@ public class MiningLeaseService {
 
     private final SiteProvisioningService siteProvisioningService;
 
+    private final SiteMasterRepository siteMasterRepository;
+
+    private final UserActiveSiteRepository userActiveSiteRepository;
+
     private final FMFSDetailsRepository fmfsDetailsRepository;
 
     private final WorkflowTrackingService workflowTrackingService;
@@ -1464,6 +1468,9 @@ public class MiningLeaseService {
                     createTask(master, app, "DIRECTOR", userId, userId);
                 }
                 case "Rejected" -> {
+                    if (request.getRemarks() == null || request.getRemarks().trim().isEmpty()) {
+                        throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Remarks are mandatory for rejection.");
+                    }
                     app.setCurrentStatus("REJECTED");
                     app.setRemarksDirector(request.getRemarks());
                     app.setDirectorReviewedAt(LocalDateTime.now());
@@ -1737,6 +1744,10 @@ public class MiningLeaseService {
                     }
                 }
                 case "Rejected" -> {
+                    if (reviewQuarryLeaseApplicationGeologist.getGeologistRemarks() == null
+                            || reviewQuarryLeaseApplicationGeologist.getGeologistRemarks().trim().isEmpty()) {
+                        throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Remarks are mandatory for rejection.");
+                    }
                     miningLeaseApplication.setCurrentStatus("REJECTED");
                     miningLeaseApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     miningLeaseApplication.setGeologistReviewedAt(LocalDateTime.now());
@@ -1992,6 +2003,10 @@ public class MiningLeaseService {
 
                 }
                 case "Rejected" -> {
+                    if (reviewQuarryLeaseApplication.getMpcdRemarks() == null
+                            || reviewQuarryLeaseApplication.getMpcdRemarks().trim().isEmpty()) {
+                        throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Remarks are mandatory for rejection.");
+                    }
                     miningLeaseApplication.setCurrentStatus("REJECTED");
                     miningLeaseApplication.setRemarksMPCD(reviewQuarryLeaseApplication.getMpcdRemarks());
                     miningLeaseApplication.setMpcdReviewedAt(LocalDateTime.now());
@@ -2220,6 +2235,9 @@ public class MiningLeaseService {
                     }
                 }
                 case "Rejected" -> {
+                    if (request.getRemarks() == null || request.getRemarks().trim().isEmpty()) {
+                        throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Remarks are mandatory for rejection.");
+                    }
                     app.setCurrentStatus("REJECTED");
                     app.setRemarksChief(request.getRemarks());
                     app.setChiefReviewedAt(LocalDateTime.now());
@@ -2550,6 +2568,9 @@ public class MiningLeaseService {
                     }
                 }
                 case "Rejected" -> {
+                    if (request.getRemarks() == null || request.getRemarks().trim().isEmpty()) {
+                        throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Remarks are mandatory for rejection.");
+                    }
                     app.setCurrentStatus("REJECTED");
                     app.setRemarksME(request.getRemarks());
                     app.setMeReviewedAt(LocalDateTime.now());
@@ -3003,5 +3024,36 @@ public class MiningLeaseService {
                 "Assigned applications fetched successfully",
                 responsePage
         );
+    }
+
+    /**
+     * Approved Mining Lease applications belonging to the logged-in promotor's own active
+     * site only — used by promotor-facing pickers (Temporary Closure). Unlike
+     * getArchivedApplicationApproved (system-wide, used by RC/MD staff screens), this must
+     * never leak other promotors' leases.
+     */
+    public SuccessResponse<List<MiningLeaseResponse>> getMyApprovedApplicationsForActiveSite(
+            Long userId, Pageable pageable, String search) {
+
+        List<String> archivedStatuses = List.of("MINING LEASE APPROVED");
+
+        Optional<UserActiveSite> activeSite = userActiveSiteRepository.findById(userId);
+        if (activeSite.isEmpty()) {
+            return SuccessResponse.fromPage("Assigned applications fetched successfully", Page.<MiningLeaseApplication>empty(pageable).map(mapper::toResponse));
+        }
+
+        Optional<SiteMaster> site = siteMasterRepository.findById(activeSite.get().getSiteId());
+        if (site.isEmpty() || !"MINING_LEASE".equals(site.get().getLeaseType())
+                || !userId.equals(site.get().getApplicantUserId())) {
+            return SuccessResponse.fromPage("Assigned applications fetched successfully", Page.<MiningLeaseApplication>empty(pageable).map(mapper::toResponse));
+        }
+
+        Page<MiningLeaseApplication> page = miningLeaseApplicationRepository.findByStatusInAndOwnerAndApplicationNumber(
+                archivedStatuses, userId, site.get().getLeaseApplicationNumber(),
+                (search == null || search.isBlank()) ? null : search.trim(), pageable);
+
+        Page<MiningLeaseResponse> responsePage = page.map(mapper::toResponse);
+
+        return SuccessResponse.fromPage("Assigned applications fetched successfully", responsePage);
     }
 }
