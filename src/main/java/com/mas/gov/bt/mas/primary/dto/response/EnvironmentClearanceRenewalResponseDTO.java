@@ -92,6 +92,10 @@ public class EnvironmentClearanceRenewalResponseDTO {
 
     private String updatedBy;
 
+    private String signedEcFileId;
+
+    private Long ecFeeAmount;
+
     // Not entity-backed — set manually by payEcFee() when a payment redirect is needed
     private String redirectUrl;
 }
