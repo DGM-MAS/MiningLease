@@ -105,6 +105,16 @@ public class MineRestorationController {
                         mineRestorationService.getApplicationById(id)));
     }
 
+    @GetMapping("/by-application-no/{applicationNumber}")
+    @Operation(summary = "Get application by application number",
+            description = "Full application detail looked up by its public application number, for any authenticated focal user (e.g. the Track Applications 'View Details' deep link)")
+    public ResponseEntity<SuccessResponse<MineRestorationResponse>> getApplicationByApplicationNumber(
+            @PathVariable String applicationNumber) {
+        return ResponseEntity.ok(
+                new SuccessResponse<>("Application retrieved successfully",
+                        mineRestorationService.getApplicationByApplicationNumber(applicationNumber)));
+    }
+
     @GetMapping("/applications/{applicationNumber}/progress-reports")
     @Operation(summary = "Get progress reports", description = "List all progress reports for a restoration application")
     public ResponseEntity<SuccessResponse<List<MineRestorationProgressReportResponse>>> getProgressReports(

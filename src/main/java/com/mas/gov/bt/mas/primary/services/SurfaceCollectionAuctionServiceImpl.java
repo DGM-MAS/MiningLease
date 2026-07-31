@@ -519,6 +519,21 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
         return mapToResponse(entity);
     }
 
+    /**
+     * Full auction detail looked up by its public application number — used by the
+     * Track Applications "View Details" deep link, which only knows the application
+     * number, not the entry's own numeric id.
+     */
+    @Override
+    public SurfaceCollectionAuctionResponseDTO getByApplicationNo(String applicationNo) {
+        SurfaceCollectionAuctionApplication entity = auctionRepository.findByApplicationNo(applicationNo)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCodes.RECORD_NOT_FOUND,
+                        "Auction data not found. Application number is missing"
+                ));
+        return mapToResponse(entity);
+    }
+
     private SurfaceCollectionAuctionApplication getAuction(Long id) {
         return auctionRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(
