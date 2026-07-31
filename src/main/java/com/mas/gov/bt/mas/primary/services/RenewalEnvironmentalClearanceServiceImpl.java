@@ -383,6 +383,8 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             validateIOMSubmission(request);
 
             entity.setIomFileId(request.getIomFileId());
+            entity.setSignedEcFileId(request.getSignedEcFileId());
+            entity.setEcFeeAmount(request.getEcFeeAmount());
             entity.setIomSubmittedOn(LocalDateTime.now());
 
             // Only actually route through a payment step if the EC fee is enabled —
@@ -421,8 +423,6 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         } else if (Boolean.TRUE.equals(request.getApproveApplication())) {
 
             entity.setStatus("APPROVED_BY_MPCD");
-            entity.setSignedEcFileId(request.getSignedEcFileId());
-            entity.setEcFeeAmount(request.getEcFeeAmount());
             entity.setMpcdApprovedOn(LocalDateTime.now());
 
         } else {
@@ -501,7 +501,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             Long assignerUserId
     ) {
 
-        entity.setStatus("IOM_SUBMITTED_TO_MD");
+        entity.setStatus("IOM_SUBMITTED");
 
         UserWorkloadProjection assignedMD = assignMD(regionId);
 
@@ -1226,11 +1226,22 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         entity.getApplicationMaster()
                 .setCurrentStatus("RESUBMISSION_REQUIRED");
 
-        if (entity.getCreatedBy() != null) {
-            String title = "Environmental Clearance Renewal Resubmission Required";
-            String message = "Your environmental clearance renewal application " + entity.getApplicationNo()
-                    + " requires resubmission. Remarks: " + request.getRemarks();
-            notificationClient.sendUserNotification(title, message, entity.getCreatedBy(), MENU_ID_APPLICANT, "CITIZEN", true, entity.getApplicationNo());
+        if(Objects.equals(entity.getServiceType(), "MINING_LEASE")
+                || Objects.equals(entity.getServiceType(), "QUARRY_LEASE")){
+
+            if (entity.getCreatedBy() != null) {
+                String title = "Environmental Clearance Renewal Resubmission Required";
+                String message = "Your environmental clearance renewal application " + entity.getApplicationNo()
+                        + " requires resubmission. Remarks: " + request.getRemarks();
+                notificationClient.sendUserNotification(title, message, entity.getCreatedBy(), MENU_ID_APPLICANT, "CITIZEN", true, entity.getApplicationNo());
+            }
+        }else{
+            if (entity.getAssignedMPCDId() != null) {
+                String title = "Environmental Clearance Renewal Resubmission Required";
+                String message = "Your environmental clearance renewal application " + entity.getApplicationNo()
+                        + " requires resubmission. Remarks: " + request.getRemarks();
+                notificationClient.sendUserNotification(title, message, entity.getAssignedMPCDId(), MENU_ID_MPCD, "AGENCY", true, entity.getApplicationNo());
+            }
         }
 
         EnvironmentClearanceRenewal saved =
