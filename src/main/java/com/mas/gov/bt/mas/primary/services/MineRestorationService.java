@@ -547,8 +547,8 @@ public class MineRestorationService {
         );
         notificationClient.sendUserNotification(
                 "Work Order Issued",
-                "Work order has been issued for your restoration application "
-                        + restoration.getApplicationNumber() + ". You may now begin the restoration process.",
+                "Work order for the restoration works has been issued. You shall submit a progress report for the "
+                        + "restoration work in the 6th month from the date of issue of work order.",
                 restoration.getApplicantUserId(),
                 MENU_ID_APPLICANT,
                 "CITIZEN",
@@ -730,6 +730,33 @@ public class MineRestorationService {
                 "ERB Release Letter Issued",
                 "The ERB Release Letter has been issued for your restoration application "
                         + restoration.getApplicationNumber() + ". The Environmental Restoration Bond (ERB) will be refunded through BIRMS.",
+                restoration.getApplicantUserId(),
+                MENU_ID_APPLICANT,
+                "CITIZEN",
+                false,
+                restoration.getApplicationNumber()
+        );
+
+        return toResponse(restoration);
+    }
+
+    @Transactional
+    public MineRestorationResponse issueERBUtilizationLetter(Long restorationApplicationId, String erbUtilizationLetterDocId, Long userId) {
+        MineRestorationApplication restoration = findById(restorationApplicationId);
+
+        if (!STATUS_ERB_UTILIZED.equals(restoration.getCurrentStatus())) {
+            throw new BusinessException(ErrorCodes.INVALID_STATE);
+        }
+
+        restoration.setErbUtilizationLetterDocId(erbUtilizationLetterDocId);
+        restoration.setErbUtilizationLetterIssuedAt(LocalDateTime.now());
+        restoration.setUpdatedBy(userId);
+        restorationApplicationRepository.save(restoration);
+
+        notificationClient.sendUserNotification(
+                "ERB Utilization Letter Issued",
+                "The ERB Utilization Letter has been issued for your restoration application "
+                        + restoration.getApplicationNumber() + ".",
                 restoration.getApplicantUserId(),
                 MENU_ID_APPLICANT,
                 "CITIZEN",
@@ -924,6 +951,8 @@ public class MineRestorationService {
         res.setErbRemarks(app.getErbRemarks());
         res.setErbReleaseLetterDocId(app.getErbReleaseLetterDocId());
         res.setErbReleaseLetterIssuedAt(app.getErbReleaseLetterIssuedAt());
+        res.setErbUtilizationLetterDocId(app.getErbUtilizationLetterDocId());
+        res.setErbUtilizationLetterIssuedAt(app.getErbUtilizationLetterIssuedAt());
         res.setCurrentStatus(app.getCurrentStatus());
         res.setCurrentStatusDisplayName(getStatusDisplayName(app.getCurrentStatus()));
         res.setRejectionReason(app.getRejectionReason());

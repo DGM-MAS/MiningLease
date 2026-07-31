@@ -102,6 +102,13 @@ public class MineRestorationApplication {
     @Column(name = "erb_release_letter_issued_at")
     private LocalDateTime erbReleaseLetterIssuedAt;
 
+    // ========== ERB Utilization Letter (restoration NOT satisfactory) ==========
+    @Column(name = "erb_utilization_letter_doc_id", length = 100)
+    private String erbUtilizationLetterDocId;
+
+    @Column(name = "erb_utilization_letter_issued_at")
+    private LocalDateTime erbUtilizationLetterIssuedAt;
+
     // ========== Status ==========
     @Column(name = "current_status", length = 500)
     private String currentStatus;

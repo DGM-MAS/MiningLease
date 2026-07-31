@@ -71,21 +71,36 @@ public class SampleTransportClearanceServiceImpl
                 SampleTransportClearanceDTO request,
                 Long userId) {
 
+            // Ex-country applications ship internationally and have no Bhutanese
+            // dzongkhag/gewog/village — only In-country applications carry these.
+            boolean hasDzongkhag = request.getDzongkhagID() != null && !request.getDzongkhagID().isBlank();
+
             Long regionId;
+            DzongkhagLookup dzongkhagLookup = null;
+            GewogLookup gewogLookup = null;
+            VillageLookup villageLookup = null;
+            RegionMaster regionMaster = null;
 
-            DzongkhagLookup dzongkhagLookup =
-                    lookupHelper.fetchLookup(request.getDzongkhagID(), dzongkhagLookupRepository, "Dzongkhag");
+            if (hasDzongkhag) {
+                dzongkhagLookup =
+                        lookupHelper.fetchLookup(request.getDzongkhagID(), dzongkhagLookupRepository, "Dzongkhag");
 
-            regionId = dzongkhagLookup.getRegion().getId();
+                regionId = dzongkhagLookup.getRegion().getId();
 
-            GewogLookup gewogLookup =
-                    lookupHelper.fetchLookup(request.getGewogID(), gewogLookupRepository, "Gewog");
+                gewogLookup =
+                        lookupHelper.fetchLookup(request.getGewogID(), gewogLookupRepository, "Gewog");
 
-            VillageLookup villageLookup =
-                    lookupHelper.fetchLookup(request.getVillageID(), villageLookupRepository, "Village");
+                if (request.getVillageID() != null && !request.getVillageID().isBlank()) {
+                    villageLookup =
+                            lookupHelper.fetchLookup(request.getVillageID(), villageLookupRepository, "Village");
+                }
 
-            RegionMaster regionMaster =
-                    lookupHelper.fetchLookup(dzongkhagLookup.getRegion().getId(), regionMasterRepository, "RegionMaster");
+                regionMaster =
+                        lookupHelper.fetchLookup(dzongkhagLookup.getRegion().getId(), regionMasterRepository, "RegionMaster");
+            } else {
+                // Default/HQ region — mirrors the assignChief(9L) HQ fallback below.
+                regionId = 9L;
+            }
 
             SampleTransportClearanceEntity entity =
                     sampleTransportClearanceMapper.toEntity(request);

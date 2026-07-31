@@ -106,7 +106,6 @@ public class TerminationService {
             if(!request.isPermanentTermination()) {
                entity.setTerminationEndDate(request.getTerminationEndDate());
             }
-            entity.setTerminationEndDate(request.getTerminationEndDate());
             entity.setApplicantName(leaseRef.applicantName());
             entity.setApplicantEmail(leaseRef.applicantEmail());
 

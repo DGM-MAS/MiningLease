@@ -44,6 +44,9 @@ public class SurfaceCollectionAuctionApplication {
     @Column(name = "material")
     private String material;
 
+    @Column(name = "reserve_mt", precision = 12, scale = 2)
+    private BigDecimal reserveMt;
+
     /**
      * EC / FC Workflow Tracking
      */
