@@ -7,7 +7,8 @@ import lombok.Setter;
 @Data
 @Getter
 @Setter
-public class ImmediateSuspensionApplicationRequest {
+public class
+ImmediateSuspensionApplicationRequest {
 
     private String applicationNumber;
     private String applicationFrom;
