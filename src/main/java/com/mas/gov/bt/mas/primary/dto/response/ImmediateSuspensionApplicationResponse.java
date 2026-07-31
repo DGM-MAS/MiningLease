@@ -1,5 +1,6 @@
 package com.mas.gov.bt.mas.primary.dto.response;
 
+import jakarta.persistence.Column;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
@@ -24,6 +25,14 @@ public class ImmediateSuspensionApplicationResponse {
     private String applicantEmail;
 
     private String applicantName;
+
+    private String dzongkhagName;
+
+    private String gewogName;
+
+    private String villageName;
+
+    private String placeOfActivity;
 
     private String remarksRcMi;
 
