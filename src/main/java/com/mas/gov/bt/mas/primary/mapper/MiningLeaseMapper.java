@@ -73,5 +73,10 @@ public interface MiningLeaseMapper {
     @Mapping(target = "nearestVillage", source = "nearestVillage.villageName")
     @Mapping(target = "nearestVillageId", source = "nearestVillage.villageSerialNo")
     @Mapping(target = "depositAssessmentReportId", source = "depositAssessmentReportId")
+    @Mapping(target = "geologicalAssessmentReportId", source = "geologicalAssessmentReportId")
+    @Mapping(target = "geologicalMapsCrossSectionsId", source = "geologicalMapsCrossSectionsId")
+    @Mapping(target = "kmzId", source = "kmzId")
+    @Mapping(target = "validTaxClearanceId", source = "validTaxClearanceId")
+    @Mapping(target = "geologistApprovalLetterDocId", source = "geologistApprovalLetterDocId")
     MiningLeaseRenewalApplicationResponse toRenewalApplicationResponse(MiningLeaseRenewalApplication app);
 }
