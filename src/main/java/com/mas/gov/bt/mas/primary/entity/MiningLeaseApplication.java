@@ -152,6 +152,9 @@ public class MiningLeaseApplication {
     @Column(name = "file_upload_id_fc")
     private String fileUploadIdFC;
 
+    @Column(name = "tor_file_id")
+    private String torFileId;
+
     @Column(name = "map_file_id")
     private String mapFileId;
 
@@ -358,6 +361,13 @@ public class MiningLeaseApplication {
     @Column(name = "ec_number")
     private String ecNumber;
 
+    @Column(name = "geological_reserve")
+    private String geologicalReserve;
 
+    @Column(name = "mineable_reserve")
+    private String mineableReserve;
+
+    @Column(name = "stripping_ratio")
+    private String strippingRatio;
 
 }

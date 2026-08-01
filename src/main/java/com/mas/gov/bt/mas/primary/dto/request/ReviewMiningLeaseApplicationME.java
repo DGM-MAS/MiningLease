@@ -19,4 +19,8 @@ public class ReviewMiningLeaseApplicationME {
     private String nameOfMine;
     private LocalDate leaseStartDate;
     private LocalDate leaseEndDate;
+
+    private String geologicalReserve;
+    private String mineableReserve;
+    private String strippingRatio;
 }

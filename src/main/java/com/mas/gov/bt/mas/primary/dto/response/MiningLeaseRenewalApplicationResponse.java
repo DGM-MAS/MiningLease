@@ -87,4 +87,5 @@ public class MiningLeaseRenewalApplicationResponse {
     private LocalDateTime rejectedAt;
     private String rejectionReason;
     private Boolean isActive;
+    private String approvedGeologicalFileId;
 }
