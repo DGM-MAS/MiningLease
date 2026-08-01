@@ -89,6 +89,9 @@ public class ApplicationListResponse {
 
     private String geologicalReportStatus;
 
+    private String mapFileId;
+    private String approvedGeologicalFileId;
+
     // Mining Engineer Review
     private String remarksME;
 
@@ -152,4 +155,6 @@ public class ApplicationListResponse {
     private Long fileUploadIdKmz;
 
     private Long regionId;
+
+    private String descriptionForSourceOfFinance;
 }

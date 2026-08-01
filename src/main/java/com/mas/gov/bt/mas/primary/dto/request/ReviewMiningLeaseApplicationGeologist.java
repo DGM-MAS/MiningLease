@@ -10,4 +10,5 @@ public class ReviewMiningLeaseApplicationGeologist {
     private Long Id;
     private String status;
     private String geologistRemarks;
+    private String approvedGeologicalFileId;
 }
