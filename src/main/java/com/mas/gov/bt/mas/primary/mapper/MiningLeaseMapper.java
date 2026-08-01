@@ -77,6 +77,5 @@ public interface MiningLeaseMapper {
     @Mapping(target = "geologicalMapsCrossSectionsId", source = "geologicalMapsCrossSectionsId")
     @Mapping(target = "kmzId", source = "kmzId")
     @Mapping(target = "validTaxClearanceId", source = "validTaxClearanceId")
-    @Mapping(target = "geologistApprovalLetterDocId", source = "geologistApprovalLetterDocId")
     MiningLeaseRenewalApplicationResponse toRenewalApplicationResponse(MiningLeaseRenewalApplication app);
 }

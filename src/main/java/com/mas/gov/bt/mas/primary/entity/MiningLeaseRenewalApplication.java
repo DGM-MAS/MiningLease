@@ -158,8 +158,8 @@ public class MiningLeaseRenewalApplication {
     @Column(name = "geological_report_status", length = 30)
     private String geologicalReportStatus;
 
-    @Column(name = "geologist_approval_letter_doc_id")
-    private String geologistApprovalLetterDocId;
+    @Column(name = "approved_geologist_file_id")
+    private String approvedGeologicalFileId;
 
     // =========== MINING CHIEF ================== //
 

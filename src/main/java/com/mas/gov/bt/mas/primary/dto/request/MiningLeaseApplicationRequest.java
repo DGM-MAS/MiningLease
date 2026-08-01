@@ -53,6 +53,8 @@ public class MiningLeaseApplicationRequest {
 
     private String sourceOfFinance;
 
+    private String descriptionForSourceOfFinance;
+
     private String technicalCompetenceExperience;
 
     private String workforceRequirementRecruitment;
