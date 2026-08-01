@@ -168,6 +168,9 @@ public class MiningLeaseApplication {
     @Column(name = "mpcd_file_upload_id_ma")
     private Long mpcdFileUploadIdMa;
 
+    @Column(name = "kmz_mpcd_file_id")
+    private String kmzMpcdFileId;
+
     @Column(name = "signed_pfs_id")
     private Long signedPFSId;
 
