@@ -453,6 +453,7 @@ public class SurfaceCollectionReviewServiceImpl
                 .ecValidUpto(entity.getEcValidUpto())
                 .ecStatus(entity.getEcStatus())
                 .fcStatus(entity.getFcStatus())
+                .submittedBy(entity.getSubmittedBy())
                 .auctionStatus(entity.getAuctionStatus())
                 .issuePermitFileId(entity.getIssuePermitFileId())
                 .bgRequested(entity.getBgRequested())
