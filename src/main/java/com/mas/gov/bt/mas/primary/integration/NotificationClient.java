@@ -424,7 +424,7 @@ public class NotificationClient {
     @Async
     public void sendApprovalFMFSNotification(String email, String applicantName,
                                          String applicationNumber) {
-        String subject = "Congratulations! Mining Lease Application Approved - " + applicationNumber;
+        String subject = "Congratulations! Mining Lease Application FMFS Approved - " + applicationNumber;
         String body = String.format("""
                 Your FMFS is approved by the department, please submit IEE/EIA to DECC for the issuance of EC.
                 After getting the EC Please upload the EC in the system.
@@ -438,6 +438,46 @@ public class NotificationClient {
 
                 Thank you for using our services.
                 """, applicationNumber);
+
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
+
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }catch (Exception ex) {
+            log.error(
+                    "Failed to send  Mining Lease Application Approved notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex
+            );
+        }
+
+    }
+
+    @Async
+    public void sendApprovalMLANotification(String email, String applicantName,
+                                             String applicationNumber, String approvedERB) {
+        String subject = "Congratulations! Mining Lease Agreement (MLA) signed - " + applicationNumber;
+        String body = String.format("""
+                Please deposit an upfront EBB amount of Nu: %s or an equivalent amount of Bank Guarantee in system and submit the original to  the DGM.
+
+                Application Number: %s
+
+                Please log in to the system to:
+                1. View your signed MLA lease details
+                2. Complete any pending payments
+                3. Upload your Bank Guarantee details
+
+                Thank you for using our services.
+                """, approvedERB, applicationNumber);
 
         EmailRequest request = new EmailRequest();
         request.setTo(email);
