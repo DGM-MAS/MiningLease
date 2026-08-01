@@ -18,6 +18,7 @@ public class SurfaceCollectionAuctionResponseDTO {
     private Long id;
 
     private String siteName;
+    private String submittedBy;
     private String applicationNo;
     private String location;
     private BigDecimal area;

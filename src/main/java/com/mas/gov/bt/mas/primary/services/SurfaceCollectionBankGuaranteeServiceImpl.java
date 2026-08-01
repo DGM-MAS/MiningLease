@@ -264,6 +264,7 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
         SurfaceCollectionAuctionListResponseDTO surfaceCollectionAuctionListResponseDTO = new SurfaceCollectionAuctionListResponseDTO();
 
         surfaceCollectionAuctionListResponseDTO.setSiteName(surfaceCollectionAuctionApplication1.getSiteName());
+        surfaceCollectionAuctionListResponseDTO.setSubmittedBy(surfaceCollectionAuctionApplication1.getSubmittedBy());
         surfaceCollectionAuctionListResponseDTO.setApplicationNo(applicationNo);
         surfaceCollectionAuctionListResponseDTO.setArea(surfaceCollectionAuctionApplication1.getArea());
         surfaceCollectionAuctionListResponseDTO.setAuctionStatus(surfaceCollectionAuctionApplication1.getAuctionStatus());
@@ -384,6 +385,7 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
                 .ecStatus(entity.getEcStatus())
                 .ecNumber(entity.getEcNumber())
                 .ecFileId(entity.getFileECid())
+                .submittedBy(entity.getSubmittedBy())
                 .ecValidUpto(entity.getEcValidUpto())
                 .fcStatus(entity.getFcStatus())
                 .auctionStatus(entity.getAuctionStatus())
