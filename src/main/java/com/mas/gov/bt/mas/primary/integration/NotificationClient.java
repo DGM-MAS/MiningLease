@@ -344,7 +344,8 @@ public class NotificationClient {
                                           String applicationNumber) {
         String subject = "Congratulations! Mining Lease Application Approved - " + applicationNumber;
         String body = String.format("""
-                Your application %1$s for Mining Lease has been approved.
+                Your FMFS is approved by the department, please submit IEE/EIA to DECC for the issuance of EC.
+                After getting the EC Please upload the EC in the system.
 
                 Application Number: %s
 
@@ -665,7 +666,7 @@ public class NotificationClient {
                                             String applicationNumber, String stepName) {
         String subject = "New Application Assigned - " + applicationNumber;
         String body = String.format("""
-                A new quarry lease application has been assigned to you for review.
+                A new mining lease application has been assigned to you for review.
 
                 Application Number: %s
                 Current Step: %s
