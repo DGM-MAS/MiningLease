@@ -67,11 +67,19 @@ public class SurfaceCollectionReviewServiceImpl
     // literal below is only a fallback if masters is unreachable.
     private String MENU_ID_PROMOTER; // "Promoter Application List" (/auctionsurfacecollectionlist)
 
+    // ME-facing review page for this same BG. Despite the "MINING_DIRECTOR" role literal
+    // used by SurfaceCollectionAuctionServiceImpl/SurfaceCollectionBankGuaranteeServiceImpl
+    // for this menu id, mas-frontend actually serves it from
+    // demo/AuctionofSurfaceCollection/miningEnginner/mdauctionsurfacecollectionlist — i.e.
+    // this IS the Mining Engineer's own review queue, confirmed against app-routing.module.ts.
+    private String MENU_ID_MINING_ENGINEER; // "ME Auction Application List" (/mdauctionsurfacecollectionlist)
+
     private static final int DEFAULT_TAT_DAYS = 2;
 
     @jakarta.annotation.PostConstruct
     private void resolveMenuIds() {
         MENU_ID_PROMOTER = menuIdResolver.resolve("/auctionsurfacecollectionlist", "73");
+        MENU_ID_MINING_ENGINEER = menuIdResolver.resolve("/mdauctionsurfacecollectionlist", "74");
     }
 
 
@@ -83,12 +91,27 @@ public class SurfaceCollectionReviewServiceImpl
 
         Long assignedMe = getLeastBusyME();
 
+        String applicationNo = bg.getAuctionApplication() != null
+                ? bg.getAuctionApplication().getApplicationNo()
+                : null;
+
         SurfaceCollectionPermitReview review =
                 SurfaceCollectionPermitReview.builder()
+                        .bgId(bgId)
+                        .applicationNo(applicationNo)
                         .reviewStatus("ASSIGNED")
+                        .assignedMeId(assignedMe)
+                        .assignedOn(LocalDateTime.now())
                         .build();
 
         reviewRepository.save(review);
+
+        if (assignedMe != null) {
+            String title = "Surface Collection permit application assigned for review";
+            String message = "A Surface Collection permit application " + applicationNo
+                    + " has been assigned to you for review.";
+            notificationClient.sendUserNotification(title, message, assignedMe, MENU_ID_MINING_ENGINEER, "STAFF", true, applicationNo);
+        }
 
         return map(review);
     }
@@ -101,7 +124,31 @@ public class SurfaceCollectionReviewServiceImpl
 
         SurfaceCollectionPermitReview review = getReview(reviewId);
 
+        Long previousAssignee = review.getAssignedMeId();
+        Long newAssignee = dto.getNewMeId();
+
+        review.setReassignedTo(newAssignee);
+        review.setReassignedOn(LocalDateTime.now());
+        review.setAssignedMeId(newAssignee);
+
         reviewRepository.save(review);
+
+        String applicationNo = review.getApplicationNo();
+
+        if (previousAssignee != null && !previousAssignee.equals(newAssignee)) {
+            notificationClient.sendUserNotification(
+                    "Surface Collection permit review reassigned away from you",
+                    "The Surface Collection permit application " + applicationNo
+                            + " has been reassigned to another reviewer.",
+                    previousAssignee, MENU_ID_MINING_ENGINEER, "STAFF", false, applicationNo);
+        }
+        if (newAssignee != null) {
+            notificationClient.sendUserNotification(
+                    "Surface Collection permit application assigned for review",
+                    "A Surface Collection permit application " + applicationNo
+                            + " has been assigned to you for review.",
+                    newAssignee, MENU_ID_MINING_ENGINEER, "STAFF", true, applicationNo);
+        }
 
         return map(review);
     }
@@ -183,7 +230,7 @@ public class SurfaceCollectionReviewServiceImpl
             String title = "Bank guarantor details has been reviewed.";
             String message = "Bank guarantor details has been reviewed for surface collection auction. Application No. "+ surfaceCollectionAuctionApplication1.getApplicationNo();
             String serviceId = MENU_ID_PROMOTER;
-            notificationClient.sendUserNotification(title, message, userPromoterDetails.getUserId(), serviceId, "STAFF", true, surfaceCollectionAuctionApplication1.getApplicationNo());
+            notificationClient.sendUserNotification(title, message, userPromoterDetails.getUserId(), serviceId, "CITIZEN", true, surfaceCollectionAuctionApplication1.getApplicationNo());
         }else {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Promoter Email Address not found.");
         }
@@ -428,6 +475,7 @@ public class SurfaceCollectionReviewServiceImpl
     private ReviewResponseDTO map(SurfaceCollectionPermitReview review) {
         return ReviewResponseDTO.builder()
                 .auctionId(review.getId())
+                .applicationNo(review.getApplicationNo())
                 .reviewStatus(review.getReviewStatus())
                 .remarks(review.getRemarks())
                 .build();
