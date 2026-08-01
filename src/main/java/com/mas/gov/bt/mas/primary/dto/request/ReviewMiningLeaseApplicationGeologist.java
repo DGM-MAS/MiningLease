@@ -10,4 +10,8 @@ public class ReviewMiningLeaseApplicationGeologist {
     private Long Id;
     private String status;
     private String geologistRemarks;
+
+    // Required when status == "ACCEPTED GR" — attachment tab for the Approval
+    // Letter, uploaded upon approval of the Geological Assessment Report.
+    private String approvalLetterDocId;
 }
