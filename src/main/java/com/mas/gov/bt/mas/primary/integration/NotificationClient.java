@@ -336,12 +336,94 @@ public class NotificationClient {
         }
     }
 
+
+    @Async
+    public void sendPAFCPublicClearanceNotification(String email, String applicantName,
+                                             String applicationNumber, String newStatus, String remarks) {
+        String subject = "Application Status Update - " + applicationNumber;
+        String body = String.format("""
+                The submitted PA, FC, and public clearance have been approved. To facilitate further processing, please submit the following:
+                
+                1. Terms of Reference (ToR) for the Environmental Impact Assessment (EIA).
+                2. Final Mining Feasibility Study (FMFS) Report.
+
+                Application Number: %s
+                New Status: %s
+                %s
+
+                You can log in to the system to view more details.
+                """,  applicationNumber, newStatus,
+                remarks != null ? "Remarks: " + remarks : "");
+
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
+
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }catch (Exception ex) {
+            log.error(
+                    "Failed to send Mining Lease Application Status Update notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex
+            );
+        }
+    }
+
     /**
      * Send approval notification to applicant.
      */
     @Async
     public void sendApprovalNotification(String email, String applicantName,
                                           String applicationNumber) {
+        String subject = "Congratulations! Mining Lease Application Approved - " + applicationNumber;
+        String body = String.format("""
+                Your FMFS is approved by the department, please submit IEE/EIA to DECC for the issuance of EC.
+                After getting the EC Please upload the EC in the system.
+
+                Application Number: %s
+
+                Please log in to the system to:
+                1. View your approved lease details
+                2. Complete any pending payments
+                3. Download your lease certificate
+
+                Thank you for using our services.
+                """, applicationNumber);
+
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
+
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }catch (Exception ex) {
+            log.error(
+                    "Failed to send  Mining Lease Application Approved notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex
+            );
+        }
+
+    }
+
+    @Async
+    public void sendApprovalFMFSNotification(String email, String applicantName,
+                                         String applicationNumber) {
         String subject = "Congratulations! Mining Lease Application Approved - " + applicationNumber;
         String body = String.format("""
                 Your FMFS is approved by the department, please submit IEE/EIA to DECC for the issuance of EC.
@@ -818,7 +900,7 @@ public class NotificationClient {
                                                  String applicationNumber, String stage, String remarks) {
         String subject = "Additional Information Required - " + applicationNumber;
         String body = String.format("""
-                Your temporary closure application requires additional information.
+                Your application requires additional information.
 
                 Application Number: %s
                 Review Stage: %s
