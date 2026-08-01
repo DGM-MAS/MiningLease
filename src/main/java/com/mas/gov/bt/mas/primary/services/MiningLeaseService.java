@@ -824,7 +824,11 @@ public class MiningLeaseService {
                     pageable
             );
         }
-        return applications.map(mapper::toListResponse);
+        return applications.map(app -> {
+            ApplicationListResponse response = mapper.toListResponse(app);
+            hidePfsRemarksIfPending(response);
+            return response;
+        });
     }
 
     /**
@@ -842,7 +846,38 @@ public class MiningLeaseService {
             throw new UnauthorizedOperationException("You are not authorized to view this application");
         }
 
-        return mapper.toResponse(application);
+        MiningLeaseResponse response = mapper.toResponse(application);
+        if (!isAgencyUser) {
+            hidePfsRemarksIfPending(response);
+        }
+        return response;
+    }
+
+    /**
+     * PFS is reviewed by MPCD and Geologist in parallel — either can approve first (see
+     * ACCEPTED PFS / ACCEPTED PFS MPCD transitions in reviewApplicationGeologist/
+     * reviewApplicationMPCD). While status is one of those two "one side approved,
+     * waiting on the other" states, the approving side's remark must not reach the
+     * applicant: otherwise they can see which focal is holding things up and blame them.
+     * Mirrors the frontend gate in miningleasedetails.ts / querylease-applicantapplicationdetails.ts.
+     * Only ever called for applicant-scoped responses — staff need to see both remarks.
+     */
+    private boolean isPfsPendingOtherFocal(String status) {
+        return "ACCEPTED PFS".equals(status) || "ACCEPTED PFS MPCD".equals(status);
+    }
+
+    private void hidePfsRemarksIfPending(MiningLeaseResponse response) {
+        if (isPfsPendingOtherFocal(response.getCurrentStatus())) {
+            response.setRemarksMPCD(null);
+            response.setRemarksGeologist(null);
+        }
+    }
+
+    private void hidePfsRemarksIfPending(ApplicationListResponse response) {
+        if (isPfsPendingOtherFocal(response.getCurrentStatus())) {
+            response.setRemarksMPCD(null);
+            response.setRemarksGeologist(null);
+        }
     }
 
     /**
