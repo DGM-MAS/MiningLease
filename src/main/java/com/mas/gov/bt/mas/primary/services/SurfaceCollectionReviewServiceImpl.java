@@ -27,7 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -268,6 +270,12 @@ public class SurfaceCollectionReviewServiceImpl
 
         SurfaceCollectionAuctionApplication entity = getAuction(reviewId);
 
+        LocalDate permitValidFrom = LocalDate.now();
+        LocalDate permitValidTo = issuePermitFileId.getPermitValidTo();
+        if (!permitValidTo.isAfter(permitValidFrom)) {
+            throw new BusinessException(ErrorCodes.INVALID_INPUT_DATA, "Permit validity (valid to) must be after the issue date.");
+        }
+
         ApplicationMaster master = entity.getApplicationMaster();
         SurfaceCollectionBidWinner bidWinner = entity.getBidWinner();
 
@@ -295,10 +303,10 @@ public class SurfaceCollectionReviewServiceImpl
         surfaceCollectionAuctionPermit.setIssuedBy(mdUserId);
         surfaceCollectionAuctionPermit.setIssuedOn(LocalDateTime.now());
         surfaceCollectionAuctionPermit.setAuctionApplication(entity);
-        surfaceCollectionAuctionPermit.setValidFrom(LocalDate.now());
+        surfaceCollectionAuctionPermit.setValidFrom(permitValidFrom);
         surfaceCollectionAuctionPermit.setPermitNo(generatePermitNo());
         surfaceCollectionAuctionPermit.setIssuePermitFileId(issuePermitFileId.getIssuePermitFileId());
-        surfaceCollectionAuctionPermit.setValidTo(LocalDate.now().plusDays(DEFAULT_TAT_DAYS));
+        surfaceCollectionAuctionPermit.setValidTo(permitValidTo);
         surfaceCollectionAuctionPermit.setPermitStatus("PERMIT_ISSUED");
         permitRepository.save(surfaceCollectionAuctionPermit);
 
@@ -330,6 +338,8 @@ public class SurfaceCollectionReviewServiceImpl
         surfaceCollectionPermitEntity.setOrigin("AUCTION");
         surfaceCollectionPermitEntity.setPermitNo(surfaceCollectionAuctionPermit.getPermitNo());
         surfaceCollectionPermitEntity.setPermitFileId(issuePermitFileId.getIssuePermitFileId());
+        surfaceCollectionPermitEntity.setPermitValidityFrom(Date.from(permitValidFrom.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+        surfaceCollectionPermitEntity.setPermitValidityTo(Date.from(permitValidTo.atStartOfDay(ZoneId.systemDefault()).toInstant()));
 
         surfaceCollectionPermitEntity.setApplicationNo(entity.getApplicationNo());
         surfaceCollectionPermitEntity.setCreatedBy(promoterId);
@@ -460,7 +470,7 @@ public class SurfaceCollectionReviewServiceImpl
         return 1L;
     }
 
-    private String generatePermitNo() {
+    private synchronized String generatePermitNo() {
         String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         return "SCP-" + date + String.format("%05d", monthlySequence());
     }
