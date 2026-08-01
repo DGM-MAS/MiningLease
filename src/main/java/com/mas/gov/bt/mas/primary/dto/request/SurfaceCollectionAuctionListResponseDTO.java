@@ -18,6 +18,7 @@ public class SurfaceCollectionAuctionListResponseDTO {
 
     private String siteName;
 
+    private String submittedBy;
     private String applicationNo;
 
     // Location details
