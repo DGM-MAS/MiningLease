@@ -200,6 +200,10 @@ public class MiningLeaseRenewalService {
             }
 
             miningLeaseRenewalApplication.setDepositAssessmentReportId(request.getDepositAssessmentReportId());
+            miningLeaseRenewalApplication.setGeologicalAssessmentReportId(request.getGeologicalAssessmentReportId());
+            miningLeaseRenewalApplication.setGeologicalMapsCrossSectionsId(request.getGeologicalMapsCrossSectionsId());
+            miningLeaseRenewalApplication.setKmzId(request.getKmzId());
+            miningLeaseRenewalApplication.setValidTaxClearanceId(request.getValidTaxClearanceId());
             miningLeaseRenewalApplication.setDeclarationStatus(request.isDeclarationStatus());
             miningLeaseRenewalApplication.setCurrentStatus("RENEWAL APPLICATION");
 
@@ -1205,9 +1209,15 @@ public class MiningLeaseRenewalService {
                     }
                 }
                 case "GEOLOGIST-APPROVED" -> {
+                    if (reviewQuarryLeaseApplicationGeologist.getApprovalLetterDocId() == null
+                            || reviewQuarryLeaseApplicationGeologist.getApprovalLetterDocId().isBlank()) {
+                        throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD,
+                                "Approval Letter must be attached before approving.");
+                    }
                     miningLeaseRenewalApplication.setCurrentStatus("GEOLOGIST-APPROVED");
                     miningLeaseRenewalApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     miningLeaseRenewalApplication.setGeologistReviewedAt(LocalDateTime.now());
+                    miningLeaseRenewalApplication.setGeologistApprovalLetterDocId(reviewQuarryLeaseApplicationGeologist.getApprovalLetterDocId());
 
                     if (applicationMaster != null) {
                         applicationMaster.setCurrentStatus("GEOLOGIST-APPROVED");
@@ -1717,6 +1727,10 @@ public class MiningLeaseRenewalService {
         app.setPlaceOfMiningActivity(request.getPlaceOfMiningActivity());
         app.setDungkhag(request.getDungkhag());
         app.setDepositAssessmentReportId(request.getDepositAssessmentReportId());
+        app.setGeologicalAssessmentReportId(request.getGeologicalAssessmentReportId());
+        app.setGeologicalMapsCrossSectionsId(request.getGeologicalMapsCrossSectionsId());
+        app.setKmzId(request.getKmzId());
+        app.setValidTaxClearanceId(request.getValidTaxClearanceId());
         app.setDeclarationStatus(request.isDeclarationStatus());
 
         if (request.getDzongkhag() != null && !request.getDzongkhag().isEmpty()) {
@@ -1934,6 +1948,10 @@ public class MiningLeaseRenewalService {
         app.setPlaceOfMiningActivity(request.getPlaceOfMiningActivity());
         app.setDungkhag(request.getDungkhag());
         app.setDepositAssessmentReportId(request.getDepositAssessmentReportId());
+        app.setGeologicalAssessmentReportId(request.getGeologicalAssessmentReportId());
+        app.setGeologicalMapsCrossSectionsId(request.getGeologicalMapsCrossSectionsId());
+        app.setKmzId(request.getKmzId());
+        app.setValidTaxClearanceId(request.getValidTaxClearanceId());
         app.setDeclarationStatus(request.isDeclarationStatus());
 
         if (request.getDzongkhag() != null && !request.getDzongkhag().isEmpty()) {

@@ -41,6 +41,10 @@ public class MiningLeaseRenewalApplicationResponse {
 
     // Documents & Declaration
     private String depositAssessmentReportId;
+    private String geologicalAssessmentReportId;
+    private String geologicalMapsCrossSectionsId;
+    private String kmzId;
+    private String validTaxClearanceId;
     private boolean declarationStatus;
     private String fmfsDocId;
     private String fmfsId;
@@ -65,6 +69,7 @@ public class MiningLeaseRenewalApplicationResponse {
     private String remarksGeologist;
     private LocalDateTime geologistReviewedAt;
     private String geologicalReportStatus;
+    private String geologistApprovalLetterDocId;
 
     // Mining Chief Review
     private String remarksChief;
