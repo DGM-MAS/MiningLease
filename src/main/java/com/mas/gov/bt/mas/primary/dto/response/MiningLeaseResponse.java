@@ -176,4 +176,6 @@ public class MiningLeaseResponse {
     private String geologicalReserve;
     private String mineableReserve;
     private String strippingRatio;
+
+    private String kmzMpcdFileId;
 }
