@@ -11,6 +11,7 @@ public class MiningLeaseFMFSRequest {
 
     private String applicationNo;
     private String fmfsDocId;
+    private String torFileId;
     private String ecFileId;
     private String ecNumber;
     private Date ecExpiryDate;
