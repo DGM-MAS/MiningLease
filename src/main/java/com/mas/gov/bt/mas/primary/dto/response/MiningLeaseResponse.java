@@ -97,10 +97,11 @@ public class MiningLeaseResponse {
     private String approvedErb;
     private String approvedLeasePeriod;
     private String approvedMineral;
+    private String approvedGeologicalFileId;
+    private String mapFileId;
     private String llcDocId;
     private String llcMineEngineerDocId;
     private String notesheetDocId;
-    private String noteSheetDocId;
     private Long workOrderDocId;
     private String mlaDocId;
     private String mlaStatus;
@@ -167,4 +168,7 @@ public class MiningLeaseResponse {
 
     private Long assignedEngineerUserId;
     private String assignedEngineerName;
+
+    private String descriptionForSourceOfFinance;
+
 }

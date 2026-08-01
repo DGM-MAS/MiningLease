@@ -593,6 +593,7 @@ public class MiningLeaseService {
         miningLeaseApplication.setExpPermitNo(request.getExpPermitNo());
         miningLeaseApplication.setFileUploadIdGr(request.getGRDocId());
         miningLeaseApplication.setFileUploadIdKmz(request.getKmzDocId());
+        miningLeaseApplication.setMapFileId(request.getMapFileId());
         miningLeaseApplication.setApplicationType(request.getApplicationType());
         miningLeaseApplication.setApplicationNumber(generateApplicationNumber());
         miningLeaseApplication.setApplicantCid(request.getApplicantCid());
@@ -726,11 +727,15 @@ public class MiningLeaseService {
         permitIssuedTo = Long.valueOf(permit.getPermitIssuedTo());
         LocalDate today = LocalDate.now();
 
+        if(permit.getExpiryDate() == null){
+            throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION,
+                    "The expiry date of permit is NULL");
+        }
         boolean isValid = !permit.getExpiryDate().isBefore(today);
 
         if (!isValid) {
             // Permit is still valid
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND,
+            throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION,
                     "The exploration permit provided has expired.");
         }
 
@@ -1401,6 +1406,7 @@ public class MiningLeaseService {
             case "GR" -> miningLeaseApplication.setFileUploadIdGr(null);
             case "PA" -> miningLeaseApplication.setFileUploadIdPA(null);
             case "FC" -> miningLeaseApplication.setFileUploadIdFC(null);
+            case "KMZ" -> miningLeaseApplication.setFileUploadIdKmz(null);
             case null, default -> miningLeaseApplication.setFmfsDocId(null);
         }
         miningLeaseApplicationRepository.save(miningLeaseApplication);
@@ -1491,6 +1497,13 @@ public class MiningLeaseService {
                     if (mineEngineerId != null) {
                         String title = "Mining lease application forwarded for review.";
                         String message = "Director has approved FMFS. Application No. " + app.getApplicationNumber() + " has been forwarded to you for review.";
+                        String serviceId = MENU_ID_MINE_ENGINEER;
+                        notificationClient.sendUserNotification(title, message, mineEngineerId, serviceId, "STAFF", true, app.getApplicationNumber());
+                    }
+
+                    if (app.getCreatedBy() != null) {
+                        String title = "Mining lease application FMFS Approved.";
+                        String message = "Director has approved FMFS. Application No. " + app.getApplicationNumber() + "Your FMFS is approved by the department, please submit IEE/EIA to DECC for the issuance of EC”. After getting the EC Please upload the EC in the system.";
                         String serviceId = MENU_ID_MINE_ENGINEER;
                         notificationClient.sendUserNotification(title, message, mineEngineerId, serviceId, "STAFF", true, app.getApplicationNumber());
                     }
@@ -1750,6 +1763,7 @@ public class MiningLeaseService {
                 }
                 case "ACCEPTED GR" -> {
                     miningLeaseApplication.setCurrentStatus("APPROVED GR");
+                    miningLeaseApplication.setApprovedGeologicalFileId(reviewQuarryLeaseApplicationGeologist.getApprovedGeologicalFileId());
                     miningLeaseApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     miningLeaseApplication.setGeologistReviewedAt(LocalDateTime.now());
 
@@ -2889,6 +2903,8 @@ public class MiningLeaseService {
                 quarryLeaseApplication1.setMlaDocId(request.getMlaDocId());
                 quarryLeaseApplication1.setMlaStatus("SUBMITTED");
                 quarryLeaseApplication1.setCurrentStatus("MLA SUBMITTED");
+                quarryLeaseApplication1.setLeaseStartDate(request.getLeaseStartDate());
+                quarryLeaseApplication1.setLeaseEndDate(request.getLeaseEndDate());
                 applicationMaster.setCurrentStatus("MLA SUBMITTED");
                 applicationMasterRepository.save(applicationMaster);
                 miningLeaseApplicationRepository.save(quarryLeaseApplication1);
@@ -2974,7 +2990,16 @@ public class MiningLeaseService {
             createTask(applicationMaster,quarryLeaseApplication,"GEOLOGIST",userId,geologistId);
             notifyStaffAssignment(geologistId, quarryLeaseApplication.getApplicationNumber(), "Geological report resubmitted for your review.", MENU_ID_GEOLOGIST);
 
-        }else {
+        } else if (request.getFileType().equals("KMZ")){
+            quarryLeaseApplication.setFileUploadIdKmz(Long.valueOf(request.getFileId()));
+            applicationMaster.setCurrentStatus("RESUBMITTED GR ");
+            quarryLeaseApplication.setCurrentStatus("RESUBMITTED GR");
+
+            createTask(applicationMaster,quarryLeaseApplication,"GEOLOGIST",userId,geologistId);
+            notifyStaffAssignment(geologistId, quarryLeaseApplication.getApplicationNumber(), "Geological report resubmitted for your review.", MENU_ID_GEOLOGIST);
+
+        }
+        else {
             quarryLeaseApplication.setFmfsDocId(request.getFileId());
             applicationMaster.setCurrentStatus("RESUBMITTED FMFS");
             quarryLeaseApplication.setCurrentStatus("RESUBMITTED FMFS");

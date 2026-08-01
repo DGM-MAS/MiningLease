@@ -98,6 +98,9 @@ public class MiningLeaseApplication {
     @Column(name = "source_of_finance", length = 255)
     private String sourceOfFinance;
 
+    @Column(name = "description_for_source_finance", columnDefinition = "TEXT")
+    private String descriptionForSourceOfFinance;
+
     @Column(name = "technical_competence_experience", columnDefinition = "TEXT")
     private String technicalCompetenceExperience;
 
@@ -149,6 +152,9 @@ public class MiningLeaseApplication {
     @Column(name = "file_upload_id_fc")
     private String fileUploadIdFC;
 
+    @Column(name = "map_file_id")
+    private String mapFileId;
+
     @Column(name = "file_upload_id_public_clearance")
     private String fileUploadIdPublicClearance;
 
@@ -172,6 +178,9 @@ public class MiningLeaseApplication {
 
     @Column(name = "geological_report_status", length = 30)
     private String geologicalReportStatus;
+
+    @Column(name = "approved_geologist_file_id")
+    private String approvedGeologicalFileId;
 
     // ========== Mining Engineer (ME) Review ==========
     @Column(name = "remarks_me", columnDefinition = "TEXT")
