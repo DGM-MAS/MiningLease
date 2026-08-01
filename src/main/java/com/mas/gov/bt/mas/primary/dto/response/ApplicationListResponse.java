@@ -157,4 +157,10 @@ public class ApplicationListResponse {
     private Long regionId;
 
     private String descriptionForSourceOfFinance;
+
+    private String torFileId;
+
+    private String geologicalReserve;
+    private String mineableReserve;
+    private String strippingRatio;
 }

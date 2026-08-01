@@ -171,4 +171,9 @@ public class MiningLeaseResponse {
 
     private String descriptionForSourceOfFinance;
 
+    private String torFileId;
+
+    private String geologicalReserve;
+    private String mineableReserve;
+    private String strippingRatio;
 }

@@ -1209,15 +1209,15 @@ public class MiningLeaseRenewalService {
                     }
                 }
                 case "GEOLOGIST-APPROVED" -> {
-                    if (reviewQuarryLeaseApplicationGeologist.getApprovalLetterDocId() == null
-                            || reviewQuarryLeaseApplicationGeologist.getApprovalLetterDocId().isBlank()) {
+                    if (reviewQuarryLeaseApplicationGeologist.getApprovedGeologicalFileId() == null
+                            || reviewQuarryLeaseApplicationGeologist.getApprovedGeologicalFileId().isBlank()) {
                         throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD,
                                 "Approval Letter must be attached before approving.");
                     }
                     miningLeaseRenewalApplication.setCurrentStatus("GEOLOGIST-APPROVED");
                     miningLeaseRenewalApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     miningLeaseRenewalApplication.setGeologistReviewedAt(LocalDateTime.now());
-                    miningLeaseRenewalApplication.setGeologistApprovalLetterDocId(reviewQuarryLeaseApplicationGeologist.getApprovalLetterDocId());
+                    miningLeaseRenewalApplication.setApprovedGeologicalFileId(reviewQuarryLeaseApplicationGeologist.getApprovedGeologicalFileId());
 
                     if (applicationMaster != null) {
                         applicationMaster.setCurrentStatus("GEOLOGIST-APPROVED");
