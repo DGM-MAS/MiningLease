@@ -537,20 +537,13 @@ public class MiningLeaseService {
     }
 
     /**
-     * Pre-flight cap check — called when the applicant clicks to open the
-     * application form, before they fill anything in. Also reused by
-     * submitGR as the authoritative server-side guard.
+     * Mining lease no longer enforces an application cap — always reports
+     * allowed. Kept as a method (rather than removed) so the controller and
+     * submitGR's guard don't need special-casing, matching the same no-op
+     * pattern used by Stock Lifting's checkCap().
      */
     public CapCheckResponse checkCap(Long userId) {
-        String[] grouping = resolveGroupingKey(userId);
-        int maxAllowed = getMaxAllowedForService("MINING_LEASE", grouping[2]);
-        Integer total = miningLeaseApplicationRepository.countMiningLeasesForGrouping(grouping[0], grouping[1]);
-        int current = total != null ? total : 0;
-        boolean allowed = current < maxAllowed;
-        String message = allowed ? null
-                : "Only " + maxAllowed + " mining lease application(s) are permitted per " +
-                        groupingLabel(grouping[0]) + ".";
-        return new CapCheckResponse(allowed, current, maxAllowed, message);
+        return new CapCheckResponse(true, 0, Integer.MAX_VALUE, null);
     }
 
     /** Records an ACTIVE entry in the shared threshold table when a lease is finally approved. */
