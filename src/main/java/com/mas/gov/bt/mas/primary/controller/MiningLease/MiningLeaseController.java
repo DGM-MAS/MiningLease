@@ -238,6 +238,21 @@ public class MiningLeaseController {
                 .body(new SuccessResponse<>("Application created successfully", response));
     }
 
+    // Used by user to submit EC
+    @PostMapping("/applicationsEC")
+    @Operation(summary = "Submit EC file application", description = "Submit EC file for mining lease application")
+    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> submitECFile(
+            @Valid @RequestBody MiningLeaseFMFSRequest request) {
+
+        Long userId = userContext.getCurrentUserId();
+        MiningLeaseResponse response = miningLeaseService.submitEC(request, userId);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new SuccessResponse<>("Application created successfully", response));
+    }
+
+
+
 
     // Used by user to submit FMFS
     @PostMapping("/applicationsBankDetails")

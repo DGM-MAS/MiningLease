@@ -8,5 +8,6 @@ import lombok.Setter;
 public class ReviewMiningLeaseApplicationMPCD {
     private Long Id;
     private String status;
+    private String kmzMpcdFileId;
     private String mpcdRemarks;
 }

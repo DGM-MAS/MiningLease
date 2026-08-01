@@ -41,4 +41,6 @@ public class MiningLeaseGRRequest {
     private Long gRDocId;
 
     private Long KmzDocId;
+
+    private String mapFileId;
 }
