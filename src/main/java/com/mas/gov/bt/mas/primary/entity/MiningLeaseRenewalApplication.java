@@ -85,6 +85,18 @@ public class MiningLeaseRenewalApplication {
     @Column(name = "deposit_assessment_record_id")
     private String DepositAssessmentReportId;
 
+    @Column(name = "geological_assessment_report_id")
+    private String geologicalAssessmentReportId;
+
+    @Column(name = "geological_maps_cross_sections_id")
+    private String geologicalMapsCrossSectionsId;
+
+    @Column(name = "kmz_id")
+    private String kmzId;
+
+    @Column(name = "valid_tax_clearance_id")
+    private String validTaxClearanceId;
+
     @Column(name = "declaration_status")
     private boolean declarationStatus;
 
@@ -145,6 +157,9 @@ public class MiningLeaseRenewalApplication {
 
     @Column(name = "geological_report_status", length = 30)
     private String geologicalReportStatus;
+
+    @Column(name = "geologist_approval_letter_doc_id")
+    private String geologistApprovalLetterDocId;
 
     // =========== MINING CHIEF ================== //
 

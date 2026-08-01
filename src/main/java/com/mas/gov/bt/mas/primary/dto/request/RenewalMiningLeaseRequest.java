@@ -33,6 +33,10 @@ public class RenewalMiningLeaseRequest {
     private String nearestVillage;
 
     private String DepositAssessmentReportId;
+    private String geologicalAssessmentReportId;
+    private String geologicalMapsCrossSectionsId;
+    private String kmzId;
+    private String validTaxClearanceId;
     private boolean declarationStatus;
 
 }
