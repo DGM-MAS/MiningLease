@@ -34,6 +34,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Year;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -1274,6 +1275,126 @@ public class MiningLeaseService {
                 applicationMasterRepository.save(applicationMaster);
                 miningLeaseApplicationRepository.save(miningLeaseApplication);
 
+                MiningLeaseApplication app = miningLeaseApplication;
+                FmfsDetails fmfsDetails = fmfsDetailsRepository
+                        .findFirstByApplicationNumberOrderByUpdatedAtDescIdDesc(app.getApplicationNumber())
+                        .orElseGet(FmfsDetails::new);
+                boolean isNewFmfsRow = fmfsDetails.getId() == null;
+                if (fmfsDetails.getFmfsId() == null || fmfsDetails.getFmfsId().isBlank()) {
+                    fmfsDetails.setFmfsId(generateUniqueFmfsId());
+                }
+
+                fmfsDetails.setApplicantCid(app.getApplicantCid());
+                fmfsDetails.setApplicantType(app.getApplicantType());
+                fmfsDetails.setApplicantContact(app.getApplicantContact());
+                fmfsDetails.setApplicantEmail(app.getApplicantEmail());
+                fmfsDetails.setApplicantName(app.getApplicantName());
+                fmfsDetails.setApplicantUserId(app.getApplicantUserId());
+
+                fmfsDetails.setBusinessLicenseNo(app.getBusinessLicenseNo());
+                fmfsDetails.setCompanyName(app.getCompanyName());
+
+                fmfsDetails.setApplicationNumber(app.getApplicationNumber());
+                fmfsDetails.setSubmittedAt(LocalDateTime.now());
+
+                fmfsDetails.setCurrentStatus(app.getCurrentStatus());
+                fmfsDetails.setDungkhag(app.getDungkhag());
+                fmfsDetails.setDzongkhag(app.getDzongkhag() != null ? app.getDzongkhag().getDzongkhagName() : null);
+                fmfsDetails.setGewog(app.getGewog() != null ? app.getGewog().getGewogName() : null);
+
+                fmfsDetails.setLeaseEndDate(app.getLeaseEndDate());
+                fmfsDetails.setLeaseStartDate(app.getLeaseStartDate());
+
+                fmfsDetails.setLicenseNo(app.getLicenseNo());
+                fmfsDetails.setNearestVillage(app.getNearestVillage() != null ? app.getNearestVillage().getVillageName() : null);
+                fmfsDetails.setPlaceOfMiningActivity(app.getPlaceOfMiningActivity());
+
+                fmfsDetails.setPostalAddress(app.getPostalAddress());
+                fmfsDetails.setProposedLeasePeriod(app.getProposedLeasePeriod());
+
+                fmfsDetails.setRequiredInvestment(app.getRequiredInvestment());
+                fmfsDetails.setSourceOfFinance(app.getSourceOfFinance());
+                fmfsDetails.setSrf(app.getSrf());
+
+                fmfsDetails.setTechnicalCompetenceExperience(app.getTechnicalCompetenceExperience());
+                fmfsDetails.setTelephoneNo(app.getTelephoneNo());
+                fmfsDetails.setTotalLand(app.getTotalLand());
+                fmfsDetails.setTypeOfMineralsProducts(app.getTypeOfMineralsProducts());
+                fmfsDetails.setTypeOfMines(app.getTypeOfMines());
+
+                fmfsDetails.setWorkforceRequirementRecruitment(app.getWorkforceRequirementRecruitment());
+                fmfsDetails.setApplicationMasterId(app.getApplicationMaster().getId());
+                fmfsDetails.setApplicationType(app.getApplicationType());
+                fmfsDetails.setApplicationFeesRequired(app.getApplicationFeesRequired());
+                fmfsDetails.setConsentLetterDocId(app.getConsentLetterDocId());
+                fmfsDetails.setExplorationReportDocId(app.getExplorationReportDocId());
+                fmfsDetails.setFinancialCapabilityDocId(app.getFinancialCapabilityDocId());
+                fmfsDetails.setFmfsDocId(app.getFmfsDocId());
+                fmfsDetails.setGeologicalReportDocId(app.getGeologicalReportDocId());
+                fmfsDetails.setLocationMapDocId(app.getLocationMapDocId());
+                fmfsDetails.setPfsDocId(app.getPfsDocId());
+
+                fmfsDetails.setMpcdFileUploadIdPa(app.getMpcdFileUploadIdPA());
+                fmfsDetails.setRemarksMpcd(app.getRemarksMPCD());
+                fmfsDetails.setRemarksGeologist(app.getRemarksGeologist());
+
+                fmfsDetails.setApprovedArea(app.getApprovedArea());
+                fmfsDetails.setApprovedErb(app.getApprovedErb());
+                fmfsDetails.setApprovedLeasePeriod(app.getApprovedLeasePeriod());
+                fmfsDetails.setApprovedMineral(app.getApprovedMineral());
+
+                fmfsDetails.setChiefReviewedAt(app.getChiefReviewedAt());
+                fmfsDetails.setDirectorReviewedAt(app.getDirectorReviewedAt());
+
+                fmfsDetails.setFmfsStatus(app.getFmfsStatus());
+                fmfsDetails.setGeologicalReportStatus(app.getGeologicalReportStatus());
+                fmfsDetails.setGeologistReviewedAt(app.getGeologistReviewedAt());
+
+                fmfsDetails.setLlcDocId(app.getLlcDocId());
+                fmfsDetails.setMeReviewedAt(app.getMeReviewedAt());
+
+                fmfsDetails.setMlaDocId(app.getMlaDocId());
+                fmfsDetails.setMlaSignedAt(app.getMlaSignedAt());
+                fmfsDetails.setMlaStatus(app.getMlaStatus());
+
+                fmfsDetails.setMpcdReviewedAt(app.getMpcdReviewedAt());
+                fmfsDetails.setNotesheetDocId(app.getNotesheetDocId());
+                fmfsDetails.setRemarksChief(app.getRemarksChief());
+                fmfsDetails.setRemarksDirector(app.getRemarksDirector());
+                fmfsDetails.setRemarksMe(app.getRemarksME());
+                fmfsDetails.setMpcdFileUploadIdMa(app.getMpcdFileUploadIdMa());
+                fmfsDetails.setFileUploadIdGr(app.getFileUploadIdGr());
+                fmfsDetails.setFileUploadIdPaFc(app.getFileUploadIdFC());
+                fmfsDetails.setCompanyRegistrationNo(app.getCompanyRegistrationNo());
+                fmfsDetails.setCompanyType(app.getCompanyType());
+                fmfsDetails.setEcNo(app.getEcNumber());
+                fmfsDetails.setEcStatus(app.getECStatus());
+                fmfsDetails.setEcExpiryDate(app.getEcExpiryDate() != null
+                        ? app.getEcExpiryDate().toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDateTime()
+                        : null);
+
+                fmfsDetails.setBankGurantorDocId(app.getBankGuarantorDocId());
+                fmfsDetails.setUpfrontPaymentAmount(app.getUpfrontPaymentAmount());
+                fmfsDetails.setWorkOrderDocId(app.getWorkOrderDocId());
+                fmfsDetails.setWorkOrderRemarks(app.getWorkOrderRemarks());
+                fmfsDetails.setDzongkhagId(app.getDzongkhag() != null ? app.getDzongkhag().getId() : null);
+                fmfsDetails.setGewogId(app.getGewog() != null ? Integer.valueOf(app.getGewog().getGewogId()) : null);
+                fmfsDetails.setVillageId(app.getNearestVillage() != null ? Integer.valueOf(app.getNearestVillage().getVillageId()) : null);
+
+                fmfsDetails.setFileUploadIdPa(app.getFileUploadIdPA());
+                fmfsDetails.setFileUploadIdFc(app.getFileUploadIdFC());
+                fmfsDetails.setFileUploadIdPublicClearance(app.getFileUploadIdPublicClearance());
+
+                fmfsDetails.setIsActive(true);
+                if (isNewFmfsRow) {
+                    fmfsDetails.setCreatedAt(LocalDateTime.now());
+                    fmfsDetails.setCreatedBy(userId);
+                }
+                fmfsDetails.setUpdatedAt(LocalDateTime.now());
+                fmfsDetails.setUpdatedBy(userId);
+
+                fmfsDetailsRepository.save(fmfsDetails);
+
                 // Region -> HQ region -> escalate is now handled natively by the resolver.
                 var resolvedMineEngineer = workflowAssignmentClient.resolve(
                         SERVICE_CODE, "FMFS SUBMITTED", miningLeaseApplication.getRegionId(),
@@ -2439,6 +2560,10 @@ public class MiningLeaseService {
         return prefix + String.format("%05d", nextNumber);
     }
 
+    private String generateUniqueFmfsId() {
+        return "FMFS-" + DateTimeFormatter.ofPattern("yyMMddHHmmssSSS").format(LocalDateTime.now());
+    }
+
     public SuccessResponse<List<MiningLeaseResponse>> getAssignedToMiningChief(Long userId, Pageable pageable, String search) {
         Page<MiningLeaseApplication> page;
 
@@ -2559,8 +2684,12 @@ public class MiningLeaseService {
                     app.setLeaseEndDate(request.getLeaseEndDate());
 
 
-                    FmfsDetails fmfsDetails = new FmfsDetails();
+                    FmfsDetails fmfsDetails = fmfsDetailsRepository
+                            .findFirstByApplicationNumberOrderByUpdatedAtDescIdDesc(app.getApplicationNumber())
+                            .orElseGet(FmfsDetails::new);
+                    boolean isNewFmfsRow = fmfsDetails.getId() == null;
                     fmfsDetails.setApplicantCid(app.getApplicantCid());
+                    fmfsDetails.setApplicantType(app.getApplicantType());
                     fmfsDetails.setApplicantContact(app.getApplicantContact());
                     fmfsDetails.setApplicantEmail(app.getApplicantEmail());
                     fmfsDetails.setApplicantName(app.getApplicantName());
@@ -2641,7 +2770,11 @@ public class MiningLeaseService {
                     fmfsDetails.setMpcdFileUploadIdMa(app.getMpcdFileUploadIdMa());
                     fmfsDetails.setFileUploadIdGr(app.getFileUploadIdGr());
                     fmfsDetails.setFileUploadIdPaFc(app.getFileUploadIdFC());
-                    fmfsDetails.setFmfsId(app.getFmfsId());
+                    if (fmfsDetails.getFmfsId() == null || fmfsDetails.getFmfsId().isBlank()) {
+                        fmfsDetails.setFmfsId(app.getFmfsId() != null && !app.getFmfsId().isBlank()
+                                ? app.getFmfsId()
+                                : generateUniqueFmfsId());
+                    }
                     fmfsDetails.setCompanyRegistrationNo(app.getCompanyRegistrationNo());
                     fmfsDetails.setCompanyType(app.getCompanyType());
                     fmfsDetails.setEcNo(app.getEcNumber());
@@ -2659,8 +2792,12 @@ public class MiningLeaseService {
                     fmfsDetails.setFileUploadIdFc(app.getFileUploadIdFC());
                     fmfsDetails.setFileUploadIdPublicClearance(app.getFileUploadIdPublicClearance());
 
-                    fmfsDetails.setCreatedAt(LocalDateTime.now());
-                    fmfsDetails.setCreatedBy(app.getApplicantUserId());
+                    if (isNewFmfsRow) {
+                        fmfsDetails.setCreatedAt(LocalDateTime.now());
+                        fmfsDetails.setCreatedBy(app.getApplicantUserId());
+                    }
+                    fmfsDetails.setUpdatedAt(LocalDateTime.now());
+                    fmfsDetails.setUpdatedBy(userId);
 
                     fmfsDetailsRepository.save(fmfsDetails);
 
