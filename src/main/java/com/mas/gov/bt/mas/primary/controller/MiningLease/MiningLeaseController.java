@@ -261,8 +261,6 @@ public class MiningLeaseController {
     }
 
 
-
-
     // Used by user to submit FMFS
     @PostMapping("/applicationsBankDetails")
     @Operation(summary = "Submit MLA file application", description = "Submit MLA file for mining lease application")

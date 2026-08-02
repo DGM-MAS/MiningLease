@@ -1041,20 +1041,20 @@ public class MiningLeaseService {
 
         UserWorkloadProjection userDetails = miningLeaseApplicationRepository.findUserDetails(request.getNewAssigneeUserId());
         notificationClient.sendTaskReassignmentNotification(
-                userDetails.getEmail(), userDetails.getUsername(),
+                userDetails.getEmail(),
+                userDetails.getUsername(),
                 firstTask.getApplicationNumber(),
                 firstTask.getAssignedToRole(),
                 request.getRemarks());
 
         if(userDetails.getUserId()!= null) {
             String title = "An new application has been reassigned.";
-            String message = "An application for quarry lease has been assigned for review. Application No. "+request.getApplicationNumber()+" Please login in review the application";
+            String message = "An application for mining lease has been assigned for review. Application No. "+request.getApplicationNumber()+" Please login in review the application";
             String serviceId = MENU_ID_GEOLOGIST;
             notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true, request.getApplicationNumber());
         }else {
             throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
         }
-
 
         log.info("Geologist task {} reassigned to user {}", firstTask.getId(), request.getNewAssigneeUserId());
     }
@@ -1087,7 +1087,7 @@ public class MiningLeaseService {
 
         if(userDetails.getUserId()!= null) {
             String title = "An new application has been reassigned.";
-            String message = "An application for quarry lease has been assigned for review. Application No. "+ request.getApplicationNumber()+" Please login in review the application";
+            String message = "An application for mining lease has been assigned for review. Application No. "+ request.getApplicationNumber()+" Please login in review the application";
             String serviceId = MENU_ID_MPCD;
             notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true, request.getApplicationNumber());
         }else {
@@ -1122,14 +1122,15 @@ public class MiningLeaseService {
 
         UserWorkloadProjection userDetails = miningLeaseApplicationRepository.findUserDetails(request.getNewAssigneeUserId());
         notificationClient.sendTaskReassignmentNotification(
-                userDetails.getEmail(), userDetails.getUsername(),
+                userDetails.getEmail(),
+                userDetails.getUsername(),
                 firstTask.getApplicationNumber(),
                 firstTask.getAssignedToRole(),
                 request.getRemarks());
 
         if(userDetails.getUserId()!= null) {
             String title = "An new application has been reassigned.";
-            String message = "An application for quarry lease has been assigned for review. Application No. "+request.getApplicationNumber()+" Please login in review the application";
+            String message = "An application for mining lease has been assigned for review. Application No. "+request.getApplicationNumber()+" Please login in review the application";
             String serviceId = MENU_ID_MINE_ENGINEER;
             notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true, request.getApplicationNumber());
         }else {
@@ -1172,7 +1173,7 @@ public class MiningLeaseService {
 
         if(userDetails.getUserId()!= null) {
             String title = "An new application has been reassigned.";
-            String message = "An application for quarry lease has been assigned for review. Application No. "+request.getApplicationNumber()+" Please login in review the application";
+            String message = "An application for mining lease has been assigned for review. Application No. "+request.getApplicationNumber()+" Please login in review the application";
             String serviceId = MENU_ID_MINING_CHIEF;
             notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true, request.getApplicationNumber());
         }else {
@@ -1726,7 +1727,7 @@ public class MiningLeaseService {
                     }
 
                     if (app.getApplicantEmail() != null) {
-                        notificationClient.sendApprovalNotification(
+                        notificationClient.sendApprovalFMFSNotification(
                                 app.getApplicantEmail(),
                                 app.getApplicantName(),
                                 app.getApplicationNumber());
@@ -1758,18 +1759,14 @@ public class MiningLeaseService {
                     }
 
                     if (app.getApplicantEmail() != null) {
-                        notificationClient.sendApprovalNotification(
+                        notificationClient.sendApprovalMLANotification(
                                 app.getApplicantEmail(),
                                 app.getApplicantName(),
-                                app.getApplicationNumber());
+                                app.getApplicationNumber(),
+                                app.getApprovedErb()
+                        );
                     }
 
-                    if (app.getApplicantEmail() != null) {
-                        notificationClient.sendMLASigningNotification(
-                                app.getApplicantEmail(),
-                                app.getApplicantName(),
-                                app.getApplicationNumber());
-                    }
                     assert master != null;
                     createTask(master, app, "DIRECTOR", userId, userId);
                 }
@@ -2982,6 +2979,50 @@ public class MiningLeaseService {
                                 request.getRemarks());
                     }
                 }
+                case "Resubmit EC" -> {
+                    app.setCurrentStatus("RESUBMIT EC");
+                    app.setRemarksME(request.getRemarks());
+                    app.setMeReviewedAt(LocalDateTime.now());
+
+                    if (master != null) {
+                        master.setCurrentStatus("RESUBMIT EC");
+                        applicationMasterRepository.save(master);
+                    }
+
+                    createRevisionRecord(app, "ME_REVIEW", request.getRemarks(), userId);
+                    createTask(master, app, "APPLICANT", userId, app.getApplicantUserId());
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendRevisionRequestNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber(),
+                                "Mining Engineer EC Review",
+                                request.getRemarks());
+                    }
+                }
+                case "Resubmit BG" -> {
+                    app.setCurrentStatus("RESUBMIT BG");
+                    app.setRemarksME(request.getRemarks());
+                    app.setMeReviewedAt(LocalDateTime.now());
+
+                    if (master != null) {
+                        master.setCurrentStatus("RESUBMIT BG");
+                        applicationMasterRepository.save(master);
+                    }
+
+                    createRevisionRecord(app, "ME_REVIEW", request.getRemarks(), userId);
+                    createTask(master, app, "APPLICANT", userId, app.getApplicantUserId());
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendRevisionRequestNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber(),
+                                "Mining Engineer BG Review",
+                                request.getRemarks());
+                    }
+                }
                 default -> throw new IllegalArgumentException("Application status not recognized");
             }
             miningLeaseApplicationRepository.save(app);
@@ -3246,8 +3287,8 @@ public class MiningLeaseService {
                 }
 
                 if(quarryLeaseApplication1.getApplicantUserId() != null) {
-                    String title = "MLA submitted.";
-                    String message = "Your MLA has been submitted and forwarded to the Director for review."+ "Application No. : "+ quarryLeaseApplication1.getApplicationNumber();
+                    String title = "MLA submitted. Bank Guarantee needs to be submitted.";
+                    String message = "Please deposit an upfront EBB amount of Nu:"+ quarryLeaseApplication1.getApprovedErb() + " or an equivalent amount of Bank Guarantee in system and submit the original to  the DGM.";
                     String serviceId = MENU_ID_PROMOTER;
                     notificationClient.sendUserNotification(title, message, quarryLeaseApplication1.getApplicantUserId(), serviceId, "CITIZEN", false, quarryLeaseApplication1.getApplicationNumber());
                 }
