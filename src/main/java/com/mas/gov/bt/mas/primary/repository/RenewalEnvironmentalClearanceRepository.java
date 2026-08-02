@@ -183,4 +183,15 @@ public interface RenewalEnvironmentalClearanceRepository extends JpaRepository<E
     Page<EnvironmentClearanceRenewal> findByAssignedMPCDIdAndStatusNotIn(Long userId, List<String> applicationStatus, Pageable pageable);
 
     Page<EnvironmentClearanceRenewal> findByAssignedMPCDIdAndApplicationNoContainingIgnoreCaseAndStatusNotIn(Long userId, String search, List<String> applicationStatus, Pageable pageable);
+
+    // Tab-count badge siblings — reuse the same derived-query filters as the Page methods above (unfiltered totals, search ignored)
+    @Query("SELECT COUNT(a) FROM EnvironmentClearanceRenewal a WHERE a.status NOT IN :applicationStatus AND a.createdBy = :userId")
+    long countByApplicantUserIdAndStatusNotIn(@Param("userId") Long userId, @Param("applicationStatus") List<String> applicationStatus);
+    long countByCreatedByAndStatusIn(Long userId, List<String> approved);
+    long countByStatusIn(List<String> approved);
+    long countByAssignedMPCDIdAndStatusNotIn(Long userId, List<String> applicationStatus);
+    long countByAssignedMPCDIdAndStatusIn(Long userId, List<String> archivedStatuses);
+    long countByAssignedRCIdAndStatusNotIn(Long userId, List<String> applicationStatuses);
+    long countByAssignedMIIdAndStatusNotIn(Long userId, List<String> applicationStatuses);
+    long countByAssignedMDIdAndStatusNotIn(Long userId, List<String> statuses);
 }
