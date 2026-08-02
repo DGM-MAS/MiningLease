@@ -85,6 +85,13 @@ public class RenewalEnvironmentalClearanceMPCDController {
         );
     }
 
+    // ** Tab-count badges for the MPCD dashboard's nav-tabs ** //
+    @GetMapping("/counts")
+    public ResponseEntity<java.util.Map<String, Long>> counts() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(renewalEnvironmentalClearanceService.getMpcdCounts(userId));
+    }
+
     @PutMapping("/tasks/reassign")
     @Operation(
             summary = "Reassign MPCD task",

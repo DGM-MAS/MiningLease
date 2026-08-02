@@ -800,6 +800,50 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
     }
 
 
+    /** Tab-count badges for the applicant's own nav-tabs: processing/archived. */
+    public java.util.Map<String, Long> getApplicantCounts(Long userId) {
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("processing", renewalEnvironmentalClearanceRepository.countByApplicantUserIdAndStatusNotIn(userId, List.of("EC_RENEWED")));
+        counts.put("archived", renewalEnvironmentalClearanceRepository.countByCreatedByAndStatusIn(userId, List.of("APPROVED", "REJECTED", "EC_RENEWED")));
+        return counts;
+    }
+
+    /** Tab-count badge for the "archived" tab shared by RC/MI/MD dashboards (agency-user branch) and the base admin view. */
+    public java.util.Map<String, Long> getArchivedCount() {
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("archived", renewalEnvironmentalClearanceRepository.countByStatusIn(List.of("APPROVED", "REJECTED", "EC_RENEWED")));
+        return counts;
+    }
+
+    /** Tab-count badges for the MPCD dashboard's nav-tabs: assigned/archived. */
+    public java.util.Map<String, Long> getMpcdCounts(Long userId) {
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("assigned", renewalEnvironmentalClearanceRepository.countByAssignedMPCDIdAndStatusNotIn(userId, List.of("EC_RENEWED")));
+        counts.put("archived", renewalEnvironmentalClearanceRepository.countByAssignedMPCDIdAndStatusIn(userId, List.of("APPROVED", "REJECTED")));
+        return counts;
+    }
+
+    /** Tab-count badge for the RC dashboard's "assigned" tab (archived comes from the shared getArchivedCount()). */
+    public java.util.Map<String, Long> getRcCounts(Long userId) {
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("assigned", renewalEnvironmentalClearanceRepository.countByAssignedRCIdAndStatusNotIn(userId, List.of("EC_RENEWED")));
+        return counts;
+    }
+
+    /** Tab-count badge for the MI dashboard's "assigned" tab (archived comes from the shared getArchivedCount()). */
+    public java.util.Map<String, Long> getMiCounts(Long userId) {
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("assigned", renewalEnvironmentalClearanceRepository.countByAssignedMIIdAndStatusNotIn(userId, List.of("EC_RENEWED")));
+        return counts;
+    }
+
+    /** Tab-count badge for the MD dashboard's "assigned" tab (archived comes from the shared getArchivedCount()). */
+    public java.util.Map<String, Long> getMdCounts(Long userId) {
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("assigned", renewalEnvironmentalClearanceRepository.countByAssignedMDIdAndStatusNotIn(userId, List.of("EC_RENEWED")));
+        return counts;
+    }
+
     @Override
     public Page<EnvironmentClearanceRenewalResponseDTO> getMyApplications(Long userId, Pageable pageable, String search) {
         List<String> ApplicationStatus = List.of(

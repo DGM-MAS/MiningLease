@@ -39,6 +39,18 @@ public interface RenewalEnvironmentalClearanceService {
 
     Page<EnvironmentClearanceRenewalResponseDTO> getArchivedApplications(Pageable pageable, String search, Long userId);
 
+    java.util.Map<String, Long> getApplicantCounts(Long userId);
+
+    java.util.Map<String, Long> getArchivedCount();
+
+    java.util.Map<String, Long> getMpcdCounts(Long userId);
+
+    java.util.Map<String, Long> getRcCounts(Long userId);
+
+    java.util.Map<String, Long> getMiCounts(Long userId);
+
+    java.util.Map<String, Long> getMdCounts(Long userId);
+
     Page<EnvironmentClearanceRenewalResponseDTO> getMyArchivedApplications(Long userId, Pageable pageable, String search);
 
     EnvironmentClearanceRenewalResponseDTO updateDraft(Long id, @Valid EnvironmentClearanceRenewalRequestDTO request, Long userId);

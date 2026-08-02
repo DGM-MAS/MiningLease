@@ -178,6 +178,19 @@ public class RenewalEnvironmentalClearanceController {
         return ResponseEntity.ok(SuccessResponse.fromPage("Applications retrieved successfully", applications));
     }
 
+    // ** Tab-count badges for the applicant's nav-tabs ** //
+    @GetMapping("/counts")
+    public ResponseEntity<java.util.Map<String, Long>> getApplicantCounts() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(renewalEnvironmentalClearanceService.getApplicantCounts(userId));
+    }
+
+    // ** Tab-count badge for the shared "archived" tab used by RC/MI/MD dashboards ** //
+    @GetMapping("/archived-count")
+    public ResponseEntity<java.util.Map<String, Long>> getArchivedCount() {
+        return ResponseEntity.ok(renewalEnvironmentalClearanceService.getArchivedCount());
+    }
+
     @GetMapping("/{id}")
     @Operation(
             summary = "Get EC renewal application",
