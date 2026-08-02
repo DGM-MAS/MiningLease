@@ -53,6 +53,13 @@ public class RCTemporaryClosureController {
         );
     }
 
+    @GetMapping("/assigned/count")
+    @Operation(summary = "Count of RC's assigned temporary closure applications (Submitted tab badge)")
+    public ResponseEntity<SuccessResponse<Long>> assignedCount() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", temporaryClosureService.countAssignedToRC(userId)));
+    }
+
     @PostMapping("/assignTask")
     @Operation(summary = "Assign application", description = "Assign mining lease application by Director to MPCD and Mine Engineer")
     public ResponseEntity<SuccessResponse<TemporaryClosureNotificationResponse>> assignApplication(

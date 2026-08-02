@@ -81,6 +81,13 @@ public class TemporaryClosureController {
         return ResponseEntity.ok(SuccessResponse.fromPage("Applications retrieved successfully", applications));
     }
 
+    @GetMapping("/my-applications/count")
+    @Operation(summary = "Count of promoter's submitted temporary closure applications (Submitted tab badge)")
+    public ResponseEntity<SuccessResponse<Long>> getMyApplicationsCount() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", temporaryClosureService.countMyApplications(userId)));
+    }
+
     @PostMapping("/rectification")
     @Operation(summary = "Submit rectification for temporary closure application", description = "Submit rectification temporary closure application with reason are documents")
     public ResponseEntity<SuccessResponse<TemporaryClosureNotificationResponse>> submitRectification(
@@ -138,6 +145,16 @@ public class TemporaryClosureController {
                 Sort.Direction.fromString(sortDirection), sortBy);
 
         return ResponseEntity.ok(temporaryClosureService.getAllApplicationAdmin(pageable, search));
+    }
+
+    @GetMapping("/archived-applications/count")
+    @Operation(summary = "Count of archived (TEMPORARY CLOSURE APPROVED) applications for the Archived tab badge. Shared by Promoter/RC/MI pages.")
+    public ResponseEntity<SuccessResponse<Long>> getArchivedApplicationsCount() {
+        Long userId = userContext.getCurrentUserId();
+        long count = userContext.isAgencyUser()
+                ? temporaryClosureService.countArchivedApplications(userId)
+                : temporaryClosureService.countMyArchivedApplications(userId);
+        return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", count));
     }
 
     @GetMapping("/archived-applications")

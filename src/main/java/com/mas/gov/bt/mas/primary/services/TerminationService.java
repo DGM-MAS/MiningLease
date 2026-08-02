@@ -284,6 +284,10 @@ public class TerminationService {
         log.info("Created task for role {}", role);
     }
 
+    public long countAssignedToCMSHead(Long userId) {
+        return terminationApplicationRepository.countAssignedToUserMI(userId);
+    }
+
     public SuccessResponse<List<TerminationApplicationResponse>> getAssignedToCMSHead(Long userId, Pageable pageable, String search) {
         Page<TerminationApplicationEntity> page;
 
@@ -481,6 +485,10 @@ public class TerminationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Application not found with ID: " + id));
     }
 
+    public long countAssignedToPromoter(Long userId) {
+        return terminationApplicationRepository.countAssignedToUserPromoter(userId);
+    }
+
     public SuccessResponse<List<TerminationApplicationResponse>> getAssignedToPromoter(Long userId, Pageable pageable, String search) {
         Page<TerminationApplicationEntity> page;
 
@@ -598,6 +606,20 @@ public class TerminationService {
 //        );
 //    }
 
+    public long countArchivedApplications(Long userId) {
+        List<String> archivedStatuses = List.of("TERMINATED", "TERMINATION CANCELED");
+        List<Long> role_id = terminationApplicationRepository.findUserDetails(userId);
+        if (role_id != null && role_id.contains(35L)) {
+            return terminationApplicationRepository.countArchivedAssignedToUserCMSHead(userId, archivedStatuses);
+        }
+        return terminationApplicationRepository.countArchivedAssignedToUser(userId, archivedStatuses);
+    }
+
+    public long countMyArchivedApplications(Long userId) {
+        List<String> archivedStatuses = List.of("TERMINATED", "TERMINATION CANCELED");
+        return terminationApplicationRepository.countByApplicantUserIdAndStatusIn(userId, archivedStatuses);
+    }
+
     public Page<TerminationApplicationResponse> getArchivedApplications(Pageable pageable, String search, Long userId) {
         List<String> archivedStatuses = List.of(
                 "TERMINATED",
@@ -690,6 +712,10 @@ public class TerminationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Application not found: " + applicationNo));
 
         return terminationMapper.toResponse(application);
+    }
+
+    public long countAssignedToUserChiefMD(Long currentUserId) {
+        return terminationApplicationRepository.countAssignedToUserChiefMD(currentUserId);
     }
 
     public SuccessResponse<List<TerminationApplicationResponse>> getAllApplications(Long currentUserId, Pageable pageable, String search) {

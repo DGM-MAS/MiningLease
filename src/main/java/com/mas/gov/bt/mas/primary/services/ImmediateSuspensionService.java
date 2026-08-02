@@ -401,6 +401,10 @@ public class ImmediateSuspensionService {
         log.info("Created task for role {}", role);
     }
 
+    public long countAssignedToPromoter(Long userId) {
+        return immediateSuspensionApplicationRepository.countAssignedToUserPromoter(userId);
+    }
+
     @Transactional(readOnly = true)
     public SuccessResponse<List<ImmediateSuspensionApplicationResponse>> getAssignedToPromoter(Long userId, Pageable pageable, String search) {
         Page<ImmediateSuspensionApplication> page;
@@ -532,6 +536,10 @@ public class ImmediateSuspensionService {
         }
         return immediateSuspensionMapper.toResponse(immediateSuspensionApplication);
 
+    }
+
+    public long countAssignedToMI(Long userId) {
+        return immediateSuspensionApplicationRepository.countAssignedToUserMI(userId);
     }
 
     public SuccessResponse<List<ImmediateSuspensionApplicationResponse>> getAssignedToMI(Long userId, Pageable pageable, String search) {
@@ -765,6 +773,10 @@ public class ImmediateSuspensionService {
         return immediateSuspensionMapper.toResponse(app);
     }
 
+    public long countAssignedToRCME(Long currentUserId) {
+        return immediateSuspensionApplicationRepository.countAssignedToUserRCME(currentUserId);
+    }
+
     public SuccessResponse<List<ImmediateSuspensionApplicationResponse>> getAllApplications(Long currentUserId, Pageable pageable, String search) {
         Page<ImmediateSuspensionApplication> page;
 
@@ -790,6 +802,20 @@ public class ImmediateSuspensionService {
                 "Assigned applications fetched successfully",
                 responsePage
         );
+    }
+
+    public long countArchivedApplications(Long userId) {
+        List<String> archivedStatuses = List.of("SUSPENSION LIFTED", "SUSPENDED");
+        List<Long> role_id = terminationApplicationRepository.findUserDetails(userId);
+        if (role_id != null && role_id.contains(22L)) {
+            return immediateSuspensionApplicationRepository.countArchivedAssignedToUserMI(userId, archivedStatuses);
+        }
+        return immediateSuspensionApplicationRepository.countArchivedAssignedToUser(userId, archivedStatuses);
+    }
+
+    public long countMyArchivedApplications(Long userId) {
+        List<String> archivedStatuses = List.of("CMS HEAD APPROVED", "TERMINATION CANCELED");
+        return immediateSuspensionApplicationRepository.countByApplicantUserIdAndStatusIn(userId, archivedStatuses);
     }
 
     public Page<ImmediateSuspensionApplicationResponse> getArchivedApplications(Pageable pageable, String search, Long userId) {
