@@ -23,6 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * REST Controller for Mining Lease Application management.
@@ -137,6 +138,14 @@ public class MiningLeaseController {
         }
 
         return ResponseEntity.ok(SuccessResponse.fromPage("Archived applications retrieved successfully", applications));
+    }
+
+    // ** Tab-count badge for the "archived" tab shared by MPCD/Geologist/MiningChief/
+    // MiningEngineer/Director dashboards (they all call /archived-applications above) ** //
+    @GetMapping("/archived-count")
+    public ResponseEntity<Map<String, Long>> archivedCount() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(miningLeaseService.getArchivedCount(userId, userContext.isAgencyUser()));
     }
 
     // ** Dashboard information for MPCD mining lease application ** //

@@ -35,7 +35,7 @@ public interface RenewalEnvironmentalClearanceService {
 
     EnvironmentClearanceRenewalResponseDTO getApplicationById(Long id, Long userId);
 
-    EnvironmentClearanceRenewalResponseDTO getApplicationByApplicationNo(String applicationNo);
+    EnvironmentClearanceRenewalResponseDTO getApplicationByApplicationNo(String applicationNo, Long userId, boolean isAgencyUser);
 
     Page<EnvironmentClearanceRenewalResponseDTO> getArchivedApplications(Pageable pageable, String search, Long userId);
 

@@ -857,22 +857,35 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
     }
 
     /**
-     * Full application detail looked up by its public application number, open to any
-     * authenticated focal user — used by the Track Applications "View Details" deep link,
-     * which must work regardless of who's currently assigned or what stage the application
-     * is in, unlike getApplicationById above (which restricts to the creator/currently
-     * assigned MPCD/RC/MI/MD).
+     * Full application detail looked up by its public application number — used by the
+     * Track Applications "View Details" deep link, which must work regardless of who's
+     * currently assigned or what stage the application is in, unlike getApplicationById
+     * above (which restricts to the creator/currently assigned MPCD/RC/MI/MD). Agency
+     * (staff) callers are left unrestricted here for that reason; a CITIZEN caller may
+     * only ever look up their own application, and gets the same internal-field stripping
+     * getApplicationById already applies for the creator.
      */
     @Override
-    public EnvironmentClearanceRenewalResponseDTO getApplicationByApplicationNo(String applicationNo) {
+    public EnvironmentClearanceRenewalResponseDTO getApplicationByApplicationNo(String applicationNo, Long userId, boolean isAgencyUser) {
         EnvironmentClearanceRenewal entity =
                 renewalEnvironmentalClearanceRepository
                         .findByApplicationNo(applicationNo)
                         .orElseThrow(() ->
                                 new RuntimeException("Application not found"));
 
-        return environmentClearanceRenewalMapper
-                .toResponseDTO(entity);
+        boolean isCreator = userId.equals(entity.getCreatedBy());
+        if (!isAgencyUser && !isCreator) {
+            throw new CustomRuntimeException("You are not authorized to access this application");
+        }
+
+        EnvironmentClearanceRenewalResponseDTO dto = environmentClearanceRenewalMapper.toResponseDTO(entity);
+        if (isCreator) {
+            dto.setRcSiteReportFileId(null);
+            dto.setMiSiteReportFileId(null);
+            dto.setMpcdSiteReportFileId(null);
+            dto.setIomFileId(null);
+        }
+        return dto;
     }
 
     @Override

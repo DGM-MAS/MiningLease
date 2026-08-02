@@ -20,6 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/mining-lease/mpcd")
@@ -77,6 +78,13 @@ public class MPCDFocalController {
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new SuccessResponse<>("Application created successfully", response));
+    }
+
+    // ** Tab-count badges for the MPCD dashboard's nav-tabs ** //
+    @GetMapping("/counts")
+    public ResponseEntity<Map<String, Long>> counts() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(miningLeaseService.getMpcdCounts(userId));
     }
 
     // ** Dashboard information for MPCD quarry lease application ** //
