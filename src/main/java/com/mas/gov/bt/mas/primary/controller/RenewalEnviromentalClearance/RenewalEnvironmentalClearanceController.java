@@ -209,9 +209,12 @@ public class RenewalEnvironmentalClearanceController {
     public ResponseEntity<SuccessResponse<EnvironmentClearanceRenewalResponseDTO>> getApplicationByApplicationNo(
             @PathVariable String applicationNo
     ) {
+        Long userId = userContext.getCurrentUserId();
+        boolean isAgencyUser = userContext.isAgencyUser();
+
         EnvironmentClearanceRenewalResponseDTO response =
                 renewalEnvironmentalClearanceService
-                        .getApplicationByApplicationNo(applicationNo);
+                        .getApplicationByApplicationNo(applicationNo, userId, isAgencyUser);
 
         return ResponseEntity.ok(
                 new SuccessResponse<>(
