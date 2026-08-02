@@ -44,6 +44,9 @@ public interface TemporaryClosureRepository extends JpaRepository<TemporaryClosu
     @Query("SELECT a FROM TemporaryClosureEntity a WHERE a.applicantUserId = :userId AND a.currentStatus IN :applicationStatus")
     Page<TemporaryClosureEntity> findByApplicantUserIdAndStatusIn(Long userId, List<String> applicationStatus, Pageable pageable);
 
+    @Query("SELECT COUNT(a) FROM TemporaryClosureEntity a WHERE a.applicantUserId = :userId AND a.currentStatus IN :applicationStatus")
+    long countByApplicantUserIdAndStatusIn(Long userId, List<String> applicationStatus);
+
     @Query("""
     SELECT q FROM TemporaryClosureEntity q
     WHERE q.applicantUserId = :userId
@@ -60,6 +63,16 @@ public interface TemporaryClosureRepository extends JpaRepository<TemporaryClosu
     AND q.currentStatus IN ('SUBMITTED', 'MI REVIEWED', 'MI ASSIGNED')
 """)
     Page<TemporaryClosureEntity> findAssignedToUserRC(Long userId, Pageable pageable);
+
+    @Query("""
+    SELECT COUNT(q)
+    FROM TemporaryClosureEntity q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationId
+    WHERE t.assignedToUserId = :userId
+    AND q.currentStatus IN ('SUBMITTED', 'MI REVIEWED', 'MI ASSIGNED')
+""")
+    long countAssignedToUserRC(Long userId);
 
     @Query("""
     SELECT q
@@ -94,6 +107,16 @@ public interface TemporaryClosureRepository extends JpaRepository<TemporaryClosu
     AND q.currentStatus IN ('MI ASSIGNED', 'MI REVIEWED')
 """)
     Page<TemporaryClosureEntity> findAssignedToUserMI(Long userId, Pageable pageable);
+
+    @Query("""
+    SELECT COUNT(q)
+    FROM TemporaryClosureEntity q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationId
+    WHERE t.assignedToUserId = :userId
+    AND q.currentStatus IN ('MI ASSIGNED', 'MI REVIEWED')
+""")
+    long countAssignedToUserMI(Long userId);
 
     @Query("""
     SELECT q
@@ -143,4 +166,14 @@ public interface TemporaryClosureRepository extends JpaRepository<TemporaryClosu
     AND q.currentStatus IN :archivedStatuses
 """)
     Page<TemporaryClosureEntity> findArchivedAssignedToUser(Long userId, List<String> archivedStatuses, Pageable pageable);
+
+    @Query("""
+    SELECT COUNT(q)
+    FROM TemporaryClosureEntity q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationId
+    WHERE t.assignedToUserId = :userId
+    AND q.currentStatus IN :archivedStatuses
+""")
+    long countArchivedAssignedToUser(Long userId, List<String> archivedStatuses);
 }

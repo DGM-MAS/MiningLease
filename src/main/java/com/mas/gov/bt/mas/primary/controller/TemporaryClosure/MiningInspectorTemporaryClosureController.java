@@ -47,6 +47,13 @@ public class MiningInspectorTemporaryClosureController {
     }
 
 
+    @GetMapping("/assigned/count")
+    @Operation(summary = "Count of MI's assigned temporary closure applications (Submitted tab badge)")
+    public ResponseEntity<SuccessResponse<Long>> assignedCount() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", temporaryClosureService.countAssignedToMI(userId)));
+    }
+
     // ** Dashboard information for mining inspector temporary closure application ** //
     // ** Assigned application to Mining Inspector ** //
     @GetMapping("/assigned")

@@ -99,6 +99,26 @@ public class ImmediateSuspensionController {
         }
     }
 
+    @GetMapping("/my-applications/count")
+    @Operation(summary = "Count of RC's assigned immediate suspension applications (Submitted tab badge)")
+    public ResponseEntity<SuccessResponse<Long>> getMyApplicationsCount() {
+        if (userContext.isAgencyUser()) {
+            return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully",
+                    immediateSuspensionService.countAssignedToRCME(userContext.getCurrentUserId())));
+        }
+        throw new BusinessException("The Current user is not allowed to access these data");
+    }
+
+    @GetMapping("/archived-applications/count")
+    @Operation(summary = "Count of archived applications for the Archived tab badge. Shared by Promoter/RC/MI pages.")
+    public ResponseEntity<SuccessResponse<Long>> getArchivedApplicationsCount() {
+        Long userId = userContext.getCurrentUserId();
+        long count = userContext.isAgencyUser()
+                ? immediateSuspensionService.countArchivedApplications(userId)
+                : immediateSuspensionService.countMyArchivedApplications(userId);
+        return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", count));
+    }
+
     @GetMapping("/archived-applications")
     @Operation(summary = "Get archived applications", description = "Get list of archived (APPROVED/REJECTED) applications. Agency users get all archived applications, others get only their own.")
     public ResponseEntity<SuccessResponse<List<ImmediateSuspensionApplicationResponse>>> getArchivedApplications(

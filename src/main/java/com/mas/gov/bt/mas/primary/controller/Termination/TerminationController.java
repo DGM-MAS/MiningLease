@@ -89,6 +89,26 @@ public class TerminationController {
         }
     }
 
+    @GetMapping("/my-applications/count")
+    @Operation(summary = "Count of MD's assigned termination applications (Submitted tab badge)")
+    public ResponseEntity<SuccessResponse<Long>> getMyApplicationsCount() {
+        if (userContext.isAgencyUser()) {
+            long count = terminationService.countAssignedToUserChiefMD(userContext.getCurrentUserId());
+            return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", count));
+        }
+        throw new BusinessException("The Current user is not allowed to access these data");
+    }
+
+    @GetMapping("/archived-applications/count")
+    @Operation(summary = "Count of archived (TERMINATED/CANCELED) applications for the Archived tab badge. Shared by Promoter/MD/CMS-Head pages.")
+    public ResponseEntity<SuccessResponse<Long>> getArchivedApplicationsCount() {
+        Long userId = userContext.getCurrentUserId();
+        long count = userContext.isAgencyUser()
+                ? terminationService.countArchivedApplications(userId)
+                : terminationService.countMyArchivedApplications(userId);
+        return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", count));
+    }
+
     @GetMapping("/archived-applications")
     @Operation(summary = "Get archived applications", description = "Get list of archived (APPROVED/REJECTED) applications. Agency users get all archived applications, others get only their own.")
     public ResponseEntity<SuccessResponse<List<TerminationApplicationResponse>>> getArchivedApplications(

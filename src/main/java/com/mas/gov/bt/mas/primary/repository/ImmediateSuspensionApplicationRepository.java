@@ -23,6 +23,14 @@ public interface ImmediateSuspensionApplicationRepository extends JpaRepository<
     Page<ImmediateSuspensionApplication> findAssignedToUserPromoter(Long userId, Pageable pageable);
 
     @Query("""
+    SELECT COUNT(q)
+    FROM ImmediateSuspensionApplication q
+    WHERE q.promoterUserId = :userId
+    AND q.currentStatus IN ('SUBMITTED' , 'RECTIFICATION BY PROMOTER', 'RECTIFICATION NEEDED', 'SUSPENSION LIFTING')
+""")
+    long countAssignedToUserPromoter(Long userId);
+
+    @Query("""
     SELECT q
     FROM ImmediateSuspensionApplication q
     WHERE q.promoterUserId = :userId
@@ -55,6 +63,16 @@ public interface ImmediateSuspensionApplicationRepository extends JpaRepository<
     Page<ImmediateSuspensionApplication> findAssignedToUserMI(Long userId, Pageable pageable);
 
     @Query("""
+    SELECT COUNT(q)
+    FROM ImmediateSuspensionApplication q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE t.assignedToUserId = :userId
+    AND t.taskStatus IN ('MI ASSIGNED', 'SUSPENSION LIFTING')
+""")
+    long countAssignedToUserMI(Long userId);
+
+    @Query("""
     SELECT q
     FROM ImmediateSuspensionApplication q
     JOIN TaskManagement t
@@ -74,6 +92,16 @@ public interface ImmediateSuspensionApplicationRepository extends JpaRepository<
     AND t.taskStatus IN ('SUBMITTED', 'RECTIFICATION BY CMS', 'SUSPENSION LIFTING')
 """)
     Page<ImmediateSuspensionApplication> findAssignedToUserRCME(Long currentUserId, Pageable pageable);
+
+    @Query("""
+    SELECT COUNT(q)
+    FROM ImmediateSuspensionApplication q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE t.createdBy = :currentUserId
+    AND t.taskStatus IN ('SUBMITTED', 'RECTIFICATION BY CMS', 'SUSPENSION LIFTING')
+""")
+    long countAssignedToUserRCME(Long currentUserId);
 
     @Query("""
     SELECT q
@@ -97,6 +125,16 @@ public interface ImmediateSuspensionApplicationRepository extends JpaRepository<
     Page<ImmediateSuspensionApplication> findArchivedAssignedToUserMI(Long userId, List<String> archivedStatuses, Pageable pageable);
 
     @Query("""
+    SELECT COUNT(q)
+    FROM ImmediateSuspensionApplication q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE q.currentStatus IN :archivedStatuses
+    AND t.assignedToUserId = :userId
+""")
+    long countArchivedAssignedToUserMI(Long userId, List<String> archivedStatuses);
+
+    @Query("""
     SELECT q
     FROM ImmediateSuspensionApplication q
     JOIN TaskManagement t
@@ -118,6 +156,16 @@ public interface ImmediateSuspensionApplicationRepository extends JpaRepository<
     Page<ImmediateSuspensionApplication> findArchivedAssignedToUser(Long userId, List<String> archivedStatuses, Pageable pageable);
 
     @Query("""
+    SELECT COUNT(q)
+    FROM ImmediateSuspensionApplication q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE q.currentStatus IN :archivedStatuses
+    AND q.createdBy = :userId
+""")
+    long countArchivedAssignedToUser(Long userId, List<String> archivedStatuses);
+
+    @Query("""
     SELECT q
     FROM ImmediateSuspensionApplication q
     JOIN TaskManagement t
@@ -130,6 +178,9 @@ public interface ImmediateSuspensionApplicationRepository extends JpaRepository<
 
     @Query("SELECT a FROM ImmediateSuspensionApplication a WHERE a.promoterUserId = :userId AND a.currentStatus IN :archivedStatuses")
     Page<ImmediateSuspensionApplication> findByApplicantUserIdAndStatusIn(Long userId, List<String> archivedStatuses, Pageable pageable);
+
+    @Query("SELECT COUNT(a) FROM ImmediateSuspensionApplication a WHERE a.promoterUserId = :userId AND a.currentStatus IN :archivedStatuses")
+    long countByApplicantUserIdAndStatusIn(Long userId, List<String> archivedStatuses);
 
     @Query("""
     SELECT q FROM ImmediateSuspensionApplication q
