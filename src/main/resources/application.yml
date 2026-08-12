@@ -161,6 +161,10 @@ birms:
     get-receipt-base64:
       url: https://birmsstagging.drc.gov.bt/api-services/moenr-service/api/v1/paymentdetails/receipt-details
 
+ecss:
+  base-url: https://ecss.systems.gov.bt/public/ec
+  token: ${ECSS_TOKEN:ecss_2026_secure_X9kLmP78}
+
 data-hub:
   get-access-token:
     url: https://stg-sso.tech.gov.bt/oauth2/token?grant_type=client_credentials

@@ -1,5 +1,6 @@
 package com.mas.gov.bt.mas.primary.controller.RenewalEnviromentalClearance;
 
+import com.mas.gov.bt.mas.primary.client.EcssClient;
 import com.mas.gov.bt.mas.primary.config.UserContext;
 import com.mas.gov.bt.mas.primary.dto.payment.PaymentCallbackDTO;
 import com.mas.gov.bt.mas.primary.dto.request.EnvironmentClearanceRenewalRequestDTO;
@@ -16,7 +17,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -36,6 +40,8 @@ public class RenewalEnvironmentalClearanceController {
     private final UserContext userContext;
 
     private final RenewalEnvironmentalClearanceService renewalEnvironmentalClearanceService;
+
+    private final EcssClient ecssClient;
 
     @PostMapping("/draft")
     @Operation(
@@ -235,6 +241,24 @@ public class RenewalEnvironmentalClearanceController {
                         response
                 )
         );
+    }
+
+    @GetMapping(value = "/ec-document/{ecNo}", produces = MediaType.APPLICATION_PDF_VALUE)
+    @Operation(
+            summary = "Get EC document from ECSS",
+            description = "Fetches the environmental clearance certificate document for a given EC number from the external ECSS system (ecss.systems.gov.bt)"
+    )
+    public ResponseEntity<byte[]> getEcDocument(
+            @PathVariable String ecNo
+    ) {
+
+        byte[] document = ecssClient.fetchEcDocument(ecNo);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.inline().filename(ecNo + ".pdf").build().toString())
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(document);
     }
 
     // The agency user path will be taken by super admin as all application
