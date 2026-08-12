@@ -74,6 +74,20 @@ public class SampleTransportClearanceController {
         return ResponseEntity.ok(SuccessResponse.fromPage("Applications retrieved successfully", applications));
     }
 
+    @GetMapping("/my-applications/count")
+    @Operation(summary = "Count of my applications (Submitted tab badge)")
+    public ResponseEntity<SuccessResponse<Long>> getMyApplicationsCount() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", sampleTransportClearanceService.countMyApplications(userId)));
+    }
+
+    @GetMapping("/archived-applications/count")
+    @Operation(summary = "Count of my archived applications (Archived tab badge)")
+    public ResponseEntity<SuccessResponse<Long>> getArchivedApplicationsCount() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", sampleTransportClearanceService.countMyArchivedApplications(userId)));
+    }
+
     @GetMapping("/archived-applications")
     @Operation(summary = "Get archived applications", description = "Get list of archived (APPROVED/REJECTED) applications.")
     public ResponseEntity<SuccessResponse<List<SampleTransportClearanceResponseDTO>>> getArchivedApplications(

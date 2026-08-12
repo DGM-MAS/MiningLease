@@ -18,6 +18,8 @@ public interface MineRestorationApplicationRepository extends JpaRepository<Mine
 
     Page<MineRestorationApplication> findByApplicantUserId(Long applicantUserId, Pageable pageable);
 
+    long countByApplicantUserId(Long applicantUserId);
+
     @Query("""
         SELECT r FROM MineRestorationApplication r
         WHERE r.applicantUserId = :userId

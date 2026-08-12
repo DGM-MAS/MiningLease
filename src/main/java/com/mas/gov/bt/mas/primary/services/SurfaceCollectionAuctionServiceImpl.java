@@ -642,6 +642,18 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
     }
 
     @Override
+    public long countMyApplications(Long userId) {
+        List<String> archivedStatuses = List.of("SUBMITTED", "EC_APPROVED", "AUCTION_COMPLETED", "BG_PENDING", "BG SUBMITTED", "BG RESUBMIT", "BG RESUBMITTED");
+        return auctionRepository.countByCreatedByAndAuctionStatusIn(userId, archivedStatuses);
+    }
+
+    @Override
+    public long countMyArchive(Long userId) {
+        List<String> archivedStatuses = List.of("PERMIT_ISSUED");
+        return auctionRepository.countByCreatedByAndAuctionStatusIn(userId, archivedStatuses);
+    }
+
+    @Override
     public Page<SurfaceCollectionAuctionListResponseDTO> getMyApplications(String search, Pageable pageable, Long userId) {
         Page<SurfaceCollectionAuctionApplication> page;
 

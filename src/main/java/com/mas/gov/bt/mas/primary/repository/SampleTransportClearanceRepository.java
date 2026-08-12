@@ -47,6 +47,8 @@ public interface SampleTransportClearanceRepository extends JpaRepository<Sample
 
     Page<SampleTransportClearanceEntity> findByCreatedByAndStatusIn(Long userId, List<String> applicationStatus, Pageable pageable);
 
+    long countByCreatedByAndStatusIn(Long userId, List<String> applicationStatus);
+
     @Query("""
     SELECT q FROM SampleTransportClearanceEntity q
     WHERE q.createdBy = :userId
@@ -76,6 +78,8 @@ public interface SampleTransportClearanceRepository extends JpaRepository<Sample
 
     Page<SampleTransportClearanceEntity> findByAssignedGSDChiefIdAndStatusIn(Long userId, Pageable pageable, List<String> applicationStatus);
 
+    long countByAssignedGSDChiefIdAndStatusIn(Long userId, List<String> applicationStatus);
+
     Page<SampleTransportClearanceEntity> findByAssignedGSDChiefIdAndApplicationNoContainingIgnoreCaseAndStatusIn(Long userId, String trim, Pageable pageable, List<String> applicationStatus);
 
     @Query(value = """
@@ -94,6 +98,8 @@ public interface SampleTransportClearanceRepository extends JpaRepository<Sample
    Optional<SampleTransportClearanceEntity> findByApplicationNo(String applicationNo);
 
     Page<SampleTransportClearanceEntity> findByAssignedGSDFocalIdAndStatusIn(Long userId, Pageable pageable, List<String> applicationStatus);
+
+    long countByAssignedGSDFocalIdAndStatusIn(Long userId, List<String> applicationStatus);
 
     Page<SampleTransportClearanceEntity> findByAssignedGSDFocalIdAndApplicationNoContainingIgnoreCaseAndStatusIn(Long userId, String trim, Pageable pageable, List<String> applicationStatus);
 }

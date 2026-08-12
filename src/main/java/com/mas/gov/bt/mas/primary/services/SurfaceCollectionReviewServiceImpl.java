@@ -387,6 +387,18 @@ public class SurfaceCollectionReviewServiceImpl
     }
 
     @Override
+    public long countMyApplicationsMD(Long userId) {
+        List<String> archivedStatuses = List.of("SUBMITTED", "EC_APPROVED", "AUCTION_COMPLETED", "BG SUBMITTED", "BG RESUBMIT", "BG RESUBMITTED");
+        return auctionRepository.countByAssignedMdUserIdAndAuctionStatusIn(userId, archivedStatuses);
+    }
+
+    @Override
+    public long countMyArchiveMD(Long userId) {
+        List<String> archivedStatuses = List.of("PERMIT_ISSUED");
+        return auctionRepository.countByAssignedMdUserIdAndAuctionStatusIn(userId, archivedStatuses);
+    }
+
+    @Override
     public Page<SurfaceCollectionAuctionListResponseDTO> getMyApplicationsMD(String search, Pageable pageable, Long userId) {
         Page<SurfaceCollectionAuctionApplication> page;
 

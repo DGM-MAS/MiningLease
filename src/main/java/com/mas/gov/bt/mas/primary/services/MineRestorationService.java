@@ -374,6 +374,10 @@ public class MineRestorationService {
     // PROMOTER — Queries
     // =====================================================
 
+    public long countMyApplications(Long userId) {
+        return restorationApplicationRepository.countByApplicantUserId(userId);
+    }
+
     public SuccessResponse<List<MineRestorationResponse>> getMyApplications(
             Long userId, String search, Pageable pageable) {
         Page<MineRestorationApplication> page;

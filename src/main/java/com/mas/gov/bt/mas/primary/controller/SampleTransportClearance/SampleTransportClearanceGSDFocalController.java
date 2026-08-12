@@ -53,6 +53,20 @@ public class SampleTransportClearanceGSDFocalController{
         );
     }
 
+    @GetMapping("/archived/count")
+    @Operation(summary = "Count of GSD Focal's archived applications (Archived tab badge)")
+    public ResponseEntity<SuccessResponse<Long>> getArchivedApplicationsCount() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", sampleTransportClearanceService.countArchivedForGSDFocal(userId)));
+    }
+
+    @GetMapping("/assigned/count")
+    @Operation(summary = "Count of GSD Focal's assigned applications (Submitted tab badge)")
+    public ResponseEntity<SuccessResponse<Long>> getAssignedCount() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", sampleTransportClearanceService.countAssignedToGSDFocal(userId)));
+    }
+
     @GetMapping("/assigned")
     public ResponseEntity<SuccessResponse<List<SampleTransportClearanceResponseDTO>>> assignedToGSDChief(
             @RequestParam(required = false) String search,
