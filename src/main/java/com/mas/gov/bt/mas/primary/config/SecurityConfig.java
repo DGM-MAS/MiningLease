@@ -34,6 +34,8 @@ public class SecurityConfig {
                     "/webjars/**",
                     "/actuator/**",
                     "/api/mining-lease/payment-callback",
+                    "/api/mining-lease/bg-payment-callback",
+                    "/api/mining-lease/renewal/erb-payment-callback",
                     "/api/renewal-environmental-clearance/ec-payment-callback"
                 ).permitAll()
                 .anyRequest().authenticated()

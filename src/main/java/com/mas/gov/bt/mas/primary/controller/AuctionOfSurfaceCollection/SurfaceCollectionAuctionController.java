@@ -239,6 +239,18 @@ public class SurfaceCollectionAuctionController {
         );
     }
 
+    @GetMapping("/my-applications/count")
+    public ResponseEntity<SuccessResponse<Long>> getMyApplicationsCount() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", auctionService.countMyApplications(userId)));
+    }
+
+    @GetMapping("/my-archive/count")
+    public ResponseEntity<SuccessResponse<Long>> getMyArchiveCount() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", auctionService.countMyArchive(userId)));
+    }
+
     @GetMapping("/my-applications")
     public ResponseEntity<
             SuccessResponse<Page<SurfaceCollectionAuctionListResponseDTO>>> getMyApplications(

@@ -55,6 +55,20 @@ public class SampleTransportClearanceGSDChiefController {
         );
     }
 
+    @GetMapping("/archived/count")
+    @Operation(summary = "Count of GSD Chief's archived applications (Archived tab badge)")
+    public ResponseEntity<SuccessResponse<Long>> getArchivedApplicationsCount() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", sampleTransportClearanceService.countArchivedForGSDChief(userId)));
+    }
+
+    @GetMapping("/assigned/count")
+    @Operation(summary = "Count of GSD Chief's assigned applications (Submitted tab badge)")
+    public ResponseEntity<SuccessResponse<Long>> getAssignedCount() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", sampleTransportClearanceService.countAssignedToGSDChief(userId)));
+    }
+
     @GetMapping("/assigned")
     public ResponseEntity<SuccessResponse<List<SampleTransportClearanceResponseDTO>>> assignedToGSDChief(
             @RequestParam(required = false) String search,

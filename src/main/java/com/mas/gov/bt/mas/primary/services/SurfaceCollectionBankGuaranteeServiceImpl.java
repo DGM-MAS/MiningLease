@@ -240,6 +240,12 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
     }
 
     @Override
+    public long countMyApplications(Long userId) {
+        List<String> archivedStatuses = List.of("AUCTION_COMPLETED", "BG_PENDING", "BG SUBMITTED", "BG RESUBMIT", "BG RESUBMITTED");
+        return surfaceCollectionAuctionRepository.countByBidWinnerPromoterIdAndAuctionStatusIn(userId, archivedStatuses);
+    }
+
+    @Override
     public Page<SurfaceCollectionAuctionListResponseDTO> getMyArchive(String search, Pageable pageable, Long userId) {
         Page<SurfaceCollectionAuctionApplication> page;
 
@@ -247,6 +253,12 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
         page = surfaceCollectionAuctionRepository.findByBidWinnerPromoterIdAndAuctionStatusIn(userId,archivedStatuses,pageable);
 
         return page.map(this::mapListResponse);
+    }
+
+    @Override
+    public long countMyArchive(Long userId) {
+        List<String> archivedStatuses = List.of("PERMIT_ISSUED");
+        return surfaceCollectionAuctionRepository.countByBidWinnerPromoterIdAndAuctionStatusIn(userId, archivedStatuses);
     }
 
     @Override
