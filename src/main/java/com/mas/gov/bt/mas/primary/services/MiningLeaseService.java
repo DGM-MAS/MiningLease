@@ -1593,6 +1593,12 @@ public class MiningLeaseService {
             case "PA" -> miningLeaseApplication.setFileUploadIdPA(null);
             case "FC" -> miningLeaseApplication.setFileUploadIdFC(null);
             case "KMZ" -> miningLeaseApplication.setFileUploadIdKmz(null);
+            case "Map" -> miningLeaseApplication.setMapFileId(null);
+            case "Location Map" -> miningLeaseApplication.setLocationMapDocId(null);
+            case "Consent Letter" -> miningLeaseApplication.setConsentLetterDocId(null);
+            case "Other file" -> miningLeaseApplication.setOtherFilesId(null);
+            case "Financial Capability" -> miningLeaseApplication.setFinancialCapabilityDocId(null);
+            case "TOR file" -> miningLeaseApplication.setTorFileId(null);
             case null, default -> miningLeaseApplication.setFmfsDocId(null);
         }
         miningLeaseApplicationRepository.save(miningLeaseApplication);
@@ -2396,10 +2402,10 @@ public class MiningLeaseService {
             if (miningLeaseApplication.isPresent()) {
                 miningleaseapplication = miningLeaseApplication.get();
                 ApplicationMaster applicationMaster = miningleaseapplication.getApplicationMaster();
-                applicationMaster.setCurrentStatus("MA SUBMITTED");
+                applicationMaster.setCurrentStatus("MA-1 ISSUED");
                 miningleaseapplication.setMpcdFileUploadIdMa(request.getMaDocId());
                 miningleaseapplication.setSignedPFSId(request.getSignedPFSId());
-                miningleaseapplication.setCurrentStatus("MA SUBMITTED");
+                miningleaseapplication.setCurrentStatus("MA-1 ISSUED");
                 applicationMasterRepository.save(applicationMaster);
                 miningLeaseApplicationRepository.save(miningleaseapplication);
 
@@ -3051,16 +3057,19 @@ public class MiningLeaseService {
             if (quarryLeaseApplication.isPresent()) {
                 quarryLeaseApplication1 = quarryLeaseApplication.get();
                 ApplicationMaster applicationMaster = quarryLeaseApplication1.getApplicationMaster();
-                applicationMaster.setCurrentStatus("NOTE SHEET UPLOADED");
+                applicationMaster.setCurrentStatus("APPROVED BY MINISTRY");
                 quarryLeaseApplication1.setNotesheetDocId(request.getNoteSheetDocId());
-                quarryLeaseApplication1.setCurrentStatus("NOTE SHEET UPLOADED");
+                quarryLeaseApplication1.setCurrentStatus("APPROVED BY MINISTRY");
                 applicationMasterRepository.save(applicationMaster);
                 miningLeaseApplicationRepository.save(quarryLeaseApplication1);
 
                 // Same open Mining Engineer task, one step closer to the Work Order — not closed yet.
                 workflowTrackingService.updateCurrentTask(
                         quarryLeaseApplication1.getApplicationNumber(), SERVICE_CODE,
-                        "IN_PROGRESS", "NOTE_SHEET_UPLOADED", "Note sheet uploaded by mine engineer.");
+                        "IN_PROGRESS",
+                        "APPROVED BY MINISTRY",
+                        "Note sheet uploaded by mine engineer."
+                );
 
                 if(quarryLeaseApplication1.getApplicantUserId() != null) {
                     String title = "Note sheet has been uploaded by mine engineer.";
@@ -3183,83 +3192,603 @@ public class MiningLeaseService {
     }
 
     @Transactional
-    public MiningLeaseResponse resubmitApplication(FileUploadRequest request, Long userId) {
-        MiningLeaseApplication quarryLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationNumber())
+    public MiningLeaseResponse resubmitApplication(FileUploadRequest request, Long userId, MiningLeaseApplicationRequest miningLeaseApplicationRequest) {
+        /* * ============================================================
+        * 1. Determine Application Number
+        * ============================================================ *
+        * Application number can come from either:
+        * - MiningLeaseApplicationRequest
+        * - FileUploadRequest
+        */
+        String applicationNumber = null;
+        if (miningLeaseApplicationRequest != null && miningLeaseApplicationRequest.getApplicationNo() != null
+                && !miningLeaseApplicationRequest.getApplicationNo().trim().isEmpty())
+        {
+            applicationNumber = miningLeaseApplicationRequest.getApplicationNo();
+        }
+        else if (request != null && request.getApplicationNumber() != null && !request.getApplicationNumber().trim().isEmpty()) {
+            applicationNumber = request.getApplicationNumber();
+        }
+        if (applicationNumber == null) {
+            throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
+        }
+
+        /* * ============================================================
+        * 2. Fetch Mining Lease Application
+        * ============================================================ */
+        MiningLeaseApplication quarryLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(applicationNumber)
                 .orElseThrow();
-
-        Long geologistId = null;
-
-        Long mpcdId = null;
 
         ApplicationMaster applicationMaster = quarryLeaseApplication.getApplicationMaster();
 
-        List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(), "GEOLOGIST", "GEOLOGIST", SERVICE_CODE);
-        if(!taskManagement.isEmpty()) {
-            TaskManagement taskManagement1 = taskManagement.getFirst();
-            geologistId = taskManagement1.getAssignedToUserId();
+        /* * ============================================================
+        * 3. Find Assigned Geologist
+        * ============================================================
+        * Used when PFS / GR / Map / KMZ / FMFS is resubmitted. */
+        Long geologistId = null;
+
+        List<TaskManagement> geologistTasks = taskManagementRepository .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+                applicationNumber,
+                "GEOLOGIST",
+                "GEOLOGIST",
+                SERVICE_CODE
+        );
+
+        if (!geologistTasks.isEmpty()) {
+            TaskManagement geologistTask = geologistTasks.getFirst();
+            geologistId = geologistTask.getAssignedToUserId();
         }
 
-        List<TaskManagement> taskManagement2 = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(), "MPCD_FOCAL", "MPCD", SERVICE_CODE);
-        if(!taskManagement2.isEmpty()) {
-            TaskManagement taskManagement3 = taskManagement.getFirst();
-            mpcdId = taskManagement3.getAssignedToUserId();
+        /* * ============================================================
+        * 4. Find Assigned MPCD Focal
+        * ============================================================ */
+        Long mpcdId = null;
+
+        List<TaskManagement> mpcdTasks = taskManagementRepository .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+                applicationNumber,
+                "MPCD_FOCAL",
+                "MPCD",
+                SERVICE_CODE
+        );
+        if (!mpcdTasks.isEmpty()) {
+            /* * FIX:
+            * Previously this was using taskManagement.getFirst()
+            * instead of taskManagement2.getFirst(). */
+            TaskManagement mpcdTask = mpcdTasks.getFirst();
+            mpcdId = mpcdTask.getAssignedToUserId();
         }
 
-        if(request.getFileType().equals("PFS")) {
+        /* * ============================================================
+        * 5. Resubmission Without File Upload
+        * ============================================================ * *
+        * This is used when the applicant resubmits the application
+        *  details only.
+        * */
+        if (request == null) {
 
-            quarryLeaseApplication.setPfsDocId(request.getFileId());
-
-            if(quarryLeaseApplication.getCurrentStatus().equals("RESUBMIT PFS GEOLOGIST")) {
-                applicationMaster.setCurrentStatus("RESUBMITTED PFS GEOLOGIST");
-                quarryLeaseApplication.setCurrentStatus("RESUBMITTED PFS GEOLOGIST");
-                createTask(applicationMaster,quarryLeaseApplication,"GEOLOGIST",userId,geologistId);
-                notifyStaffAssignment(geologistId, quarryLeaseApplication.getApplicationNumber(), "PFS resubmitted for your review.", MENU_ID_GEOLOGIST);
-            }else {
-                applicationMaster.setCurrentStatus("RESUBMITTED PFS MPCD");
-                quarryLeaseApplication.setCurrentStatus("RESUBMITTED PFS MPCD");
-                createTask(applicationMaster,quarryLeaseApplication,"MPCD FOCAL",userId,mpcdId);
-                notifyStaffAssignment(mpcdId, quarryLeaseApplication.getApplicationNumber(), "PFS resubmitted for your review.", MENU_ID_MPCD);
+            if (miningLeaseApplicationRequest == null) {
+                throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
             }
-        } else if (request.getFileType().equals("GR")) {
-            quarryLeaseApplication.setFileUploadIdGr(Long.valueOf(request.getFileId()));
-            applicationMaster.setCurrentStatus("RESUBMITTED GR");
-            quarryLeaseApplication.setCurrentStatus("RESUBMITTED GR");
 
-            createTask(applicationMaster,quarryLeaseApplication,"GEOLOGIST",userId,geologistId);
-            notifyStaffAssignment(geologistId, quarryLeaseApplication.getApplicationNumber(), "Geological report resubmitted for your review.", MENU_ID_GEOLOGIST);
+            /* * Find the user who originally assigned the
+            * "RESUBMIT APPLICATION" task to the applicant.
+            */
+            Long assignedByUserId = null;
+            List<TaskManagement> resubmitTasks = taskManagementRepository .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+                    applicationNumber,
+                    "RESUBMIT APPLICATION",
+                    "APPLICANT",
+                    SERVICE_CODE
+            );
 
-        } else if (request.getFileType().equals("KMZ")){
-            quarryLeaseApplication.setFileUploadIdKmz(Long.valueOf(request.getFileId()));
-            applicationMaster.setCurrentStatus("RESUBMITTED GR ");
-            quarryLeaseApplication.setCurrentStatus("RESUBMITTED GR");
+            if (!resubmitTasks.isEmpty()) {
+                assignedByUserId = resubmitTasks.getFirst().getAssignedByUserId();
+            }
+            if (assignedByUserId == null) {
+                throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
+            }
 
-            createTask(applicationMaster,quarryLeaseApplication,"GEOLOGIST",userId,geologistId);
-            notifyStaffAssignment(geologistId, quarryLeaseApplication.getApplicationNumber(), "Geological report resubmitted for your review.", MENU_ID_GEOLOGIST);
+            /* * Update the existing application entity with
+            * the newly submitted application information.
+            * */
+            mapper.updateEntityFromRequest(
+                    miningLeaseApplicationRequest,
+                    quarryLeaseApplication
+            );
 
+            /*
+            * * Update application status.
+            * */
+            applicationMaster.setCurrentStatus("RESUBMITTED APPLICATION");
+            quarryLeaseApplication.setCurrentStatus("RESUBMITTED APPLICATION");
+
+            /*
+            * * Create a new task for MPCD Focal.
+            * */
+            createTask(
+                    applicationMaster,
+                    quarryLeaseApplication,
+                    "MPCD FOCAL",
+                    userId,
+                    assignedByUserId
+            );
+
+            /*
+            * * Notify the MPCD Focal that the application
+            * * has been resubmitted.
+            * */
+            notifyStaffAssignment(
+                    mpcdId,
+                    quarryLeaseApplication.getApplicationNumber(),
+                    "Application resubmitted for your review.",
+                    MENU_ID_MPCD
+            );
+        } else {
+
+            /* * ========================================================
+            * * 6. Resubmission With File Upload
+            * * ========================================================
+            * * The behavior depends on the type of document
+            * * being resubmitted.
+            * */
+            switch (request.getFileType()) {
+                /* * ----------------------------------------------------
+                * * PFS
+                * * ---------------------------------------------------- */
+                case "PFS" -> {
+
+                    quarryLeaseApplication.setPfsDocId(request.getFileId());
+
+                    /* * If PFS was previously sent back by Geologist,
+                    * * return it to Geologist.
+                    * * Otherwise, return it to MPCD Focal.
+                    * */
+
+                    if (Objects.equals(
+                            quarryLeaseApplication.getCurrentStatus(),
+                            "RESUBMIT PFS GEOLOGIST")) {
+                        applicationMaster.setCurrentStatus( "RESUBMITTED PFS GEOLOGIST" );
+                        quarryLeaseApplication.setCurrentStatus( "RESUBMITTED PFS GEOLOGIST" );
+                        createTask( applicationMaster, quarryLeaseApplication, "GEOLOGIST", userId, geologistId );
+                        notifyStaffAssignment(
+                                geologistId,
+                                quarryLeaseApplication.getApplicationNumber(),
+                                "PFS resubmitted for your review.",
+                                MENU_ID_GEOLOGIST );
+                    } else {
+                        applicationMaster.setCurrentStatus( "RESUBMITTED PFS MPCD" );
+                        quarryLeaseApplication.setCurrentStatus( "RESUBMITTED PFS MPCD" );
+                        createTask( applicationMaster, quarryLeaseApplication, "MPCD FOCAL", userId, mpcdId );
+                        notifyStaffAssignment(
+                                mpcdId,
+                                quarryLeaseApplication.getApplicationNumber(),
+                                "PFS resubmitted for your review.",
+                                MENU_ID_MPCD );
+                    }
+                }
+                /* * ----------------------------------------------------
+                * * GR
+                * * ----------------------------------------------------
+                * */
+                case "GR" -> {
+                    quarryLeaseApplication.setFileUploadIdGr(
+                            Long.valueOf(request.getFileId())
+                    );
+
+                    applicationMaster.setCurrentStatus("RESUBMITTED GR");
+                    quarryLeaseApplication.setCurrentStatus("RESUBMITTED GR");
+
+                    createTask(
+                            applicationMaster,
+                            quarryLeaseApplication,
+                            "GEOLOGIST",
+                            userId,
+                            geologistId);
+                }
+                /* * ----------------------------------------------------
+                *  * Map
+                * * ---------------------------------------------------- */
+                case "Map" -> {
+                    quarryLeaseApplication.setMapFileId(request.getFileId());
+
+                    applicationMaster.setCurrentStatus("RESUBMITTED GR");
+                    quarryLeaseApplication.setCurrentStatus("RESUBMITTED GR");
+
+                    createTask(
+                            applicationMaster,
+                            quarryLeaseApplication,
+                            "GEOLOGIST",
+                            userId,
+                            geologistId
+                    );
+                }
+                /* * ----------------------------------------------------
+                * * KMZ
+                * * ----------------------------------------------------
+                * */
+                case "KMZ" -> {
+                    quarryLeaseApplication.setFileUploadIdKmz(Long.valueOf(request.getFileId()));
+
+                    applicationMaster.setCurrentStatus("RESUBMITTED GR");
+                    quarryLeaseApplication.setCurrentStatus("RESUBMITTED GR");
+
+                    createTask(
+                            applicationMaster,
+                            quarryLeaseApplication,
+                            "GEOLOGIST",
+                            userId,
+                            geologistId
+                    );
+                }
+
+                /* * ----------------------------------------------------
+                * * Other Files
+                * * ----------------------------------------------------
+                * */
+                case "Other files" -> {
+
+                    quarryLeaseApplication.setOtherFilesId(
+                            request.getFileId()
+                    );
+                    /* *
+                    * * Determine whether the PFS was previously returned
+                    * * by Geologist or MPCD.
+                    * */
+                    Long assignedPfsUserId =
+                            findPfsResubmissionAssignedUserId(
+                                    applicationNumber,
+                                    quarryLeaseApplication.getCurrentStatus()
+                            );
+
+                    if (Objects.equals(
+                            quarryLeaseApplication.getCurrentStatus(),
+                            "RESUBMIT PFS GEOLOGIST")) {
+
+                        if (assignedPfsUserId == null) {
+                            throw new BusinessException( ErrorCodes.BUSINESS_RULE_VIOLATION );
+                        }
+
+                        applicationMaster.setCurrentStatus( "RESUBMITTED PFS GEOLOGIST" );
+                        quarryLeaseApplication.setCurrentStatus( "RESUBMITTED PFS GEOLOGIST" );
+
+                        createTask(
+                                applicationMaster,
+                                quarryLeaseApplication,
+                                "GEOLOGIST",
+                                userId,
+                                assignedPfsUserId
+                        );
+                    } else {
+                        if (assignedPfsUserId == null) {
+                            throw new BusinessException( ErrorCodes.BUSINESS_RULE_VIOLATION );
+                        }
+
+                        applicationMaster.setCurrentStatus( "RESUBMITTED PFS MPCD" );
+                        quarryLeaseApplication.setCurrentStatus( "RESUBMITTED PFS MPCD" );
+                        createTask(
+                                applicationMaster,
+                                quarryLeaseApplication,
+                                "MPCD FOCAL",
+                                userId,
+                                assignedPfsUserId );
+                    }
+                }
+
+                /*
+                * * ----------------------------------------------------
+                * * Financial Evidence
+                * * ---------------------------------------------------- */
+                case "Financial Capability" -> {
+
+                    quarryLeaseApplication.setFinancialCapabilityDocId(
+                            request.getFileId()
+                    );
+
+                    Long assignedPfsUserId =
+                            findPfsResubmissionAssignedUserId(
+                                    applicationNumber,
+                                    quarryLeaseApplication.getCurrentStatus()
+                            );
+
+                    if (Objects.equals(
+                            quarryLeaseApplication.getCurrentStatus(),
+                            "RESUBMIT PFS GEOLOGIST")) {
+
+                        if (assignedPfsUserId == null) {
+
+                            throw new BusinessException( ErrorCodes.BUSINESS_RULE_VIOLATION );
+                        }
+                        applicationMaster.setCurrentStatus( "RESUBMITTED PFS GEOLOGIST" );
+                        quarryLeaseApplication.setCurrentStatus( "RESUBMITTED PFS GEOLOGIST" );
+                        createTask(
+                                applicationMaster,
+                                quarryLeaseApplication,
+                                "GEOLOGIST",
+                                userId,
+                                assignedPfsUserId
+                        );
+                    } else {
+                        if (assignedPfsUserId == null) {
+                            throw new BusinessException( ErrorCodes.BUSINESS_RULE_VIOLATION );
+                        }
+                        applicationMaster.setCurrentStatus( "RESUBMITTED PFS MPCD" );
+                        quarryLeaseApplication.setCurrentStatus( "RESUBMITTED PFS MPCD" );
+                        createTask(
+                                applicationMaster,
+                                quarryLeaseApplication,
+                                "MPCD FOCAL",
+                                userId,
+                                assignedPfsUserId
+                        );
+                    }
+                }
+
+                /*
+                * *----------------------------------------------------
+                * * Location Map
+                * * ----------------------------------------------------
+                * */
+                case "Location Map" -> {
+                    quarryLeaseApplication.setLocationMapDocId(
+                            request.getFileId()
+                    );
+                    Long assignedPfsUserId =
+                            findPfsResubmissionAssignedUserId(
+                                    applicationNumber,
+                                    quarryLeaseApplication.getCurrentStatus()
+                            );
+
+                    if (Objects.equals(
+                            quarryLeaseApplication.getCurrentStatus(),
+                            "RESUBMIT PFS GEOLOGIST")) {
+
+                        if (assignedPfsUserId == null) {
+                            throw new BusinessException( ErrorCodes.BUSINESS_RULE_VIOLATION );
+                        }
+
+                        applicationMaster.setCurrentStatus( "RESUBMITTED PFS GEOLOGIST" );
+                        quarryLeaseApplication.setCurrentStatus( "RESUBMITTED PFS GEOLOGIST" );
+                        createTask(
+                                applicationMaster,
+                                quarryLeaseApplication,
+                                "GEOLOGIST",
+                                userId,
+                                assignedPfsUserId
+                        );
+                    }
+                    else {
+
+                        if (assignedPfsUserId == null) {
+                            throw new BusinessException( ErrorCodes.BUSINESS_RULE_VIOLATION );
+                        }
+
+                        applicationMaster.setCurrentStatus( "RESUBMITTED PFS MPCD" );
+                        quarryLeaseApplication.setCurrentStatus( "RESUBMITTED PFS MPCD" );
+                        createTask(
+                                applicationMaster,
+                                quarryLeaseApplication,
+                                "MPCD FOCAL",
+                                userId,
+                                assignedPfsUserId
+                        );
+                    }
+                }
+
+                /* *
+                 * ----------------------------------------------------
+                 * * Consent Letter
+                 * * ----------------------------------------------------
+                 * */
+
+                case "Consent Letter" -> {
+
+                    quarryLeaseApplication.setConsentLetterDocId(
+                            request.getFileId()
+                    );
+
+                    Long assignedPfsUserId =
+                            findPfsResubmissionAssignedUserId(
+                                    applicationNumber,
+                                    quarryLeaseApplication.getCurrentStatus()
+                            );
+
+                    if (Objects.equals(
+                            quarryLeaseApplication.getCurrentStatus(),
+                            "RESUBMIT PFS GEOLOGIST")) {
+
+                        if (assignedPfsUserId == null) {
+                            throw new BusinessException( ErrorCodes.BUSINESS_RULE_VIOLATION
+                            );
+                        }
+
+                        applicationMaster.setCurrentStatus( "RESUBMITTED PFS GEOLOGIST" );
+                        quarryLeaseApplication.setCurrentStatus( "RESUBMITTED PFS GEOLOGIST" );
+                        createTask(
+                                applicationMaster,
+                                quarryLeaseApplication,
+                                "GEOLOGIST",
+                                userId,
+                                assignedPfsUserId
+                        );
+                    }
+                    else {
+
+                        if (assignedPfsUserId == null) {
+                            throw new BusinessException( ErrorCodes.BUSINESS_RULE_VIOLATION );
+                        }
+
+                        applicationMaster.setCurrentStatus( "RESUBMITTED PFS MPCD" );
+                        quarryLeaseApplication.setCurrentStatus( "RESUBMITTED PFS MPCD" );
+                        createTask(
+                                applicationMaster,
+                                quarryLeaseApplication,
+                                "MPCD FOCAL",
+                                userId,
+                                assignedPfsUserId
+                        );
+                    }
+                }
+
+                /* *
+                * ----------------------------------------------------
+                * * FMFS / Default
+                * * ----------------------------------------------------
+                * *
+                * * Any file type not explicitly handled above is * treated as FMFS.
+                * */
+
+                default -> {
+                    quarryLeaseApplication.setFmfsDocId(
+                            request.getFileId()
+                    );
+
+                    quarryLeaseApplication.setTorFileId(
+                            request.getTorFileId()
+                    );
+
+                    applicationMaster.setCurrentStatus(
+                            "RESUBMITTED FMFS"
+                    );
+
+                    quarryLeaseApplication.setCurrentStatus(
+                            "RESUBMITTED FMFS"
+                    );
+
+                    /* *
+                    * * FMFS requires both Geologist and MPCD Focal
+                    * * tasks.
+                    * */
+                    createTask(
+                            applicationMaster,
+                            quarryLeaseApplication,
+                            "GEOLOGIST",
+                            userId,
+                            geologistId
+                    );
+
+                    createTask(
+                            applicationMaster,
+                            quarryLeaseApplication,
+                            "MPCD FOCAL",
+                            userId,
+                            mpcdId
+                    );
+
+                    notifyStaffAssignment(
+                            geologistId,
+                            quarryLeaseApplication.getApplicationNumber(),
+                            "FMFS resubmitted for your review.",
+                            MENU_ID_GEOLOGIST
+                    );
+
+                    notifyStaffAssignment(
+                            mpcdId,
+                            quarryLeaseApplication.getApplicationNumber(),
+                            "FMFS resubmitted for your review.",
+                            MENU_ID_MPCD
+                    );
+                }
+            }
         }
-        else {
-            quarryLeaseApplication.setFmfsDocId(request.getFileId());
-            applicationMaster.setCurrentStatus("RESUBMITTED FMFS");
-            quarryLeaseApplication.setCurrentStatus("RESUBMITTED FMFS");
 
-            createTask(applicationMaster,quarryLeaseApplication,"GEOLOGIST",userId,geologistId);
-            createTask(applicationMaster,quarryLeaseApplication,"MPCD FOCAL",userId,mpcdId);
-            notifyStaffAssignment(geologistId, quarryLeaseApplication.getApplicationNumber(), "FMFS resubmitted for your review.", MENU_ID_GEOLOGIST);
-            notifyStaffAssignment(mpcdId, quarryLeaseApplication.getApplicationNumber(), "FMFS resubmitted for your review.", MENU_ID_MPCD);
-        }
+        /* *
+        * * ============================================================
+        * * 7. Save Application
+        * * ============================================================
+        * */
+
         applicationMasterRepository.save(applicationMaster);
         miningLeaseApplicationRepository.save(quarryLeaseApplication);
 
+        /*
+        * * ============================================================
+        * * 8. Additional MPCD Notification
+        * * ============================================================
+        * * GR, Map and KMZ resubmissions need to notify MPCD.
+        * */
+
+        if(request != null){
+            if(Objects.equals(request.getFileType(), "KMZ")
+                    || Objects.equals(request.getFileType(), "Map")
+                    || Objects.equals(request.getFileType(), "GR")) {
+
+                notifyStaffAssignment(
+                        mpcdId,
+                        quarryLeaseApplication.getApplicationNumber(),
+                        "Application resubmitted for your review.",
+                        MENU_ID_MPCD
+                );
+            }
+        }
+
+        /*
+        * * ============================================================
+        * * 9. Notify Applicant
+        * * ============================================================
+        * */
         if (quarryLeaseApplication.getApplicantUserId() != null) {
+
             notificationClient.sendUserNotification(
                     "Application resubmitted.",
-                    "Your application " + quarryLeaseApplication.getApplicationNumber() + " for Mining Lease has been resubmitted.",
-                    quarryLeaseApplication.getApplicantUserId(), MENU_ID_PROMOTER, "CITIZEN", false, quarryLeaseApplication.getApplicationNumber());
+                    "Your application " + quarryLeaseApplication.getApplicationNumber()
+                            + " for Mining Lease has been resubmitted.",
+                    quarryLeaseApplication.getApplicantUserId(),
+                    MENU_ID_PROMOTER,
+                    "CITIZEN",
+                    false,
+                    quarryLeaseApplication.getApplicationNumber()
+            );
         }
 
         return mapper.toResponse(quarryLeaseApplication);
     }
 
+
+    /**
+     * *
+     * Finds the user who originally assigned the PFS resubmission task.
+     * * *
+     * If the application was returned by the Geologist, the task
+     * * "RESUBMIT PFS GEOLOGIST" is searched.
+     * * * Otherwise, the task "RESUBMIT PFS MPCD" is searched.
+     * * *
+     * @param applicationNumber application number
+     * @param currentStatus current application status
+     * @return assigned user ID, or null if no matching task is found
+     *
+     * */
+    private Long findPfsResubmissionAssignedUserId(
+            String applicationNumber,
+            String currentStatus) {
+
+        if (Objects.equals(currentStatus, "RESUBMIT PFS GEOLOGIST")) {
+            List<TaskManagement> taskGeologist =
+                    taskManagementRepository .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+                            applicationNumber,
+                            "RESUBMIT PFS GEOLOGIST",
+                            "APPLICANT",
+                            SERVICE_CODE
+                    );
+
+            if (!taskGeologist.isEmpty()) {
+                return taskGeologist.getFirst().getAssignedByUserId();
+            }
+        } else {
+            List<TaskManagement> taskMpcd =
+                    taskManagementRepository .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+                            applicationNumber,
+                            "RESUBMIT PFS MPCD",
+                            "APPLICANT",
+                            SERVICE_CODE
+                    );
+
+            if (!taskMpcd.isEmpty()) {
+                return taskMpcd.getFirst().getAssignedByUserId();
+            }
+        }
+
+        return null;
+    }
     /**
      * @param menuId Real sidebar menu id (permissions.id) for the specific staff role being
      *               notified — callers must pass the constant matching the recipient's actual

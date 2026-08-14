@@ -119,4 +119,7 @@ public class MiningLeaseApplicationRequest {
 
     private Long workOrderDocId;
 
+    private String otherFilesId;
+
+
 }

@@ -265,14 +265,30 @@ public class MiningLeaseController {
     }
 
     // ========== Resubmission ==========
-
+    /**
+     *
+     * Resubmits a Mining Lease application.
+     * The request can contain either:
+     * 1. File upload information - for resubmitting supporting documents.
+     * 2. Application information - for resubmitting the application itself
+     * without a new file upload.
+     */
     @PutMapping("/applications/resubmit")
-    @Operation(summary = "Resubmit application", description = "Resubmit an application after providing additional data")
+    @Operation(
+            summary = "Resubmit application",
+            description = "Resubmit an application after providing additional data"
+    )
     public ResponseEntity<SuccessResponse<MiningLeaseResponse>> resubmitApplication(
-            @RequestBody FileUploadRequest request) {
+            @RequestBody ResubmitApplicationRequest request) {
 
         Long userId = userContext.getCurrentUserId();
-        MiningLeaseResponse response = miningLeaseService.resubmitApplication(request, userId);
+
+        MiningLeaseResponse response = miningLeaseService.resubmitApplication(
+                request.getFileUploadRequest(),
+                userId,
+                request.getMiningLeaseApplicationRequest()
+        );
+
         return ResponseEntity.ok(new SuccessResponse<>("Application resubmitted successfully", response));
     }
 
