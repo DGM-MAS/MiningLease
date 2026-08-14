@@ -47,6 +47,16 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     Page<TerminationApplicationEntity> findAssignedToUserMI(Long userId, Pageable pageable);
 
     @Query("""
+    SELECT COUNT(q)
+    FROM TerminationApplicationEntity q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.terminationId
+    WHERE t.assignedToUserId = :userId
+    AND q.currentStatus NOT IN ('TERMINATED', 'TERMINATION CANCELED')
+""")
+    long countAssignedToUserMI(Long userId);
+
+    @Query("""
     SELECT q
     FROM TerminationApplicationEntity q
     JOIN TaskManagement t
@@ -64,6 +74,14 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     AND q.currentStatus NOT IN ('TERMINATED', 'TERMINATION CANCELED')
 """)
     Page<TerminationApplicationEntity> findAssignedToUserPromoter(Long userId, Pageable pageable);
+
+    @Query("""
+    SELECT COUNT(q)
+    FROM TerminationApplicationEntity q
+    WHERE q.promoterUserId = :userId
+    AND q.currentStatus NOT IN ('TERMINATED', 'TERMINATION CANCELED')
+""")
+    long countAssignedToUserPromoter(Long userId);
 
     @Query("""
     SELECT q
@@ -85,6 +103,16 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     Page<TerminationApplicationEntity> findArchivedAssignedToUser(Long userId, List<String> archivedStatuses, Pageable pageable);
 
     @Query("""
+    SELECT COUNT(q)
+    FROM TerminationApplicationEntity q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE q.currentStatus IN :archivedStatuses
+    AND q.createdBy = :userId
+""")
+    long countArchivedAssignedToUser(Long userId, List<String> archivedStatuses);
+
+    @Query("""
     SELECT q
     FROM TerminationApplicationEntity q
     JOIN TaskManagement t
@@ -97,6 +125,9 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
 
     @Query("SELECT a FROM TerminationApplicationEntity a WHERE a.promoterUserId = :userId AND a.currentStatus IN :archivedStatuses")
     Page<TerminationApplicationEntity> findByApplicantUserIdAndStatusIn(Long userId, List<String> archivedStatuses, Pageable pageable);
+
+    @Query("SELECT COUNT(a) FROM TerminationApplicationEntity a WHERE a.promoterUserId = :userId AND a.currentStatus IN :archivedStatuses")
+    long countByApplicantUserIdAndStatusIn(Long userId, List<String> archivedStatuses);
 
     @Query("""
     SELECT q FROM TerminationApplicationEntity q
@@ -172,6 +203,16 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     Page<TerminationApplicationEntity> findAssignedToUserChiefMD(Long currentUserId, Pageable pageable);
 
     @Query("""
+    SELECT COUNT(q)
+    FROM TerminationApplicationEntity q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.terminationId
+    WHERE q.createdBy = :currentUserId
+    AND q.currentStatus NOT IN ('TERMINATED', 'TERMINATION CANCELED')
+""")
+    long countAssignedToUserChiefMD(Long currentUserId);
+
+    @Query("""
     SELECT q
     FROM TerminationApplicationEntity q
     JOIN TaskManagement t
@@ -191,6 +232,16 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     AND t.assignedToUserId = :userId
 """)
     Page<TerminationApplicationEntity> findArchivedAssignedToUserCMSHead(Long userId, List<String> archivedStatuses, Pageable pageable);
+
+    @Query("""
+    SELECT COUNT(q)
+    FROM TerminationApplicationEntity q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.terminationId
+    WHERE q.currentStatus IN :archivedStatuses
+    AND t.assignedToUserId = :userId
+""")
+    long countArchivedAssignedToUserCMSHead(Long userId, List<String> archivedStatuses);
 
     @Query("""
     SELECT q

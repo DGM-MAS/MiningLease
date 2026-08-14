@@ -16,11 +16,19 @@ public interface SampleTransportClearanceService {
 
     Page<SampleTransportClearanceResponseDTO> getMyApplications(Long userId, Pageable pageable, String search);
 
+    long countMyApplications(Long userId);
+
     Page<SampleTransportClearanceResponseDTO> getMyArchivedApplications(Long userId, Pageable pageable, String search);
+
+    long countMyArchivedApplications(Long userId);
 
     SuccessResponse<List<SampleTransportClearanceResponseDTO>> getAllApplicationAdmin(Pageable pageable, String search);
 
     SuccessResponse<List<SampleTransportClearanceResponseDTO>> getAssignedToGSDChief(Long userId, Pageable pageable, String search);
+
+    long countAssignedToGSDChief(Long userId);
+
+    long countArchivedForGSDChief(Long userId);
 
     SampleTransportClearanceResponseDTO assignApplicationChief(@Valid AssignedTaskChiefDTO request, Long userId);
 
@@ -29,6 +37,10 @@ public interface SampleTransportClearanceService {
     void reassignTaskGSDChief(@Valid ReassignTaskRequest request, Long userId);
 
     SuccessResponse<List<SampleTransportClearanceResponseDTO>> getAssignedToGSDFocal(Long userId, Pageable pageable, String search);
+
+    long countAssignedToGSDFocal(Long userId);
+
+    long countArchivedForGSDFocal(Long userId);
 
     SampleTransportClearanceResponseDTO reviewApplicationGSDFocal(@Valid SampleTransportClearanceGSDFocalReviewRequestDTO request, Long userId);
 

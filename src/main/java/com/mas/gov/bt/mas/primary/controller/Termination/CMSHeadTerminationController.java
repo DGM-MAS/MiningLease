@@ -56,6 +56,13 @@ public class CMSHeadTerminationController {
         );
     }
 
+    @GetMapping("/assigned/count")
+    @Operation(summary = "Count of CMS Head's assigned termination applications (Submitted tab badge)")
+    public ResponseEntity<SuccessResponse<Long>> assignedCount() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", terminationService.countAssignedToCMSHead(userId)));
+    }
+
     // ========== Task Reassignment ==========
 
     @PutMapping("/tasks/reassignCMS")

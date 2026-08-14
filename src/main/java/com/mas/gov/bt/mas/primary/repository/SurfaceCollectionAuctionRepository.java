@@ -20,6 +20,8 @@ public interface SurfaceCollectionAuctionRepository
 
     Page<SurfaceCollectionAuctionApplication> findByCreatedByAndAuctionStatusIn(Long userId, List<String> archivedStatuses, Pageable pageable);
 
+    long countByCreatedByAndAuctionStatusIn(Long userId, List<String> archivedStatuses);
+
     Page<SurfaceCollectionAuctionApplication> findByApplicationNoContainingIgnoreCaseOrLocationContainingIgnoreCaseAndAuctionStatusIn(String search, String search1, List<String> archivedStatuses, Pageable pageable);
 
     @Query(value = """
@@ -91,6 +93,8 @@ public interface SurfaceCollectionAuctionRepository
 
     Page<SurfaceCollectionAuctionApplication> findByAssignedMdUserIdAndAuctionStatusIn(Long userId, List<String> archivedStatuses, Pageable pageable);
 
+    long countByAssignedMdUserIdAndAuctionStatusIn(Long userId, List<String> archivedStatuses);
+
     Page<SurfaceCollectionAuctionApplication> findByAssignedMdUserIdAndApplicationNoContainingIgnoreCaseOrLocationContainingIgnoreCaseAndAuctionStatusIn(Long userId, String search, String search1, List<String> archivedStatuses, Pageable pageable);
 
     Page<SurfaceCollectionAuctionApplication>
@@ -100,6 +104,8 @@ public interface SurfaceCollectionAuctionRepository
     );
 
     Page<SurfaceCollectionAuctionApplication> findByBidWinnerPromoterIdAndAuctionStatusIn(Long userId, List<String> archivedStatuses, Pageable pageable);
+
+    long countByBidWinnerPromoterIdAndAuctionStatusIn(Long userId, List<String> archivedStatuses);
 
     Optional<SurfaceCollectionAuctionApplication> findByApplicationNoAndBidWinnerPromoterId(String applicationNo, Long userId);
 

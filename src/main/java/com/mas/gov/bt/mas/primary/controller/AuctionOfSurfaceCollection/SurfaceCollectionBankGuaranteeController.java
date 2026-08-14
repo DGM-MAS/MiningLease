@@ -77,6 +77,18 @@ public class SurfaceCollectionBankGuaranteeController {
         );
     }
 
+    @GetMapping("/my-applications/count")
+    public ResponseEntity<SuccessResponse<Long>> getMyApplicationsCount() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", bgService.countMyApplications(userId)));
+    }
+
+    @GetMapping("/my-archive/count")
+    public ResponseEntity<SuccessResponse<Long>> getMyArchiveCount() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", bgService.countMyArchive(userId)));
+    }
+
     @GetMapping("/my-applications")
     public ResponseEntity<
             SuccessResponse<Page<SurfaceCollectionAuctionListResponseDTO>>> getMyApplications(

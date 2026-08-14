@@ -59,6 +59,13 @@ public class RenewalEnvironmentalClearanceMIController {
         );
     }
 
+    // ** Tab-count badge for the MI dashboard's "assigned" tab ** //
+    @GetMapping("/counts")
+    public ResponseEntity<java.util.Map<String, Long>> counts() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(renewalEnvironmentalClearanceService.getMiCounts(userId));
+    }
+
     @PostMapping("/submit-report")
     public ResponseEntity<SuccessResponse<EnvironmentClearanceRenewalResponseDTO>> submitMIReport(
             @Valid @RequestBody SubmitMIReportDTO request

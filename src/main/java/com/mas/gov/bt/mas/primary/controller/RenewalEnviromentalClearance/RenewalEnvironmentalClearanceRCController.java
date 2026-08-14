@@ -56,6 +56,13 @@ public class RenewalEnvironmentalClearanceRCController {
         );
     }
 
+    // ** Tab-count badge for the RC dashboard's "assigned" tab ** //
+    @GetMapping("/counts")
+    public ResponseEntity<java.util.Map<String, Long>> counts() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(renewalEnvironmentalClearanceService.getRcCounts(userId));
+    }
+
     @PostMapping("/submit-report")
     public ResponseEntity<SuccessResponse<EnvironmentClearanceRenewalResponseDTO>> submitRCReport(
             @Valid @RequestBody SubmitRCReportDTO request

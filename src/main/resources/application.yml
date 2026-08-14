@@ -9,6 +9,8 @@ app:
     email-builder-url: http://172.30.3.10:30081/master/api/notifications/send
   menu-resolution:
     api-url: http://172.30.3.10:30081/master/api/menu-resolution
+  frontend:
+    base-url: http://172.30.3.10
 
 # Set to false to bypass payment and let applications flow through directly (dev/testing only)
 payment:
@@ -159,6 +161,10 @@ birms:
     get-receipt-base64:
       url: https://birmsstagging.drc.gov.bt/api-services/moenr-service/api/v1/paymentdetails/receipt-details
 
+ecss:
+  base-url: https://ecss.systems.gov.bt/public/ec
+  token: ${ECSS_TOKEN:ecss_2026_secure_X9kLmP78}
+
 data-hub:
   get-access-token:
     url: https://stg-sso.tech.gov.bt/oauth2/token?grant_type=client_credentials
@@ -234,6 +240,8 @@ app:
     email-builder-url: http://172.30.3.10:30081/master/api/notifications/send
   menu-resolution:
     api-url: http://172.30.3.10:30081/master/api/menu-resolution
+  frontend:
+    base-url: http://172.30.3.10
 
 springdoc:
   swagger-ui:

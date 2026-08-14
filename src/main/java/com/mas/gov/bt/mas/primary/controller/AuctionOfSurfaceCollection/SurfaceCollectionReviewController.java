@@ -94,6 +94,18 @@ public class SurfaceCollectionReviewController {
         );
     }
 
+    @GetMapping("/my-applications/count")
+    public ResponseEntity<SuccessResponse<Long>> getMyApplicationsCount() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", reviewService.countMyApplicationsMD(userId)));
+    }
+
+    @GetMapping("/my-archive/count")
+    public ResponseEntity<SuccessResponse<Long>> getMyArchiveCount() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", reviewService.countMyArchiveMD(userId)));
+    }
+
     @GetMapping("/my-applications")
     public ResponseEntity<
             SuccessResponse<Page<SurfaceCollectionAuctionListResponseDTO>>> getMyApplications(

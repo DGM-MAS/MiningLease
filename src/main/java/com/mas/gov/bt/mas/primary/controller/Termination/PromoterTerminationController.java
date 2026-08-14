@@ -52,6 +52,13 @@ public class PromoterTerminationController {
         );
     }
 
+    @GetMapping("/assigned/count")
+    @Operation(summary = "Count of promoter's assigned termination applications (Submitted tab badge)")
+    public ResponseEntity<SuccessResponse<Long>> assignedCount() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", terminationService.countAssignedToPromoter(userId)));
+    }
+
     @PostMapping("/review")
     @Operation(summary = "Rectification application", description = "Rectification Termination application by promoter")
     public ResponseEntity<SuccessResponse<TerminationApplicationResponse>> reviewApplication(

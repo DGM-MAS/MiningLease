@@ -46,7 +46,11 @@ public interface SurfaceCollectionAuctionService {
 
     Page<SurfaceCollectionAuctionListResponseDTO> getMyApplications(String search, Pageable pageable, Long userId);
 
+    long countMyApplications(Long userId);
+
     List<BGResponseDTO> getBGAttachmentsByAuctionId(Long auctionId);
 
     Page<SurfaceCollectionAuctionListResponseDTO> getMyArchive(String search, Pageable pageable, Long userId);
+
+    long countMyArchive(Long userId);
 }

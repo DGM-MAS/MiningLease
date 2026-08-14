@@ -155,6 +155,18 @@ public class SampleTransportClearanceServiceImpl
         }
 
     @Override
+    public long countMyApplications(Long userId) {
+        List<String> applicationStatus = List.of("SUBMITTED", "ASSIGNED", "ACCEPTED");
+        return repository.countByCreatedByAndStatusIn(userId, applicationStatus);
+    }
+
+    @Override
+    public long countMyArchivedApplications(Long userId) {
+        List<String> archivedStatuses = List.of("APPROVED", "REJECTED");
+        return repository.countByCreatedByAndStatusIn(userId, archivedStatuses);
+    }
+
+    @Override
     public Page<SampleTransportClearanceResponseDTO> getMyApplications(Long userId, Pageable pageable, String search) {
         List<String> ApplicationStatus = List.of(
                 "SUBMITTED", "ASSIGNED", "ACCEPTED");
@@ -202,6 +214,18 @@ public class SampleTransportClearanceServiceImpl
         }
 
         return SuccessResponse.fromPage("Applications fetched successfully", page.map(sampleTransportClearanceMapper::toListResponse));
+    }
+
+    @Override
+    public long countAssignedToGSDChief(Long userId) {
+        List<String> applicationStatus = List.of("SUBMITTED", "ASSIGNED", "ACCEPTED", "DRAFT", "PAYMENT PENDING");
+        return repository.countByAssignedGSDChiefIdAndStatusIn(userId, applicationStatus);
+    }
+
+    @Override
+    public long countArchivedForGSDChief(Long userId) {
+        List<String> terminalStatuses = List.of("APPROVED", "REJECTED");
+        return repository.countByAssignedGSDChiefIdAndStatusIn(userId, terminalStatuses);
     }
 
     @Override
@@ -445,6 +469,18 @@ public class SampleTransportClearanceServiceImpl
         }
 
         log.info("Task reassigned by chief to user {}", request.getNewAssigneeUserId());
+    }
+
+    @Override
+    public long countAssignedToGSDFocal(Long userId) {
+        List<String> applicationStatus = List.of("SUBMITTED", "ASSIGNED", "ACCEPTED");
+        return repository.countByAssignedGSDFocalIdAndStatusIn(userId, applicationStatus);
+    }
+
+    @Override
+    public long countArchivedForGSDFocal(Long userId) {
+        List<String> terminalStatuses = List.of("APPROVED", "REJECTED");
+        return repository.countByAssignedGSDFocalIdAndStatusIn(userId, terminalStatuses);
     }
 
     @Override

@@ -19,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 
 @RestController
@@ -79,6 +80,13 @@ public class MiningEngineerController {
         return ResponseEntity.ok(
                 miningLeaseService.getMineEngineerTeamQueue(pageable, search)
         );
+    }
+
+    // ** Tab-count badges for the Mining Engineer dashboard's nav-tabs (submitted + team-queue) ** //
+    @GetMapping("/counts")
+    public ResponseEntity<Map<String, Long>> counts() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(miningLeaseService.getMiningEngineerCounts(userId));
     }
 
     // Used by user to submit LLC

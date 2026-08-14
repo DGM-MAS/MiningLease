@@ -940,6 +940,43 @@ public class MiningLeaseService {
         return applications.map(mapper::toListResponse);
     }
 
+    /**
+     * Tab-count badge for the shared "archived" tab used by all of MPCD/Geologist/MiningChief/
+     * MiningEngineer/Director (frontend calls the same /mining-lease/archived-applications
+     * endpoint regardless of role) — mirrors the isAgencyUser() branch already in
+     * getArchivedApplications()/getMyArchivedApplications() above.
+     */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Long> getArchivedCount(Long userId, boolean isAgencyUser) {
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        long archivedCount;
+        if (isAgencyUser) {
+            List<String> archivedStatuses = List.of(
+                    "MINING LEASE APPROVED",
+                    "REJECTED",
+                    "TERMINATED",
+                    "RENEWAL APPLICATION",
+                    "TEMPORARY CLOSURE APPROVED",
+                    "UNDER-REVIEW-TERMINATION"
+            );
+            archivedCount = miningLeaseApplicationRepository.countArchivedAssignedToUserMPCD(userId, archivedStatuses);
+        } else {
+            List<String> archivedStatuses = List.of(
+                    "MINING LEASE APPROVED",
+                    "REJECTED",
+                    "TERMINATED",
+                    "RENEWAL APPLICATION",
+                    "TEMPORARY CLOSURE APPROVED",
+                    "UNDER-REVIEW-TERMINATION",
+                    "MINING RENEWAL APPROVED",
+                    "QUARRY RENEWAL APPROVED"
+            );
+            archivedCount = miningLeaseApplicationRepository.countByApplicantUserIdAndCurrentStatusIn(userId, archivedStatuses);
+        }
+        counts.put("archived", archivedCount);
+        return counts;
+    }
+
     public SuccessResponse<List<MiningLeaseResponse>> getArchivedApplicationToMPCD(Long userId, Pageable pageable, String search) {
 
         Page<MiningLeaseApplication> page;
@@ -1644,6 +1681,24 @@ public class MiningLeaseService {
         );
     }
 
+    /** Tab-count badges for the Director dashboard's nav-tabs. */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Long> getDirectorCounts(Long userId) {
+        List<String> archivedStatuses = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION",
+                "MINING RENEWAL APPROVED",
+                "QUARRY RENEWAL APPROVED"
+        );
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("submitted", miningLeaseApplicationRepository.countAssignedToUserDirector(userId, archivedStatuses));
+        return counts;
+    }
+
     @Transactional
     public MiningLeaseResponse reviewApplicationDirector(@Valid ReviewMiningLeaseApplicationDirector request, Long userId) {
         log.info("Reviewing mining lease application by Director user: {}", userId);
@@ -2146,6 +2201,14 @@ public class MiningLeaseService {
         );
     }
 
+    /** Tab-count badges for the Geologist dashboard's nav-tabs. */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Long> getGeologistCounts(Long userId) {
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("submitted", miningLeaseApplicationRepository.countAssignedToUserGeologist(userId));
+        return counts;
+    }
+
     @Transactional
     public MiningLeaseResponse reviewApplicationMPCD(@Valid ReviewMiningLeaseApplicationMPCD reviewQuarryLeaseApplication, Long userId) {
         log.info("Reviewing mining lease application by MPCD user: {}", userId);
@@ -2394,6 +2457,24 @@ public class MiningLeaseService {
         );
     }
 
+    /** Tab-count badges for the MPCD Focal dashboard's nav-tabs. */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Long> getMpcdCounts(Long userId) {
+        List<String> applicationStatus = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION",
+                "MINING RENEWAL APPROVED",
+                "QUARRY RENEWAL APPROVED"
+        );
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("submitted", miningLeaseApplicationRepository.countAssignedToUserMPCD(userId, applicationStatus));
+        return counts;
+    }
+
     @Transactional
     public MiningLeaseResponse submitMA(@Valid MiningLeaseMARequest request, Long userId) {
         MiningLeaseApplication miningleaseapplication = null;
@@ -2604,6 +2685,24 @@ public class MiningLeaseService {
                 "Assigned applications fetched successfully",
                 responsePage
         );
+    }
+
+    /** Tab-count badges for the Mining Chief dashboard's nav-tabs. */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Long> getMiningChiefCounts(Long userId) {
+        List<String> applicationStatus = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION",
+                "MINING RENEWAL APPROVED",
+                "QUARRY RENEWAL APPROVED"
+        );
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("submitted", miningLeaseApplicationRepository.countAssignedToUserMPCD(userId, applicationStatus));
+        return counts;
     }
 
     @Transactional
@@ -3012,6 +3111,25 @@ public class MiningLeaseService {
                 "Team-wide queue fetched successfully",
                 responsePage
         );
+    }
+
+    /** Tab-count badges for the Mining Engineer (Mining Division) dashboard's nav-tabs. */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Long> getMiningEngineerCounts(Long userId) {
+        List<String> archivedStatuses = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION",
+                "MINING RENEWAL APPROVED",
+                "QUARRY RENEWAL APPROVED"
+        );
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("submitted", miningLeaseApplicationRepository.countAssignedToUserMineEngineer(userId, archivedStatuses));
+        counts.put("teamQueue", miningLeaseApplicationRepository.countTeamQueueMineEngineer());
+        return counts;
     }
 
     @Transactional

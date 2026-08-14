@@ -224,6 +224,15 @@ public class TemporaryClosureService {
      * Get applications for an applicant.
      */
     @Transactional(readOnly = true)
+    public long countMyApplications(Long userId) {
+        List<String> ApplicationStatus = List.of(
+                "SUBMITTED",
+                "RC ASSIGNED",
+                "RECTIFICATION BY RC",
+                "RESUBMITTED");
+        return temporaryClosureRepository.countByApplicantUserIdAndStatusIn(userId, ApplicationStatus);
+    }
+
     public Page<TemporaryClosureNotificationResponse> getMyApplications(Long userId, Pageable pageable, String search) {
         List<String> ApplicationStatus = List.of(
                 "SUBMITTED",
@@ -247,6 +256,10 @@ public class TemporaryClosureService {
             );
         }
         return applications.map(TemporaryClosureMapper::toListResponse);
+    }
+
+    public long countAssignedToRC(Long userId) {
+        return temporaryClosureRepository.countAssignedToUserRC(userId);
     }
 
     public SuccessResponse<List<TemporaryClosureNotificationResponse>> getAssignedToRC(Long userId, Pageable pageable, String search) {
@@ -492,6 +505,10 @@ public class TemporaryClosureService {
         return TemporaryClosureMapper.toResponse(app);
     }
 
+    public long countAssignedToMI(Long userId) {
+        return temporaryClosureRepository.countAssignedToUserMI(userId);
+    }
+
     public SuccessResponse<List<TemporaryClosureNotificationResponse>> getAssignedToMI(Long userId, Pageable pageable, String search) {
         Page<TemporaryClosureEntity> page;
 
@@ -675,6 +692,16 @@ public class TemporaryClosureService {
 
         revisionHistoryRepository.save(revision);
         log.info("Created revision record #{} for application {} at stage {}", revision.getRevisionNumber(), miningLeaseApplication.getApplicationId(), geologistReview);
+    }
+
+    public long countArchivedApplications(Long userId) {
+        List<String> archivedStatuses = List.of("TEMPORARY CLOSURE APPROVED");
+        return temporaryClosureRepository.countArchivedAssignedToUser(userId, archivedStatuses);
+    }
+
+    public long countMyArchivedApplications(Long userId) {
+        List<String> archivedStatuses = List.of("TEMPORARY CLOSURE APPROVED");
+        return temporaryClosureRepository.countByApplicantUserIdAndStatusIn(userId, archivedStatuses);
     }
 
     public Page<TemporaryClosureNotificationResponse> getArchivedApplications(Pageable pageable, String search, Long userId) {
