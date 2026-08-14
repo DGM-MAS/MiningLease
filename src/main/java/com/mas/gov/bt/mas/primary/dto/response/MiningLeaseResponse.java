@@ -178,4 +178,6 @@ public class MiningLeaseResponse {
     private String strippingRatio;
 
     private String kmzMpcdFileId;
+
+    private String otherFilesId;
 }

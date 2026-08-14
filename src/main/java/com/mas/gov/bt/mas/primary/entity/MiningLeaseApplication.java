@@ -373,4 +373,7 @@ public class MiningLeaseApplication {
     @Column(name = "stripping_ratio")
     private String strippingRatio;
 
+    @Column(name = "other_files_id")
+    private String otherFilesId;
+
 }
