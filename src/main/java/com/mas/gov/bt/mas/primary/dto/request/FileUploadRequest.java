@@ -9,4 +9,5 @@ public class FileUploadRequest {
     private String applicationNumber;
     private String fileType;
     private String fileId;
+    private String torFileId;
 }

@@ -165,4 +165,6 @@ public class ApplicationListResponse {
     private String strippingRatio;
 
     private String kmzMpcdFileId;
+
+    private String otherFilesId;
 }
