@@ -23,5 +23,9 @@ public interface SurfaceCollectionReviewService {
 
     Page<SurfaceCollectionAuctionListResponseDTO> getMyApplicationsMD(String search, Pageable pageable, Long userId);
 
+    long countMyApplicationsMD(Long userId);
+
     Page<SurfaceCollectionAuctionListResponseDTO> getMyArchiveMD(String search, Pageable pageable, Long userId);
+
+    long countMyArchiveMD(Long userId);
 }

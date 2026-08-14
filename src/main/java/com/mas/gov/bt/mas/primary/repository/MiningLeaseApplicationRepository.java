@@ -74,6 +74,18 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
 """)
     Page<MiningLeaseApplication> findArchivedAssignedToUserMPCD(Long userId, List<String> archivedStatuses, Pageable pageable);
 
+    // Count sibling of findArchivedAssignedToUserMPCD — used for the "archived" tab badge shared
+    // by the MPCD/Geologist/MiningChief/MiningEngineer/Director archived-applications endpoint.
+    @Query("""
+    SELECT COUNT(q)
+    FROM MiningLeaseApplication q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE t.assignedToUserId = :userId
+    AND q.currentStatus IN :archivedStatuses
+""")
+    long countArchivedAssignedToUserMPCD(Long userId, List<String> archivedStatuses);
+
     @Query("""
     SELECT q
     FROM MiningLeaseApplication q
@@ -107,6 +119,15 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     AND q.currentStatus NOT IN :archivedStatuses
 """)
     Page<MiningLeaseApplication> findAssignedToUserDirector(Long userId, List<String> archivedStatuses, Pageable pageable);
+
+    // Count sibling of findAssignedToUserDirector — Director "submitted" tab badge.
+    @Query("""
+    SELECT COUNT(q) FROM MiningLeaseApplication q
+    JOIN TaskManagement t ON t.applicationNumber = q.applicationNumber
+    WHERE t.assignedToUserId = :userId
+    AND q.currentStatus NOT IN :archivedStatuses
+""")
+    long countAssignedToUserDirector(@Param("userId") Long userId, @Param("archivedStatuses") List<String> archivedStatuses);
 
     @Query("""
     SELECT q
@@ -196,6 +217,58 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
 """)
     Page<MiningLeaseApplication> findAssignedToUserGeologist(Long userId, Pageable pageable);
 
+    // Count sibling of findAssignedToUserGeologist — Geologist "submitted" tab badge.
+    @Query("""
+    SELECT COUNT(q)
+    FROM MiningLeaseApplication q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE t.assignedToUserId = :userId
+    AND q.currentStatus IN (
+    'ASSIGNED',
+    'GEOLOGIST_REVIEW',
+    "ACCEPTED PFS MPCD",
+    "ACCEPTED PFS",
+    "APPROVED",
+    "RESUBMIT APPLICATION",
+    'APPROVED BY DIRECTOR',
+    'NOTE SHEET UPLOADED',
+    'MA SUBMITTED',
+    'MLA SUBMITTED',
+    'ACCEPTED PFS',
+    'APPROVED PA/FC',
+    'RESUBMIT PA/FC',
+    'RESUBMITTED PFS',
+    'RESUBMIT PFS GEOLOGIST',
+    'FMFS SUBMITTED',
+    'RESUBMIT FMFS',
+    'RESUBMITTED FMFS',
+    'GR SUBMITTED',
+    'RESUBMITTED PFS GEOLOGIST',
+    "MA SUBMITTED",
+    "PA/FC SUBMITTED",
+    "APPROVED GR",
+    "NOTE SHEET UPLOADED",
+    "GR SUBMITTED",
+    "BG SUBMITTED",
+    "FMFS SUBMITTED",
+    "MLA SUBMITTED",
+    "APPROVED BY DIRECTOR",
+    "RESUBMITTED PFS",
+    "RESUBMIT GR",
+    "RESUBMITTED GR",
+    "RESUBMIT FMFS",
+    "MPCD ASSIGNED",
+    "RESUBMITTED FMFS",
+    "RESUBMIT APPLICATION",
+    "RESUBMIT PFS GEOLOGIST",
+    "RESUBMIT PFS MPCD",
+    "RESUBMIT PA/FC",
+    "APPROVED PA/FC"
+    )
+""")
+    long countAssignedToUserGeologist(Long userId);
+
     @Query("""
     SELECT q
     FROM MiningLeaseApplication q
@@ -262,6 +335,18 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
             Pageable pageable
     );
 
+    // Count sibling of findAssignedToUserMPCD — reused by both MPCD's and Mining Chief's
+    // "submitted" tab badges (Mining Chief's getAssignedToMiningChief() calls this same query).
+    @Query("""
+    SELECT COUNT(q)
+    FROM MiningLeaseApplication q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE t.assignedToUserId = :userId
+    AND q.currentStatus NOT IN :applicationStatus
+""")
+    long countAssignedToUserMPCD(Long userId, List<String> applicationStatus);
+
     @Query("""
     SELECT q
     FROM MiningLeaseApplication q
@@ -297,6 +382,17 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
 """)
     Page<MiningLeaseApplication> findAssignedToUserMineEngineer(Long userId, List<String> archivedStatuses, Pageable pageable);
 
+    // Count sibling of findAssignedToUserMineEngineer — Mining Engineer "submitted" tab badge.
+    @Query("""
+    SELECT COUNT(q)
+    FROM MiningLeaseApplication q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE t.assignedToUserId = :userId
+    AND q.currentStatus NOT IN :archivedStatuses
+""")
+    long countAssignedToUserMineEngineer(Long userId, List<String> archivedStatuses);
+
     @Query("""
     SELECT q
     FROM MiningLeaseApplication q
@@ -327,6 +423,26 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
     )
 """)
     Page<MiningLeaseApplication> findTeamQueueMineEngineer(Pageable pageable);
+
+    // Count sibling of findTeamQueueMineEngineer — Mining Engineer "team-queue" tab badge.
+    @Query("""
+    SELECT COUNT(q)
+    FROM MiningLeaseApplication q
+    JOIN TaskManagement t
+        ON t.applicationNumber = q.applicationNumber
+    WHERE t.taskStatus IN (
+    'FMFS SUBMITTED',
+    'ACCEPTED DIRECTOR',
+    'BG SUBMITTED',
+    'FORWARDED TO DIRECTOR',
+    'DIRECTOR APPROVED FMFS',
+    'LLC UPLOADED',
+    'NOTE SHEET UPLOADED',
+    'RESUBMITTED FMFS',
+    'MINING_CHIEF_REVIEW'
+    )
+""")
+    long countTeamQueueMineEngineer();
 
     @Query("""
     SELECT q
@@ -528,4 +644,9 @@ SELECT
     Page<MiningLeaseApplication> findByStatusInAndSearch(List<String> archivedStatuses, String search, Pageable pageable);
 
     Page<MiningLeaseApplication> findByApplicantUserIdAndCurrentStatusIn(Long userId, List<String> archivedStatuses, Pageable pageable);
+
+    // Count sibling of findByApplicantUserIdAndCurrentStatusIn — citizen-side branch of the shared
+    // archived-applications endpoint (mirrors getMyArchivedApplications()). Not used by the 5 staff
+    // role dashboards but kept symmetric with the non-agency-user branch of that endpoint.
+    long countByApplicantUserIdAndCurrentStatusIn(Long userId, List<String> archivedStatuses);
 }

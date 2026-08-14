@@ -19,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/mining-lease/mining-chief")
@@ -59,5 +60,12 @@ public class MiningChiefController {
         return ResponseEntity.ok(
                 miningLeaseService.getAssignedToMiningChief(userId, pageable, search)
         );
+    }
+
+    // ** Tab-count badges for the Mining Chief dashboard's nav-tabs ** //
+    @GetMapping("/counts")
+    public ResponseEntity<Map<String, Long>> counts() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(miningLeaseService.getMiningChiefCounts(userId));
     }
 }

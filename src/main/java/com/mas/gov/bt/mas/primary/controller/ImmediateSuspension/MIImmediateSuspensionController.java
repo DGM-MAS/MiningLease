@@ -57,6 +57,13 @@ public class MIImmediateSuspensionController {
         );
     }
 
+    @GetMapping("/assigned/count")
+    @Operation(summary = "Count of MI's assigned immediate suspension applications (Submitted tab badge)")
+    public ResponseEntity<SuccessResponse<Long>> assignedCount() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", immediateSuspensionService.countAssignedToMI(userId)));
+    }
+
     @PostMapping("/review")
     @Operation(summary = "Rectification application", description = "Rectification Termination application by promoter")
     public ResponseEntity<SuccessResponse<ImmediateSuspensionApplicationResponse>> reviewApplication(

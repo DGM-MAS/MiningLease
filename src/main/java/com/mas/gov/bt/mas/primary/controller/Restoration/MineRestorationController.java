@@ -96,6 +96,13 @@ public class MineRestorationController {
         return ResponseEntity.ok(mineRestorationService.getMyApplications(userId, search, pageable));
     }
 
+    @GetMapping("/applications/count")
+    @Operation(summary = "Count of my restoration applications", description = "Count for the Submitted tab badge")
+    public ResponseEntity<SuccessResponse<Long>> getMyApplicationsCount() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(new SuccessResponse<>("Count fetched successfully", mineRestorationService.countMyApplications(userId)));
+    }
+
     @GetMapping("/applications/{id}")
     @Operation(summary = "Get application by ID", description = "Get details of a specific mine restoration application")
     public ResponseEntity<SuccessResponse<MineRestorationResponse>> getApplicationById(

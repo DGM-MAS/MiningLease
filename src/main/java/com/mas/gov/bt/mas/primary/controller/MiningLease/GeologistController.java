@@ -20,6 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RequiredArgsConstructor
 @Slf4j
@@ -60,5 +61,12 @@ public class GeologistController {
         return ResponseEntity.ok(
                 miningLeaseService.getAssignedToGeologist(userId, pageable, search)
         );
+    }
+
+    // ** Tab-count badges for the Geologist dashboard's nav-tabs ** //
+    @GetMapping("/counts")
+    public ResponseEntity<Map<String, Long>> counts() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(miningLeaseService.getGeologistCounts(userId));
     }
 }

@@ -19,7 +19,11 @@ public interface SurfaceCollectionBankGuaranteeService {
 
     Page<SurfaceCollectionAuctionListResponseDTO> getMyApplications(String search, Pageable pageable, Long userId);
 
+    long countMyApplications(Long userId);
+
     Page<SurfaceCollectionAuctionListResponseDTO> getMyArchive(String search, Pageable pageable, Long userId);
+
+    long countMyArchive(Long userId);
 
     SurfaceCollectionAuctionListResponseDTO viewApplicationDetails(Long userId, String applicationNo);
 

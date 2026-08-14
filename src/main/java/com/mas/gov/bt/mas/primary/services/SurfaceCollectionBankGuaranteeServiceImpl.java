@@ -18,6 +18,7 @@ import com.mas.gov.bt.mas.primary.repository.*;
 import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,9 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
     private final SurfaceCollectionBankGuaranteeRepository bgRepository;
 
     private final SurfaceCollectionAuctionRepository surfaceCollectionAuctionRepository;
+
+    @Value("${app.frontend.base-url}")
+    private String frontendBaseUrl;
 
     private final ApplicationMasterRepository applicationMasterRepository;
 
@@ -236,6 +240,12 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
     }
 
     @Override
+    public long countMyApplications(Long userId) {
+        List<String> archivedStatuses = List.of("AUCTION_COMPLETED", "BG_PENDING", "BG SUBMITTED", "BG RESUBMIT", "BG RESUBMITTED");
+        return surfaceCollectionAuctionRepository.countByBidWinnerPromoterIdAndAuctionStatusIn(userId, archivedStatuses);
+    }
+
+    @Override
     public Page<SurfaceCollectionAuctionListResponseDTO> getMyArchive(String search, Pageable pageable, Long userId) {
         Page<SurfaceCollectionAuctionApplication> page;
 
@@ -243,6 +253,12 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
         page = surfaceCollectionAuctionRepository.findByBidWinnerPromoterIdAndAuctionStatusIn(userId,archivedStatuses,pageable);
 
         return page.map(this::mapListResponse);
+    }
+
+    @Override
+    public long countMyArchive(Long userId) {
+        List<String> archivedStatuses = List.of("PERMIT_ISSUED");
+        return surfaceCollectionAuctionRepository.countByBidWinnerPromoterIdAndAuctionStatusIn(userId, archivedStatuses);
     }
 
     @Override
@@ -347,7 +363,7 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
                                         "Application not found"));
 
         String angularUrl =
-                "http://localhost:4200/Verifedscpermitcertificate/" +
+                frontendBaseUrl + "/Verifedscpermitcertificate/" +
                         application.getApplicationNo();
 
         QRCodeWriter qrCodeWriter = new QRCodeWriter();

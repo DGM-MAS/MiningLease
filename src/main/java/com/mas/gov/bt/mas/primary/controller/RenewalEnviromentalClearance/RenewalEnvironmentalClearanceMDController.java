@@ -56,6 +56,13 @@ public class RenewalEnvironmentalClearanceMDController {
         );
     }
 
+    // ** Tab-count badge for the MD dashboard's "assigned" tab ** //
+    @GetMapping("/counts")
+    public ResponseEntity<java.util.Map<String, Long>> counts() {
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(renewalEnvironmentalClearanceService.getMdCounts(userId));
+    }
+
     @PostMapping("/approve-ec")
     public ResponseEntity<SuccessResponse<EnvironmentClearanceRenewalResponseDTO>> approveEC(
             @Valid @RequestBody ApproveECRequestDTO request
