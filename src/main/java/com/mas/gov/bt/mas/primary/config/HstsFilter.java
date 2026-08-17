@@ -19,7 +19,7 @@ public class HstsFilter implements Filter {
             httpResponse.setHeader("X-XSS-Protection", "1; mode=block");
             httpResponse.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
             httpResponse.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
-            httpResponse.setHeader("Cross-Origin-Resource-Policy", "same-site");
+            httpResponse.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
             httpResponse.setHeader("Content-Security-Policy",
                     "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
                             "img-src 'self' data:; font-src 'self' data:; frame-ancestors 'none'; " +
