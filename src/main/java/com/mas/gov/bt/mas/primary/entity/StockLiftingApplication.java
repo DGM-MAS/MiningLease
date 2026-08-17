@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -83,8 +84,11 @@ public class StockLiftingApplication {
     @Column(name = "validity_date")
     private LocalDateTime validityDate;
 
-    @Column(name = "quantity")
-    private String quantity;
+    // mas_db.stock_lifting_application is shared with mas-royalty-service, which owns
+    // this column as numeric(12,2) — was mismapped here as String, which made Hibernate's
+    // startup schema validation fail (crash-loop) the moment the two disagreed.
+    @Column(name = "quantity", precision = 12, scale = 2)
+    private BigDecimal quantity;
     // New columns added
 
     // ── Audit ────────────────────────────────────────────────────────────────────
