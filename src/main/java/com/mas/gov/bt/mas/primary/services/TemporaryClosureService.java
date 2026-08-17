@@ -408,6 +408,18 @@ public class TemporaryClosureService {
                         queryLeaseApplicationRepository.save(quarryLeaseApplicationEntity);
                     }
 
+                    if(app.getApplicationType().equalsIgnoreCase("QUARRY_LEASE")){
+                        Optional<QuarryLeaseApplication> quarryLeaseApplication = queryLeaseApplicationRepository.findByApplicationNumber(app.getApplicationId());
+                        QuarryLeaseApplication quarryLeaseApplicationEntity = null;
+                        if (quarryLeaseApplication.isPresent()) {
+                            quarryLeaseApplicationEntity = quarryLeaseApplication.get();
+                        }
+                        assert quarryLeaseApplicationEntity != null;
+                        quarryLeaseApplicationEntity.setCurrentStatus("TEMPORARY CLOSURE APPROVED");
+                        queryLeaseApplicationRepository.save(quarryLeaseApplicationEntity);
+                    }
+
+
                     siteProvisioningService.setSiteActive(serviceType, app.getApplicationId(), false);
 
                     Optional<HouseholdPermitThresholdEntity> entity = householdPermitThresholdRepository.findByApplicationNoAndServiceType(app.getApplicationId(), serviceType);
