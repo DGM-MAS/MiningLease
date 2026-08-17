@@ -60,7 +60,7 @@ public class MiningLeaseResponse {
     private String dzongkhag;
     private String dzongkhagId;
     private String gewog;
-    private Integer gewogId;
+    private String gewogId;
     private String nearestVillage;
     private Integer nearestVillageId;
 
