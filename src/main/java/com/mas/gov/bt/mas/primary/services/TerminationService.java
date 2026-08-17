@@ -37,6 +37,7 @@ public class TerminationService {
     private static final String SERVICE_CODE = "TERMINATION_SERVICE";
     private static final int DEFAULT_TAT_DAYS = 2;
 
+    private static final String SURFACE_COLLECTION_CATEGORY   = "SURFACE_COLLECTION_PERMIT";
     // Real sidebar menu ids (permissions.id) per recipient role for this service — used to target
     // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
     // NOT the same thing as SERVICE_CODE above, which is an unrelated t_application_master.service_code value.
@@ -64,6 +65,8 @@ public class TerminationService {
     private final MiningLeaseApplicationRepository miningLeaseApplicationRepository;
 
     private final QuarryLeaseApplicationRepository quarryLeaseApplicationRepository;
+
+    private final SurfaceCollectionPermitRepository surfaceCollectionPermitRepository;
 
     private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
 
@@ -202,6 +205,37 @@ public class TerminationService {
             );
         }
 
+        Optional<SurfaceCollectionPermitEntity> surfaceCollectionPermitEntity =
+                surfaceCollectionPermitRepository
+                        .findByApplicationNo(appNo);
+
+        if (surfaceCollectionPermitEntity.isPresent()) {
+            SurfaceCollectionPermitEntity application = surfaceCollectionPermitEntity.get();
+
+            if (!"PERMIT_ISSUED".equalsIgnoreCase(application.getStatus())) {
+                throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
+            }
+            application.setStatus("UNDER-REVIEW-TERMINATION");
+
+            surfaceCollectionPermitRepository.save(application);
+
+            Optional<ApplicationMaster> applicationMaster = applicationMasterRepository
+                    .findByApplicationNumberAndServiceCode(appNo, SURFACE_COLLECTION_CATEGORY);
+
+            ApplicationMaster applicationMaster1 = null;
+
+            if (applicationMaster.isPresent()) {
+                applicationMaster1 = applicationMaster.get();
+            }
+            return new LeaseApplicationRef(
+                    application.getApplicantName(),
+                    application.getEmail(),
+                    applicationMaster1,
+                    application.getNameOfSurfaceCollection(),
+                    SURFACE_COLLECTION_CATEGORY
+            );
+        }
+
         throw new CustomRuntimeException("Invalid application number: " + appNo);
     }
 
@@ -236,6 +270,27 @@ public class TerminationService {
             serviceType = "QUARRY_LEASE";
             applicationMasterRepository.save(master);
             quarryLeaseApplicationRepository.save(quarryLeaseApplication);
+        }
+
+        Optional<SurfaceCollectionPermitEntity> applicationSurfaceCollection = surfaceCollectionPermitRepository.findByApplicationNo(appNo);
+
+        Optional<ApplicationMaster> applicationMaster = applicationMasterRepository
+                .findByApplicationNumberAndServiceCode(appNo, SURFACE_COLLECTION_CATEGORY);
+
+        ApplicationMaster applicationMaster1 = null;
+
+        if (applicationMaster.isPresent()) {
+            applicationMaster1 = applicationMaster.get();
+        }
+
+        if (applicationSurfaceCollection.isPresent()) {
+            SurfaceCollectionPermitEntity surfaceCollectionPermitEntity = applicationSurfaceCollection.get();
+            surfaceCollectionPermitEntity.setStatus(quarryStatus);
+            master = applicationMaster1;
+            master.setCurrentStatus(quarryStatus);
+            serviceType = "SURFACE_COLLECTION_PERMIT";
+            applicationMasterRepository.save(master);
+            surfaceCollectionPermitRepository.save(surfaceCollectionPermitEntity);
         }
 
         Optional<HouseholdPermitThresholdEntity> householdPermitThresholdEntity = householdPermitThresholdRepository.findByApplicationNoAndServiceType(appNo, serviceType);
