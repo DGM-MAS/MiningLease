@@ -1416,8 +1416,8 @@ public class MiningLeaseService {
                 fmfsDetails.setWorkOrderDocId(app.getWorkOrderDocId());
                 fmfsDetails.setWorkOrderRemarks(app.getWorkOrderRemarks());
                 fmfsDetails.setDzongkhagId(app.getDzongkhag() != null ? app.getDzongkhag().getId() : null);
-                fmfsDetails.setGewogId(app.getGewog() != null ? Integer.valueOf(app.getGewog().getGewogId()) : null);
-                fmfsDetails.setVillageId(app.getNearestVillage() != null ? Integer.valueOf(app.getNearestVillage().getVillageId()) : null);
+                fmfsDetails.setGewogId(app.getGewog() != null ? app.getGewog().getGewogSerialNo() : null);
+                fmfsDetails.setVillageId(app.getNearestVillage() != null ? app.getNearestVillage().getVillageSerialNo() : null);
 
                 fmfsDetails.setFileUploadIdPa(app.getFileUploadIdPA());
                 fmfsDetails.setFileUploadIdFc(app.getFileUploadIdFC());
@@ -2887,8 +2887,8 @@ public class MiningLeaseService {
                     fmfsDetails.setWorkOrderDocId(app.getWorkOrderDocId());
                     fmfsDetails.setWorkOrderRemarks(app.getWorkOrderRemarks());
                     fmfsDetails.setDzongkhagId(app.getDzongkhag().getId());
-                    fmfsDetails.setGewogId(Integer.valueOf(app.getGewog().getGewogId()));
-                    fmfsDetails.setVillageId(Integer.valueOf(app.getNearestVillage().getVillageId()));
+                    fmfsDetails.setGewogId(app.getGewog().getGewogSerialNo());
+                    fmfsDetails.setVillageId(app.getNearestVillage().getVillageSerialNo());
 
                     fmfsDetails.setFileUploadIdPa(app.getFileUploadIdPA());
                     fmfsDetails.setFileUploadIdFc(app.getFileUploadIdFC());
