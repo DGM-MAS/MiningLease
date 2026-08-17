@@ -180,4 +180,10 @@ public class MiningLeaseResponse {
     private String kmzMpcdFileId;
 
     private String otherFilesId;
+
+    private String geologicalAssessmentReportId;
+    private String geologicalMapsCrossSectionsId;
+    private String kmzId;
+    private String validTaxClearanceId;
+    private boolean declarationStatus;
 }
