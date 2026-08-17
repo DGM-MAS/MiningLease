@@ -364,7 +364,7 @@ public class MiningLeaseController {
 
         Long userId = userContext.getCurrentUserId();
         return ResponseEntity.ok(
-                miningLeaseService.getArchivedApplicationApproved(userId, pageable, search)
+                miningLeaseService.getArchivedApplicationApproved(userId, userContext.isAgencyUser(), pageable, search)
         );
     }
 

@@ -3964,7 +3964,16 @@ public class MiningLeaseService {
                 .countByApplicantCidAndServiceType(identifier, SERVICE_CODE);
     }
 
-    public SuccessResponse<List<MiningLeaseResponse>> getArchivedApplicationApproved(Long userId, Pageable pageable, String search) {
+    public SuccessResponse<List<MiningLeaseResponse>> getArchivedApplicationApproved(
+            Long userId, boolean isAgencyUser, Pageable pageable, String search) {
+
+        // System-wide, used by RC/MD staff screens — had no role gate at all, so any
+        // authenticated citizen JWT could pull every applicant's approved lease data via
+        // this endpoint directly. Citizens have getMyApprovedApplicationsForActiveSite
+        // (the /mine route) instead.
+        if (!isAgencyUser) {
+            throw new UnauthorizedOperationException("You are not authorized to view this data");
+        }
 
         Page<MiningLeaseApplication> page;
 
