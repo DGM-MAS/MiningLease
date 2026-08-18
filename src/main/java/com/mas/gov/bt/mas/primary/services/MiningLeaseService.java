@@ -3268,8 +3268,6 @@ public class MiningLeaseService {
                 quarryLeaseApplication1.setMlaDocId(request.getMlaDocId());
                 quarryLeaseApplication1.setMlaStatus("SUBMITTED");
                 quarryLeaseApplication1.setCurrentStatus("MLA SUBMITTED");
-                quarryLeaseApplication1.setLeaseStartDate(request.getLeaseStartDate());
-                quarryLeaseApplication1.setLeaseEndDate(request.getLeaseEndDate());
                 applicationMaster.setCurrentStatus("MLA SUBMITTED");
                 applicationMasterRepository.save(applicationMaster);
                 miningLeaseApplicationRepository.save(quarryLeaseApplication1);
