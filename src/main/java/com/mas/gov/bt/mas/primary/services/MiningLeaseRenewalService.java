@@ -1633,23 +1633,36 @@ public class MiningLeaseRenewalService {
         MiningLeaseRenewalApplication miningLeaseRenewalApplication = null;
         if (request.getApplicationNo() != null) {
             Optional<MiningLeaseRenewalApplication> miningLeaseRenewalApplication1 = miningLeaseRenewalApplicationRepository.findByApplicationNumber(request.getApplicationNo());
+
             if (miningLeaseRenewalApplication1.isPresent()) {
+
                 miningLeaseRenewalApplication = miningLeaseRenewalApplication1.get();
                 ApplicationMaster applicationMaster = miningLeaseRenewalApplication.getApplicationMaster();
+
                 miningLeaseRenewalApplication.setMlaDocId(request.getMlaDocId());
                 miningLeaseRenewalApplication.setWorkOrderDocId(request.getWorkOrderDocId());
+
                 miningLeaseRenewalApplication.setMlaStatus("SUBMITTED");
                 miningLeaseRenewalApplication.setCurrentStatus("MLA SUBMITTED");
+
+                miningLeaseRenewalApplication.setLeaseStartDate(request.getLeaseStartDate());
+                miningLeaseRenewalApplication.setLeaseEndDate(request.getLeaseEndDate());
+
                 applicationMaster.setCurrentStatus("MLA SUBMITTED");
+
                 applicationMasterRepository.save(applicationMaster);
                 miningLeaseRenewalApplicationRepository.save(miningLeaseRenewalApplication);
 
 
                 List<String> status = new ArrayList<>();
+
                 status.add("SUBMITTED");
                 status.add("PAYMENT PENDING");
+
                 List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusInAndAssignedToRole(miningLeaseRenewalApplication.getApplicationNumber(),status,"DIRECTOR");
+
                 Long directorId = null;
+
                 if (taskManagement != null) {
                     TaskManagement taskManagement1 = taskManagement.getFirst();
                     directorId = taskManagement1.getAssignedToUserId();
@@ -1658,6 +1671,7 @@ public class MiningLeaseRenewalService {
                 createTask(applicationMaster,miningLeaseRenewalApplication,"DIRECTOR", userId, directorId);
 
                 UserWorkloadProjection assignedDirectorDetails = miningLeaseApplicationRepository.findUserDetails(directorId);
+
                 if(assignedDirectorDetails.getUserId() != null) {
                     String title = "Mining lease application has been assigned for MLA review.";
                     String message = "Mining lease application has been  assigned for MLA review.";

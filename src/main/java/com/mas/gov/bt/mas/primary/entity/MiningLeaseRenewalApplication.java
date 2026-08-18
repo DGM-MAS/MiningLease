@@ -50,6 +50,9 @@ public class MiningLeaseRenewalApplication {
     private String telephoneNo;
 
     // ========== Lease Period ==========
+    @Column(name = "lease_start_date")
+    private LocalDate leaseStartDate;
+
     @Column(name = "lease_end_date")
     private LocalDate leaseEndDate;
 
