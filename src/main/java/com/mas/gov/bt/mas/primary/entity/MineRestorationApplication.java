@@ -9,6 +9,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Date;
 
 @Entity
 @Table(name = "t_mine_restoration_application", schema = "mas_db")
@@ -115,6 +116,9 @@ public class MineRestorationApplication {
 
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
     private String rejectionReason;
+
+    @Column(name = "resubmission_date_line")
+    private Date resubmissionDateLine;
 
     // ========== Audit ==========
     @Column(name = "created_by")

@@ -129,6 +129,10 @@ public class SampleTransportClearanceEntity {
     @Column(name = "assigned_gsd_focal_remarks", columnDefinition = "TEXT")
     private String assignedGSDFocalRemarks;
 
+    @Column(name = "file_id_gsd_focal")
+    private String fileIdGSDFocal;
+
+
     /* ================= AUDIT COLUMNS ================= */
 
     @Column(name = "created_by", updatable = false)
