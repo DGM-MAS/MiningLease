@@ -24,7 +24,9 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.time.Year;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -66,131 +68,199 @@ public class SampleTransportClearanceServiceImpl
 
     private final LookupHelper lookupHelper;
 
-        @Override
-        public SampleTransportClearanceResponseDTO createApplication(
-                SampleTransportClearanceDTO request,
-                Long userId) {
+    @Override
+    @Transactional
+    public SampleTransportClearanceResponseDTO createApplication(
+            SampleTransportClearanceDTO request,
+            Long userId) {
 
-            // Ex-country applications ship internationally and have no Bhutanese
-            // dzongkhag/gewog/village — only In-country applications carry these.
-            boolean hasDzongkhag = request.getDzongkhagID() != null && !request.getDzongkhagID().isBlank();
+        // =========================================================
+        // 1. DETERMINE LOCATION / REGION
+        // =========================================================
 
-            Long regionId;
-            DzongkhagLookup dzongkhagLookup = null;
-            GewogLookup gewogLookup = null;
-            VillageLookup villageLookup = null;
-            RegionMaster regionMaster = null;
+        boolean hasDzongkhag =
+                request.getDzongkhagID() != null
+                        && !request.getDzongkhagID().isBlank();
 
-            if (hasDzongkhag) {
-                dzongkhagLookup =
-                        lookupHelper.fetchLookup(request.getDzongkhagID(), dzongkhagLookupRepository, "Dzongkhag");
+        Long regionId;
 
-                regionId = dzongkhagLookup.getRegion().getId();
+        DzongkhagLookup dzongkhagLookup = null;
+        GewogLookup gewogLookup = null;
+        VillageLookup villageLookup = null;
+        RegionMaster regionMaster = null;
 
-                gewogLookup =
-                        lookupHelper.fetchLookup(request.getGewogID(), gewogLookupRepository, "Gewog");
+        if (hasDzongkhag) {
 
-                if (request.getVillageID() != null && !request.getVillageID().isBlank()) {
-                    villageLookup =
-                            lookupHelper.fetchLookup(request.getVillageID(), villageLookupRepository, "Village");
-                }
-
-                regionMaster =
-                        lookupHelper.fetchLookup(dzongkhagLookup.getRegion().getId(), regionMasterRepository, "RegionMaster");
-            } else {
-                // Default/HQ region — mirrors the assignChief(9L) HQ fallback below.
-                regionId = 9L;
-            }
-
-            SampleTransportClearanceEntity entity =
-                    sampleTransportClearanceMapper.toEntity(request);
-
-            if (request.getMinerals() != null) {
-
-                List<SampleTransportClearanceMineralEntity> minerals =
-                        request.getMinerals().stream()
-                                .map(mineralDTO -> {
-
-                                    SampleTransportClearanceMineralEntity mineral =
-                                            new SampleTransportClearanceMineralEntity();
-
-                                    mineral.setRockMineralName(
-                                            mineralDTO.getRockMineralName());
-
-                                    mineral.setRockMineralNameSpecify(
-                                            mineralDTO.getRockMineralNameSpecify());
-
-                                    mineral.setSampleCount(
-                                            mineralDTO.getSampleCount());
-
-                                    mineral.setSampleForm(
-                                            mineralDTO.getSampleForm());
-
-                                    mineral.setSampleFormSpecify(
-                                            mineralDTO.getSampleFormSpecify());
-
-                                    mineral.setTotalWeight(
-                                            mineralDTO.getTotalWeight());
-
-                                    mineral.setWeightUnit(
-                                            mineralDTO.getWeightUnit());
-
-                                    mineral.setSampleTransportClearance(entity);
-
-                                    return mineral;
-                                })
-                                .toList();
-
-                entity.setMinerals(minerals);
-            }
-
-            // Site Details
-//            entity.setSiteApplicationNo(request.getSiteApplicationNo());
-//            entity.setSiteName(request.getSiteName());
-
-
-
-            entity.setDzongkhagId(dzongkhagLookup);
-            entity.setGewogId(gewogLookup);
-            entity.setVillageId(villageLookup);
-            entity.setRegionMaster(regionMaster);
-
-            entity.setRegionId(regionId);
-
-            entity.setApplicationNo(generateApplicationNumber());
-            entity.setCreatedOn(LocalDateTime.now());
-            entity.setCreatedBy(userId);
-            entity.setStatus("SUBMITTED");
-
-            SampleTransportClearanceEntity saved =
-                    repository.save(entity);
-
-            UserWorkloadProjection assignedChief = null;
-
-            assignedChief = assignChief(regionId);
-
-            if (assignedChief == null) {
-                assignedChief = assignChief(9L);
-            }
-
-            entity.setAssignedGSDChiefId(assignedChief.getUserId());
-
-            repository.save(entity);
-
-            ApplicationMaster master = createApplicationMaster(entity, userId);
-
-            entity.setApplicationMaster(master);
-
-            createTask(
-                    master,
-                    entity,
-                    "GSD_CHIEF",
-                    userId,
-                    assignedChief.getUserId()
+            dzongkhagLookup = lookupHelper.fetchLookup(
+                    request.getDzongkhagID(),
+                    dzongkhagLookupRepository,
+                    "Dzongkhag"
             );
 
-            return sampleTransportClearanceMapper.toResponseDTO(saved);
+            regionId = dzongkhagLookup.getRegion().getId();
+
+            gewogLookup = lookupHelper.fetchLookup(
+                    request.getGewogID(),
+                    gewogLookupRepository,
+                    "Gewog"
+            );
+
+            if (request.getVillageID() != null
+                    && !request.getVillageID().isBlank()) {
+
+                villageLookup = lookupHelper.fetchLookup(
+                        request.getVillageID(),
+                        villageLookupRepository,
+                        "Village"
+                );
+            }
+
+            regionMaster = lookupHelper.fetchLookup(
+                    regionId,
+                    regionMasterRepository,
+                    "RegionMaster"
+            );
+
+        } else {
+
+            // HQ fallback
+            regionId = 9L;
         }
+
+
+        // =========================================================
+        // 2. MAP REQUEST TO ENTITY
+        // =========================================================
+
+        SampleTransportClearanceEntity entity =
+                sampleTransportClearanceMapper.toEntity(request);
+
+
+        // =========================================================
+        // 3. SET MINERALS
+        // =========================================================
+
+        List<SampleTransportClearanceMineralEntity> minerals =
+                new ArrayList<>();
+
+        if (request.getMinerals() != null) {
+
+            for (SampleMineralDTO mineralDTO : request.getMinerals()) {
+
+                SampleTransportClearanceMineralEntity mineral =
+                        new SampleTransportClearanceMineralEntity();
+
+                mineral.setRockMineralName(
+                        mineralDTO.getRockMineralName());
+
+                mineral.setRockMineralNameSpecify(
+                        mineralDTO.getRockMineralNameSpecify());
+
+                mineral.setSampleCount(
+                        mineralDTO.getSampleCount());
+
+                mineral.setSampleForm(
+                        mineralDTO.getSampleForm());
+
+                mineral.setSampleFormSpecify(
+                        mineralDTO.getSampleFormSpecify());
+
+                mineral.setTotalWeight(
+                        mineralDTO.getTotalWeight());
+
+                mineral.setWeightUnit(
+                        mineralDTO.getWeightUnit());
+
+                // Important bidirectional relationship
+                mineral.setSampleTransportClearance(entity);
+
+                minerals.add(mineral);
+            }
+        }
+
+        entity.setMinerals(minerals);
+
+
+        // =========================================================
+        // 4. SET LOCATION
+        // =========================================================
+
+        entity.setDzongkhagId(dzongkhagLookup);
+        entity.setGewogId(gewogLookup);
+        entity.setVillageId(villageLookup);
+        entity.setRegionMaster(regionMaster);
+
+        entity.setRegionId(regionId);
+
+
+        // =========================================================
+        // 5. SET APPLICATION DETAILS
+        // =========================================================
+
+        entity.setApplicationNo(generateApplicationNumber());
+        entity.setCreatedBy(userId);
+        entity.setStatus("SUBMITTED");
+
+
+        // =========================================================
+        // 6. ASSIGN GSD CHIEF
+        // =========================================================
+
+        UserWorkloadProjection assignedChief =
+                assignChief(regionId);
+
+        if (assignedChief == null) {
+            assignedChief = assignChief(9L);
+        }
+
+        if (assignedChief == null) {
+            throw new BusinessException(
+                    "No GSD Chief is available for assignment"
+            );
+        }
+
+        entity.setAssignedGSDChiefId(
+                assignedChief.getUserId()
+        );
+
+
+        // =========================================================
+        // 7. SAVE APPLICATION ONCE
+        // =========================================================
+
+        SampleTransportClearanceEntity saved =
+                repository.save(entity);
+
+
+        // =========================================================
+        // 8. CREATE APPLICATION MASTER
+        // =========================================================
+
+        ApplicationMaster master =
+                createApplicationMaster(saved, userId);
+
+        saved.setApplicationMaster(master);
+
+
+        // =========================================================
+        // 9. CREATE TASK
+        // =========================================================
+
+        createTask(
+                master,
+                saved,
+                "GSD_CHIEF",
+                userId,
+                assignedChief.getUserId()
+        );
+
+
+        // =========================================================
+        // 10. RETURN RESPONSE
+        // =========================================================
+
+        return sampleTransportClearanceMapper.toResponseDTO(saved);
+    }
 
     @Override
     public long countMyApplications(Long userId) {
@@ -382,7 +452,7 @@ public class SampleTransportClearanceServiceImpl
 
         ApplicationMaster applicationMaster = sampleTransportClearanceEntity.getApplicationMaster();
 
-        UserWorkloadProjection applicantDetails = repository.findUserDetails(sampleTransportClearanceEntity.getCreatedBy());
+        UserWorkloadProjection applicantDetails = repository.findCitizenDetails(sampleTransportClearanceEntity.getCreatedBy());
 
         UserWorkloadProjection assignedGHDFocal = repository.findUserDetails(sampleTransportClearanceEntity.getAssignedGSDFocalId());
 
@@ -603,7 +673,9 @@ public class SampleTransportClearanceServiceImpl
 
                 }
                 case "ACCEPTED" -> {
+
                     sampleTransportClearanceEntity.setStatus("ACCEPTED");
+                    sampleTransportClearanceEntity.setFileIdGSDFocal(request.getFileIdGSDFocal());
                     sampleTransportClearanceEntity.setAssignedGSDFocalRemarks(request.getRemarksGSDFocal());
                     repository.save(sampleTransportClearanceEntity);
 

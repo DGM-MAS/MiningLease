@@ -20,8 +20,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Year;
+import java.time.ZoneId;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
@@ -87,7 +90,13 @@ public class MineRestorationService {
 
         MiningLeaseApplication miningLeaseApplication = null;
         QuarryLeaseApplication quarryLeaseApplication = null;
+
+        // =========================================================
+        // FIND MINING / QUARRY APPLICATION
+        // =========================================================
+
         Long regionId = null;
+
         Optional<MiningLeaseApplication> lease = miningLeaseApplicationRepository
                 .findByApplicationNumber(request.getMiningLeaseApplicationNumber());
 
@@ -103,6 +112,9 @@ public class MineRestorationService {
             }
         }
 
+        // =========================================================
+        // LOAD / CREATE RESTORATION APPLICATION
+        // =========================================================
         // Load existing draft if ID provided, otherwise create new
         MineRestorationApplication restoration;
 
@@ -144,38 +156,72 @@ public class MineRestorationService {
 
         }
 
+        // =========================================================
+        // DOCUMENT
+        // =========================================================
         restoration.setMrpDocId(request.getMrpDocId());
 
+        // =========================================================
+        // DRAFT / SUBMISSION
+        // =========================================================
         boolean isDraft = "DRAFT".equalsIgnoreCase(request.getStatus());
         if (isDraft) {
             restoration.setCurrentStatus(STATUS_MRP_DRAFT);
         } else {
+
+            // Validate TERMINATED status + Application Master status
+            // + two-month submission deadline
+            LocalDateTime deadline =
+                    validateMRPSubmissionEligibility(
+                            miningLeaseApplication,
+                            quarryLeaseApplication
+                    );
+
             restoration.setCurrentStatus(STATUS_MRP_SUBMITTED);
             restoration.setMrpSubmittedAt(LocalDateTime.now());
+
             if (restoration.getApplicationNumber() == null) {
-                restoration.setApplicationNumber(generateApplicationNumber());
+                restoration.setApplicationNumber(
+                        generateApplicationNumber()
+                );
             }
 
             // Auto-assign ME by workload
-            UserWorkloadProjection assignedME = restorationApplicationRepository.findMEWithLeastWorkload(regionId);
+            // =====================================================
+            // ASSIGN MINING ENGINEER
+            // =====================================================
+            UserWorkloadProjection assignedME =
+                    restorationApplicationRepository
+                            .findMEWithLeastWorkload(regionId);
 
             if (assignedME == null) {
-                assignedME = restorationApplicationRepository.findMEWithLeastWorkload(9L);
+
+                assignedME =
+                        restorationApplicationRepository
+                                .findMEWithLeastWorkload(9L);
 
                 if (assignedME == null) {
-                    throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Mining Engineer with required permission, role and region not found.");
+                    throw new BusinessException(
+                            ErrorCodes.RECORD_NOT_FOUND,
+                            "Mining Engineer with required permission, role and region not found."
+                    );
                 }
-
             }
 
-            restoration.setAssignedMeUserId(assignedME.getUserId());
+            restoration.setAssignedMeUserId(
+                    assignedME.getUserId()
+            );
 
+            // =====================================================
+            // NOTIFICATIONS
+            // =====================================================
             notificationClient.sendAssignmentNotification(
                     assignedME.getEmail(),
                     assignedME.getUsername(),
                     restoration.getApplicationNumber(),
                     "Mine Restoration Plan Review"
             );
+
             notificationClient.sendUserNotification(
                     "New Mine Restoration Plan assigned",
                     "A Mine Restoration Plan has been assigned to you for review.",
@@ -187,8 +233,111 @@ public class MineRestorationService {
             );
         }
 
+        // =========================================================
+        // SAVE
+        // =========================================================
         restorationApplicationRepository.save(restoration);
         return toResponse(restoration);
+    }
+
+    private LocalDateTime validateMRPSubmissionEligibility(
+            MiningLeaseApplication miningLeaseApplication,
+            QuarryLeaseApplication quarryLeaseApplication) {
+
+        String leaseStatus;
+        ApplicationMaster applicationMaster;
+
+        if (miningLeaseApplication != null) {
+
+            leaseStatus = miningLeaseApplication.getCurrentStatus();
+            applicationMaster = miningLeaseApplication.getApplicationMaster();
+
+        } else {
+
+            leaseStatus = quarryLeaseApplication.getCurrentStatus();
+            applicationMaster = quarryLeaseApplication.getApplicationMaster();
+        }
+
+        // ---------------------------------------------------------
+        // 1. Lease/Application must be TERMINATED
+        // ---------------------------------------------------------
+
+        if (!"TERMINATED".equalsIgnoreCase(leaseStatus)) {
+
+            throw new BusinessException(
+                    ErrorCodes.INVALID_STATE,
+                    "Mine Restoration Plan can only be submitted for a terminated application."
+            );
+        }
+
+
+        // ---------------------------------------------------------
+        // 2. Application Master must exist
+        // ---------------------------------------------------------
+
+        if (applicationMaster == null) {
+
+            throw new BusinessException(
+                    ErrorCodes.RECORD_NOT_FOUND,
+                    "Application Master record was not found."
+            );
+        }
+
+
+        // ---------------------------------------------------------
+        // 3. Application Master status must be valid
+        // ---------------------------------------------------------
+
+        String masterStatus = applicationMaster.getCurrentStatus();
+
+        boolean validMasterStatus =
+                "TERMINATED".equalsIgnoreCase(masterStatus)
+                        || "TEMPORARY CLOSURE APPROVED".equalsIgnoreCase(masterStatus);
+
+        if (!validMasterStatus) {
+
+            throw new BusinessException(
+                    ErrorCodes.INVALID_STATE,
+                    "Mine Restoration Plan cannot be submitted because the Application Master status is "
+                            + masterStatus
+                            + "."
+            );
+        }
+
+
+        // ---------------------------------------------------------
+        // 4. Approved date must exist
+        // ---------------------------------------------------------
+
+        LocalDateTime approvedAt = applicationMaster.getApprovedAt();
+
+        if (approvedAt == null) {
+
+            throw new BusinessException(
+                    ErrorCodes.INVALID_STATE,
+                    "Application Master approval date is not available."
+            );
+        }
+
+
+        // ---------------------------------------------------------
+        // 5. Calculate MRP submission deadline
+        // ---------------------------------------------------------
+
+        LocalDateTime deadline = approvedAt.plusMonths(2);
+
+        LocalDateTime now = LocalDateTime.now();
+
+        if (now.isAfter(deadline)) {
+
+            throw new BusinessException(
+                    ErrorCodes.INVALID_STATE,
+                    "The deadline for submitting the Mine Restoration Plan has passed. "
+                            + "The deadline was " + deadline.toLocalDate() + "."
+            );
+        }
+
+        return deadline;
     }
 
     @Transactional
@@ -197,8 +346,44 @@ public class MineRestorationService {
 
         if (!STATUS_MRP_REVISION_REQUESTED.equals(restoration.getCurrentStatus())
                 && !STATUS_MRP_DRAFT.equals(restoration.getCurrentStatus())) {
-            throw new BusinessException(ErrorCodes.INVALID_STATE);
+            throw new BusinessException(ErrorCodes.INVALID_STATE, "Invalid current status of the application for resubmission.");
         }
+
+        // =========================================================
+        // VALIDATE RESUBMISSION DEADLINE
+        // =========================================================
+
+        if (STATUS_MRP_REVISION_REQUESTED.equals(
+                restoration.getCurrentStatus())) {
+
+            Date resubmissionDateLine =
+                    restoration.getResubmissionDateLine();
+
+            if (resubmissionDateLine == null) {
+
+                throw new BusinessException(
+                        ErrorCodes.INVALID_STATE,
+                        "Resubmission deadline has not been set for this application."
+                );
+            }
+
+            LocalDate deadline =
+                    resubmissionDateLine.toInstant()
+                            .atZone(ZoneId.systemDefault())
+                            .toLocalDate();
+
+            LocalDate today = LocalDate.now();
+
+            if (today.isAfter(deadline)) {
+
+                throw new BusinessException(
+                        ErrorCodes.INVALID_STATE,
+                        "The resubmission deadline has passed. "
+                                + "The deadline was " + deadline + "."
+                );
+            }
+        }
+
 
         restoration.setMrpDocId(request.getMrpDocId());
         restoration.setCurrentStatus(STATUS_MRP_SUBMITTED);
@@ -481,6 +666,7 @@ public class MineRestorationService {
             }
             case "REVISION_REQUESTED" -> {
                 restoration.setCurrentStatus(STATUS_MRP_REVISION_REQUESTED);
+                restoration.setResubmissionDateLine(request.getResubmissionDateLine());
                 notificationClient.sendRevisionRequestNotification(
                         restoration.getApplicantEmail(),
                         restoration.getApplicantName(),
@@ -963,6 +1149,7 @@ public class MineRestorationService {
         res.setCreatedBy(app.getCreatedBy());
         res.setCreatedOn(app.getCreatedOn());
         res.setUpdatedOn(app.getUpdatedOn());
+        res.setResubmissionDateLine(app.getResubmissionDateLine());
         return res;
     }
 

@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -22,19 +23,18 @@ public class SampleTransportClearanceResponseDTO {
     private String contactNo;
     private String emailAddress;
     private String applicantScope;
-    private String rockMineralName;
-    private String rockMineralNameSpecify;
-    private Integer sampleCount;
-    private String sampleForm;
-    private String sampleFormSpecify;
-    private Double totalWeight;
-    private String weightUnit;
+
+    private List<SampleMineralResponseDTO> minerals;
+
     private String shippingPurpose;
     private String shippingMode;
     private String destination;
     private String destinationCountry;
     private String samplePhotoFileId;
     private String othersFileId;
+
+    private String fileIdGSDFocal;
+
     private Long createdBy;
 
     private LocalDateTime createdOn;
