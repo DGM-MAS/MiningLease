@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface MineRestorationProgressReportRepository extends JpaRepository<MineRestorationProgressReport, Long> {
@@ -57,4 +58,16 @@ public interface MineRestorationProgressReportRepository extends JpaRepository<M
             @Param("userId") Long userId,
             @Param("search") String search,
             Pageable pageable);
+
+
+    boolean existsByRestorationApplicationNumberAndProgressReportNumberAndStatus(
+            String restorationApplicationNumber,
+            Integer progressReportNumber,
+            String status
+    );
+
+    Optional<MineRestorationProgressReport>
+    findTopByRestorationApplicationNumberAndStatusOrderByDateOfProgressReportDesc(
+            String restorationApplicationNumber,
+            String status);
 }

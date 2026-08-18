@@ -76,6 +76,14 @@ public class MineRestorationApplication {
     @Column(name = "work_order_issued_at")
     private LocalDateTime workOrderIssuedAt;
 
+    // ========== Progress Report Scheduling ==========
+
+    @Column(name = "next_progress_report_due_date")
+    private LocalDate nextProgressReportDueDate;
+
+    @Column(name = "progress_report_reminder_sent_at")
+    private LocalDateTime progressReportReminderSentAt;
+
     // ========== Mining Engineer (ME) Review ==========
     @Column(name = "assigned_me_user_id")
     private Long assignedMeUserId;

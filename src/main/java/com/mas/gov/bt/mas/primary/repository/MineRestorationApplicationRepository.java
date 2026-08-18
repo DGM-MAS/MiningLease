@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -113,4 +115,17 @@ public interface MineRestorationApplicationRepository extends JpaRepository<Mine
         WHERE r.applicationNumber LIKE CONCAT(:prefix, '%')
     """)
     Integer findMaxSequenceByPrefix(@Param("prefix") String prefix);
+
+    @Query("""
+    SELECT r
+    FROM MineRestorationApplication r
+    WHERE r.nextProgressReportDueDate IS NOT NULL
+      AND r.nextProgressReportDueDate <= :today
+      AND r.progressReportReminderSentAt IS NULL
+      AND r.currentStatus IN :statuses
+""")
+    List<MineRestorationApplication> findProgressReportsDue(
+            @Param("today") LocalDate today,
+            @Param("statuses") List<String> statuses
+    );
 }
