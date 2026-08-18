@@ -213,7 +213,7 @@ springdoc:
 
 # JWT Configuration (HS512 symmetric key) - must match auth server
 jwt:
-  secret: ${JWT_SECRET:ui+E7GSXc420QM93wD/FuYOZ3UzlDQ314bckuPN1zJQUCN69FpFLc7Ex6XwbY2PXmXM5JNNtYR9mDQoUS0w9KA==}
+  secret: ${JWT_SECRET}
 
 ---
 # ── Production profile ── activate with SPRING_PROFILES_ACTIVE=prod in Kubernetes

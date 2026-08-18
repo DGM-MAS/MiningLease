@@ -441,7 +441,9 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
 
         // New Columns added
         sl.setValidityDate(req.getValidityDate());
-        sl.setQuantity(req.getQuantity());
+        sl.setQuantity(req.getQuantity() != null && !req.getQuantity().isBlank()
+                ? new java.math.BigDecimal(req.getQuantity())
+                : null);
 
         sl.setStockLiftingPermitNo(generatePermitNumber());
         sl.setApplicationFileId(req.getApplicationFileId());
