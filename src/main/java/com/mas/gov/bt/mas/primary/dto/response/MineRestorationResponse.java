@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Date;
 
 @Data
 @NoArgsConstructor
@@ -61,4 +62,5 @@ public class MineRestorationResponse {
     private Long createdBy;
     private LocalDateTime createdOn;
     private LocalDateTime updatedOn;
+    private Date resubmissionDateLine;
 }

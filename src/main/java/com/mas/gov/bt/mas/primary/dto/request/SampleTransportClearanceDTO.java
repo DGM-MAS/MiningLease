@@ -2,6 +2,8 @@ package com.mas.gov.bt.mas.primary.dto.request;
 
 import lombok.*;
 
+import java.util.List;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -13,13 +15,9 @@ public class SampleTransportClearanceDTO {
     private String contactNo;
     private String emailAddress;
     private String applicantScope;
-    private String rockMineralName;
-    private String rockMineralNameSpecify;
-    private Integer sampleCount;
-    private String sampleForm;
-    private String sampleFormSpecify;
-    private Double totalWeight;
-    private String weightUnit;
+
+    private List<SampleMineralDTO> minerals;
+
     private String shippingPurpose;
     private String shippingMode;
     private String destination;

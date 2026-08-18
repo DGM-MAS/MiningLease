@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "t_sample_transport_clearance")
@@ -48,33 +50,46 @@ public class SampleTransportClearanceEntity {
     @Column(name = "applicant_scope", length = 50)
     private String applicantScope;
 
+    // =========================================================
+    // MINERALS
+    // =========================================================
+
+    @OneToMany(
+            mappedBy = "sampleTransportClearance",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    @Builder.Default
+    private List<SampleTransportClearanceMineralEntity> minerals =
+            new ArrayList<>();
+
     // Name of the rock/Mineral
-    @Column(name = "rock_mineral_name", nullable = false, length = 255)
-    private String rockMineralName;
-
-    // Specify (only if rock/mineral name = Other)
-    @Column(name = "rock_mineral_name_specify", length = 255)
-    private String rockMineralNameSpecify;
-
-    // Number of Samples
-    @Column(name = "sample_count", nullable = false)
-    private Integer sampleCount;
-
-    // Form of Sample (Solid/Powder/Other)
-    @Column(name = "sample_form", nullable = false, length = 50)
-    private String sampleForm;
-
-    // Specify (only if sample form = Other)
-    @Column(name = "sample_form_specify", length = 255)
-    private String sampleFormSpecify;
-
-    // Total Weight
-    @Column(name = "total_weight", nullable = false)
-    private Double totalWeight;
-
-    // Unit (KG/G)
-    @Column(name = "weight_unit", nullable = false, length = 20)
-    private String weightUnit;
+//    @Column(name = "rock_mineral_name", nullable = false, length = 255)
+//    private String rockMineralName;
+//
+//    // Specify (only if rock/mineral name = Other)
+//    @Column(name = "rock_mineral_name_specify", length = 255)
+//    private String rockMineralNameSpecify;
+//
+//    // Number of Samples
+//    @Column(name = "sample_count", nullable = false)
+//    private Integer sampleCount;
+//
+//    // Form of Sample (Solid/Powder/Other)
+//    @Column(name = "sample_form", nullable = false, length = 50)
+//    private String sampleForm;
+//
+//    // Specify (only if sample form = Other)
+//    @Column(name = "sample_form_specify", length = 255)
+//    private String sampleFormSpecify;
+//
+//    // Total Weight
+//    @Column(name = "total_weight", nullable = false)
+//    private Double totalWeight;
+//
+//    // Unit (KG/G)
+//    @Column(name = "weight_unit", nullable = false, length = 20)
+//    private String weightUnit;
 
     // Purpose of shipping
     @Column(name = "shipping_purpose", length = 500)
@@ -113,6 +128,10 @@ public class SampleTransportClearanceEntity {
 
     @Column(name = "assigned_gsd_focal_remarks", columnDefinition = "TEXT")
     private String assignedGSDFocalRemarks;
+
+    @Column(name = "file_id_gsd_focal")
+    private String fileIdGSDFocal;
+
 
     /* ================= AUDIT COLUMNS ================= */
 
