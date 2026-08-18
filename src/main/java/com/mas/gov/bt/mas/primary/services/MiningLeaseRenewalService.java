@@ -1693,7 +1693,7 @@ public class MiningLeaseRenewalService {
                 .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
 
         String currentStatus = app.getCurrentStatus();
-        if (!"DIRECTOR APPROVED FMFS".equals(currentStatus) && !"NOTE SHEET UPLOADED".equals(currentStatus)) {
+        if (!"DIRECTOR APPROVED FMFS".equals(currentStatus) && !"APPROVED BY MINISTRY".equals(currentStatus)) {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
         }
 
