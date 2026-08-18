@@ -386,6 +386,8 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             entity.setIomFileId(request.getIomFileId());
             entity.setSignedEcFileId(request.getSignedEcFileId());
             entity.setEcFeeAmount(request.getEcFeeAmount());
+            entity.setEcExpiryDate(request.getEcExpiryDate());
+            entity.setEcNumber(request.getEcNumber());
             entity.setIomSubmittedOn(LocalDateTime.now());
 
             // Only actually route through a payment step if the EC fee is enabled —
