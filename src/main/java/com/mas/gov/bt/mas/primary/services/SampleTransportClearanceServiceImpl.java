@@ -105,6 +105,44 @@ public class SampleTransportClearanceServiceImpl
             SampleTransportClearanceEntity entity =
                     sampleTransportClearanceMapper.toEntity(request);
 
+            if (request.getMinerals() != null) {
+
+                List<SampleTransportClearanceMineralEntity> minerals =
+                        request.getMinerals().stream()
+                                .map(mineralDTO -> {
+
+                                    SampleTransportClearanceMineralEntity mineral =
+                                            new SampleTransportClearanceMineralEntity();
+
+                                    mineral.setRockMineralName(
+                                            mineralDTO.getRockMineralName());
+
+                                    mineral.setRockMineralNameSpecify(
+                                            mineralDTO.getRockMineralNameSpecify());
+
+                                    mineral.setSampleCount(
+                                            mineralDTO.getSampleCount());
+
+                                    mineral.setSampleForm(
+                                            mineralDTO.getSampleForm());
+
+                                    mineral.setSampleFormSpecify(
+                                            mineralDTO.getSampleFormSpecify());
+
+                                    mineral.setTotalWeight(
+                                            mineralDTO.getTotalWeight());
+
+                                    mineral.setWeightUnit(
+                                            mineralDTO.getWeightUnit());
+
+                                    mineral.setSampleTransportClearance(entity);
+
+                                    return mineral;
+                                })
+                                .toList();
+
+                entity.setMinerals(minerals);
+            }
 
             // Site Details
 //            entity.setSiteApplicationNo(request.getSiteApplicationNo());
