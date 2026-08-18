@@ -173,6 +173,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         }else {
 
             Optional<SurfaceCollectionPermitEntity> surfaceCollectionPermitEntity = surfaceCollectionPermitRepository.findByApplicationNo(request.getSiteApplicationNo());
+
             if (surfaceCollectionPermitEntity.isPresent()) {
                 regionId = surfaceCollectionPermitEntity.get().getRegionId();
             }
