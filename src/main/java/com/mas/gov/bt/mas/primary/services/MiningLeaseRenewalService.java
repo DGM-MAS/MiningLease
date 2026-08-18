@@ -1736,10 +1736,10 @@ public class MiningLeaseRenewalService {
 
         ApplicationMaster master = app.getApplicationMaster();
         app.setNoteSheetDocId(request.getNoteSheetDocId());
-        app.setCurrentStatus("NOTE SHEET UPLOADED");
+        app.setCurrentStatus("APPROVED BY MINISTRY");
 
         if (master != null) {
-            master.setCurrentStatus("NOTE SHEET UPLOADED");
+            master.setCurrentStatus("APPROVED BY MINISTRY");
             applicationMasterRepository.save(master);
         }
 
