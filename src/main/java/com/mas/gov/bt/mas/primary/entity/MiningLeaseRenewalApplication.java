@@ -9,6 +9,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Date;
 
 @Entity
 @Table(name = "t_mining_lease_renewal_application")
@@ -49,6 +50,9 @@ public class MiningLeaseRenewalApplication {
     private String telephoneNo;
 
     // ========== Lease Period ==========
+    @Column(name = "lease_start_date")
+    private LocalDate leaseStartDate;
+
     @Column(name = "lease_end_date")
     private LocalDate leaseEndDate;
 
@@ -109,6 +113,9 @@ public class MiningLeaseRenewalApplication {
 
     @Column(name = "fmfs_status", length = 30)
     private String fmfsStatus;
+
+    @Column(name = "tor_file_id")
+    private String torFileId;
 
     // Focal review details and file upload part
 
@@ -178,7 +185,7 @@ public class MiningLeaseRenewalApplication {
     @Column(name = "payable_amount", precision = 19, scale = 2)
     private java.math.BigDecimal payableAmount;
 
-    @Column(name = "current_status", length = 30)
+    @Column(name = "current_status", length = 80)
     private String currentStatus;
 
     // ========== Audit Fields ==========
@@ -207,6 +214,22 @@ public class MiningLeaseRenewalApplication {
 
     @Column(name = "region_id")
     private Long regionId;
+
+    // Added after Review
+    // New Requirement For EC
+    // SUBMITTED BY Promoter
+
+    @Column(name = "ec_file_id")
+    private String ecFileId;
+
+    @Column(name = "ec_number")
+    private String ecNumber;
+
+    @Column(name = "ec_status", length = 30)
+    private String eCStatus;
+
+    @Column(name = "ec_expiry_date", length = 30)
+    private Date ecExpiryDate;
 
     /* ===== Soft Delete ===== */
     @Column(name = "is_active")

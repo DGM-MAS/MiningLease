@@ -1141,13 +1141,13 @@ public class MiningLeaseRenewalService {
                                 reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     }
                 }
-                case "Resubmit GR" -> {
-                    miningLeaseRenewalApplication.setCurrentStatus("RESUBMIT GR");
+                case "Resubmit Application" -> {
+                    miningLeaseRenewalApplication.setCurrentStatus("RESUBMIT APP GEOLOGIST");
                     miningLeaseRenewalApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     miningLeaseRenewalApplication.setGeologistReviewedAt(LocalDateTime.now());
 
                     if (applicationMaster != null) {
-                        applicationMaster.setCurrentStatus("RESUBMIT GR");
+                        applicationMaster.setCurrentStatus("RESUBMIT APP GEOLOGIST");
                         applicationMasterRepository.save(applicationMaster);
                     }
 
@@ -1302,6 +1302,7 @@ public class MiningLeaseRenewalService {
                     miningLeaseRenewalApplication = miningLeaseRenewalApplication1.get();
                     ApplicationMaster applicationMaster = miningLeaseRenewalApplication.getApplicationMaster();
                     miningLeaseRenewalApplication.setFmfsDocId(request.getFmfsDocId());
+                    miningLeaseRenewalApplication.setTorFileId(request.getTorFileId());
                     miningLeaseRenewalApplication.setCurrentStatus("FMFS SUBMITTED");
                     applicationMaster.setCurrentStatus("FMFS SUBMITTED");
                     applicationMasterRepository.save(applicationMaster);
@@ -1310,6 +1311,68 @@ public class MiningLeaseRenewalService {
 
                     createTask(applicationMaster, miningLeaseRenewalApplication, "MINE ENGINEER", userId, taskManagement.getAssignedToUserId());
                     UserWorkloadProjection userWorkloadProjection = miningLeaseRenewalApplicationRepository.findUserDetailsME(taskManagement.getAssignedToUserId());
+                    if (userWorkloadProjection.getEmail() != null) {
+                        notificationClient.sendStatusUpdateNotification(
+                                miningLeaseRenewalApplication.getApplicantEmail(),
+                                miningLeaseRenewalApplication.getApplicantCid(),
+                                miningLeaseRenewalApplication.getApplicationNumber(),
+                                "FMFS SUBMITTED",
+                                "FMFS for application " + miningLeaseRenewalApplication.getApplicationNumber() + " has been submitted by the client.");
+                    }
+
+                    if (userWorkloadProjection.getUserId() != null) {
+                        String title = "Mining lease application has been assigned for FMFS review.";
+                        String message = "Mining lease application has been  assigned for FMFS review.";
+                        String serviceId = MENU_ID_MINE_ENGINEER;
+                        notificationClient.sendUserNotification(title, message, userWorkloadProjection.getUserId(), serviceId, "STAFF", true, miningLeaseRenewalApplication.getApplicationNumber());
+                    }
+                }
+
+            }else {
+                throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
+            }
+        }
+        return mapper.toRenewalResponse(miningLeaseRenewalApplication);
+    }
+
+    @Transactional
+    public MiningLeaseResponse submitEC(@Valid MiningLeaseFMFSRequest request, Long userId) {
+        MiningLeaseRenewalApplication miningLeaseRenewalApplication = null;
+        new TaskManagement();
+        TaskManagement taskManagement;
+
+        if (request.getApplicationNo() != null) {
+            Optional<MiningLeaseRenewalApplication> miningLeaseRenewalApplication1 = miningLeaseRenewalApplicationRepository.findByApplicationNumber(request.getApplicationNo());
+            List<TaskManagement> taskManagements = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNo(),"ASSIGNED", "MINE ENGINEER", SERVICE_CODE);
+
+            if (miningLeaseRenewalApplication1.isPresent()) {
+                if (taskManagements != null && !taskManagements.isEmpty()) {
+                    taskManagement = taskManagements.getFirst();
+
+                    miningLeaseRenewalApplication = miningLeaseRenewalApplication1.get();
+
+                    ApplicationMaster applicationMaster = miningLeaseRenewalApplication.getApplicationMaster();
+
+                    // New Requirement from client side
+                    if(request.getEcFileId() != null && request.getEcNumber() != null && request.getEcExpiryDate() != null) {
+                        miningLeaseRenewalApplication.setEcFileId(request.getEcFileId());
+                        miningLeaseRenewalApplication.setEcNumber(request.getEcNumber());
+                        miningLeaseRenewalApplication.setEcExpiryDate(request.getEcExpiryDate());
+                        miningLeaseRenewalApplication.setECStatus("ACTIVE");
+                    }else{
+                        throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION, "EC DETAILS HAS TO BE SUBMITTED");
+                    }
+
+                    miningLeaseRenewalApplication.setCurrentStatus("EC SUBMITTED");
+                    applicationMaster.setCurrentStatus("EC SUBMITTED");
+                    applicationMasterRepository.save(applicationMaster);
+                    miningLeaseRenewalApplicationRepository.save(miningLeaseRenewalApplication);
+
+
+                    createTask(applicationMaster, miningLeaseRenewalApplication, "MINE ENGINEER", userId, taskManagement.getAssignedToUserId());
+
+                    UserWorkloadProjection userWorkloadProjection = miningLeaseRenewalApplicationRepository.findUserDetailsME(taskManagement.getAssignedToUserId());
+
                     if (userWorkloadProjection.getEmail() != null) {
                         notificationClient.sendStatusUpdateNotification(
                                 miningLeaseRenewalApplication.getApplicantEmail(),
@@ -1570,23 +1633,36 @@ public class MiningLeaseRenewalService {
         MiningLeaseRenewalApplication miningLeaseRenewalApplication = null;
         if (request.getApplicationNo() != null) {
             Optional<MiningLeaseRenewalApplication> miningLeaseRenewalApplication1 = miningLeaseRenewalApplicationRepository.findByApplicationNumber(request.getApplicationNo());
+
             if (miningLeaseRenewalApplication1.isPresent()) {
+
                 miningLeaseRenewalApplication = miningLeaseRenewalApplication1.get();
                 ApplicationMaster applicationMaster = miningLeaseRenewalApplication.getApplicationMaster();
+
                 miningLeaseRenewalApplication.setMlaDocId(request.getMlaDocId());
                 miningLeaseRenewalApplication.setWorkOrderDocId(request.getWorkOrderDocId());
+
                 miningLeaseRenewalApplication.setMlaStatus("SUBMITTED");
                 miningLeaseRenewalApplication.setCurrentStatus("MLA SUBMITTED");
+
+                miningLeaseRenewalApplication.setLeaseStartDate(request.getLeaseStartDate());
+                miningLeaseRenewalApplication.setLeaseEndDate(request.getLeaseEndDate());
+
                 applicationMaster.setCurrentStatus("MLA SUBMITTED");
+
                 applicationMasterRepository.save(applicationMaster);
                 miningLeaseRenewalApplicationRepository.save(miningLeaseRenewalApplication);
 
 
                 List<String> status = new ArrayList<>();
+
                 status.add("SUBMITTED");
                 status.add("PAYMENT PENDING");
+
                 List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusInAndAssignedToRole(miningLeaseRenewalApplication.getApplicationNumber(),status,"DIRECTOR");
+
                 Long directorId = null;
+
                 if (taskManagement != null) {
                     TaskManagement taskManagement1 = taskManagement.getFirst();
                     directorId = taskManagement1.getAssignedToUserId();
@@ -1595,6 +1671,7 @@ public class MiningLeaseRenewalService {
                 createTask(applicationMaster,miningLeaseRenewalApplication,"DIRECTOR", userId, directorId);
 
                 UserWorkloadProjection assignedDirectorDetails = miningLeaseApplicationRepository.findUserDetails(directorId);
+
                 if(assignedDirectorDetails.getUserId() != null) {
                     String title = "Mining lease application has been assigned for MLA review.";
                     String message = "Mining lease application has been  assigned for MLA review.";
@@ -1616,7 +1693,7 @@ public class MiningLeaseRenewalService {
                 .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
 
         String currentStatus = app.getCurrentStatus();
-        if (!"DIRECTOR APPROVED FMFS".equals(currentStatus) && !"NOTE SHEET UPLOADED".equals(currentStatus)) {
+        if (!"DIRECTOR APPROVED FMFS".equals(currentStatus) && !"APPROVED BY MINISTRY".equals(currentStatus)) {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
         }
 
@@ -1659,10 +1736,10 @@ public class MiningLeaseRenewalService {
 
         ApplicationMaster master = app.getApplicationMaster();
         app.setNoteSheetDocId(request.getNoteSheetDocId());
-        app.setCurrentStatus("NOTE SHEET UPLOADED");
+        app.setCurrentStatus("APPROVED BY MINISTRY");
 
         if (master != null) {
-            master.setCurrentStatus("NOTE SHEET UPLOADED");
+            master.setCurrentStatus("APPROVED BY MINISTRY");
             applicationMasterRepository.save(master);
         }
 
@@ -1762,9 +1839,9 @@ public class MiningLeaseRenewalService {
 
         if (isGeologistResubmit) {
             // Resubmission after Geologist sent back → re-assign to Geologist
-            app.setCurrentStatus("RESUBMITTED APPLICATION");
+            app.setCurrentStatus("RESUBMITTED APPLICATION GEO");
             if (master != null) {
-                master.setCurrentStatus("RESUBMITTED APPLICATION");
+                master.setCurrentStatus("RESUBMITTED APPLICATION GEO");
                 applicationMasterRepository.save(master);
             }
 
@@ -1786,9 +1863,9 @@ public class MiningLeaseRenewalService {
             }
         } else {
             // Resubmission after ME sent back → re-assign to ME
-            app.setCurrentStatus("RESUBMITTED APPLICATION");
+            app.setCurrentStatus("RESUBMITTED APPLICATION ME");
             if (master != null) {
-                master.setCurrentStatus("RESUBMITTED APPLICATION");
+                master.setCurrentStatus("RESUBMITTED APPLICATION ME");
                 applicationMasterRepository.save(master);
             }
 
@@ -2188,4 +2265,5 @@ public class MiningLeaseRenewalService {
                 responsePage
         );
     }
+
 }
