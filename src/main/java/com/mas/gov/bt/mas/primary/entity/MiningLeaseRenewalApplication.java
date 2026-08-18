@@ -178,7 +178,7 @@ public class MiningLeaseRenewalApplication {
     @Column(name = "payable_amount", precision = 19, scale = 2)
     private java.math.BigDecimal payableAmount;
 
-    @Column(name = "current_status", length = 30)
+    @Column(name = "current_status", length = 80)
     private String currentStatus;
 
     // ========== Audit Fields ==========
