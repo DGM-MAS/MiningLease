@@ -1141,13 +1141,13 @@ public class MiningLeaseRenewalService {
                                 reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     }
                 }
-                case "Resubmit GR" -> {
-                    miningLeaseRenewalApplication.setCurrentStatus("RESUBMIT GR");
+                case "Resubmit Application" -> {
+                    miningLeaseRenewalApplication.setCurrentStatus("RESUBMIT APP GEOLOGIST");
                     miningLeaseRenewalApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     miningLeaseRenewalApplication.setGeologistReviewedAt(LocalDateTime.now());
 
                     if (applicationMaster != null) {
-                        applicationMaster.setCurrentStatus("RESUBMIT GR");
+                        applicationMaster.setCurrentStatus("RESUBMIT APP GEOLOGIST");
                         applicationMasterRepository.save(applicationMaster);
                     }
 
@@ -1758,9 +1758,9 @@ public class MiningLeaseRenewalService {
 
         if ("RESUBMIT-RENEWAL".equals(currentStatus)) {
             // Resubmission after Geologist sent back → re-assign to Geologist
-            app.setCurrentStatus("RESUBMITTED APPLICATION");
+            app.setCurrentStatus("RESUBMITTED APPLICATION GEOLOGIST");
             if (master != null) {
-                master.setCurrentStatus("RESUBMITTED APPLICATION");
+                master.setCurrentStatus("RESUBMITTED APPLICATION GEOLOGIST");
                 applicationMasterRepository.save(master);
             }
 
@@ -1782,9 +1782,9 @@ public class MiningLeaseRenewalService {
             }
         } else {
             // Resubmission after ME sent back → re-assign to ME
-            app.setCurrentStatus("RESUBMITTED APPLICATION");
+            app.setCurrentStatus("RESUBMITTED APPLICATION MINING ENGINEER");
             if (master != null) {
-                master.setCurrentStatus("RESUBMITTED APPLICATION");
+                master.setCurrentStatus("RESUBMITTED APPLICATION MINING ENGINEER");
                 applicationMasterRepository.save(master);
             }
 
@@ -2184,4 +2184,5 @@ public class MiningLeaseRenewalService {
                 responsePage
         );
     }
+
 }
