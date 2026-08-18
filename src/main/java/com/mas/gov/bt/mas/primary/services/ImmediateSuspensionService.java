@@ -237,27 +237,17 @@ public class ImmediateSuspensionService {
         String villageName = "";
         String placeOfMiningActivity = "";
         if (surfaceCollectionPermitEntity.getDzongkhag() != null && !surfaceCollectionPermitEntity.getDzongkhag().isEmpty()) {
-            DzongkhagLookup dzongkhag = dzongkhagLookupRepository
-                    .findById(surfaceCollectionPermitEntity.getDzongkhag())
-                    .orElseThrow(() -> new RuntimeException("Invalid Dzongkhag ID"));
-            dzongkhagName = dzongkhag.getDzongkhagName();
-
-            regionName = dzongkhag.getRegion().getRegionName();
+            dzongkhagName = surfaceCollectionPermitEntity.getDzongkhag();
         }
 
         if (surfaceCollectionPermitEntity.getGewog() != null && !surfaceCollectionPermitEntity.getGewog().isEmpty()) {
-            GewogLookup gewog = (GewogLookup) gewogLookupRepository
-                    .findByGewogId(surfaceCollectionPermitEntity.getGewog())
-                    .orElseThrow(() -> new RuntimeException("Invalid gewog ID"));
-            gewogName = gewog.getGewogName();
+            gewogName = surfaceCollectionPermitEntity.getGewog();
         }
 
         if (surfaceCollectionPermitEntity.getPlaceVillage() != null && !surfaceCollectionPermitEntity.getPlaceVillage().isEmpty()) {
-            VillageLookup villageLookup = villageLookupRepository
-                    .findByVillageSerialNo(Integer.parseInt(surfaceCollectionPermitEntity.getPlaceVillage()))
-                    .orElseThrow(() -> new RuntimeException("Invalid village ID"));
 
-            villageName = villageLookup.getVillageName();
+
+            villageName = surfaceCollectionPermitEntity.getPlaceVillage();
         }
 
         ImmediateSuspensionApplication suspension =

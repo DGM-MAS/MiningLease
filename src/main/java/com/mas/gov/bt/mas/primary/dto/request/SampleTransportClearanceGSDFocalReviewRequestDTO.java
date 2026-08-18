@@ -10,4 +10,5 @@ public class SampleTransportClearanceGSDFocalReviewRequestDTO {
     private String remarksGSDFocal;
     private String applicationNo;
     private String status;
+    private String fileIdGSDFocal;
 }

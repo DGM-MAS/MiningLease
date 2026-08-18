@@ -243,7 +243,7 @@ public class TerminationService {
      * Updates the underlying lease application's status once a termination is decided, trying
      * Mining Lease first and falling back to Quarry Lease, mirroring resolveAndMarkUnderReview.
      */
-    private void updateLeaseApplicationStatus(String appNo, String miningStatus, String quarryStatus) {
+    private void updateLeaseApplicationStatus(String appNo, String miningStatus, String quarryStatus, String surfaceCollectionStatus) {
         String serviceType = "";
         ApplicationMaster master = null;
 
@@ -285,9 +285,9 @@ public class TerminationService {
 
         if (applicationSurfaceCollection.isPresent()) {
             SurfaceCollectionPermitEntity surfaceCollectionPermitEntity = applicationSurfaceCollection.get();
-            surfaceCollectionPermitEntity.setStatus(quarryStatus);
+            surfaceCollectionPermitEntity.setStatus(surfaceCollectionStatus);
             master = applicationMaster1;
-            master.setCurrentStatus(quarryStatus);
+            master.setCurrentStatus(surfaceCollectionStatus);
             serviceType = "SURFACE_COLLECTION_PERMIT";
             applicationMasterRepository.save(master);
             surfaceCollectionPermitRepository.save(surfaceCollectionPermitEntity);
@@ -460,7 +460,7 @@ public class TerminationService {
                     assert master != null;
                     createTask( master, app, "DIRECTOR CMS APPROVED", userId, app.getCreatedBy());
 
-                    updateLeaseApplicationStatus(app.getApplicationNumber(), "TERMINATED", "TERMINATED");
+                    updateLeaseApplicationStatus(app.getApplicationNumber(), "TERMINATED", "TERMINATED", "TERMINATED");
                 }
                 case "Rectification" -> {
                     LocalDateTime now = LocalDateTime.now();
@@ -526,7 +526,7 @@ public class TerminationService {
                     assert master != null;
                     createTask( master, app, "TERMINATION CANCELED", userId, app.getCreatedBy());
 
-                    updateLeaseApplicationStatus(app.getApplicationNumber(), "MINING LEASE APPROVED", "QUARRY LEASE APPROVED");
+                    updateLeaseApplicationStatus(app.getApplicationNumber(), "MINING LEASE APPROVED", "QUARRY LEASE APPROVED", "PERMIT_ISSUED");
                 }
                 default -> throw new IllegalArgumentException("Application status not recognized");
             }

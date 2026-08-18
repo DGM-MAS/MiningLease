@@ -102,4 +102,17 @@ public interface SampleTransportClearanceRepository extends JpaRepository<Sample
     long countByAssignedGSDFocalIdAndStatusIn(Long userId, List<String> applicationStatus);
 
     Page<SampleTransportClearanceEntity> findByAssignedGSDFocalIdAndApplicationNoContainingIgnoreCaseAndStatusIn(Long userId, String trim, Pageable pageable, List<String> applicationStatus);
+
+    @Query(value = """
+    SELECT 
+        u.id AS userId,
+        u.email AS email,
+        u.username AS userName
+    FROM mas_db.t_citizens u
+    WHERE u.id = :createdBy
+      AND u.account_status = 'ACTIVE'
+    GROUP BY u.id, u.email, u.username
+    LIMIT 1
+    """, nativeQuery = true)
+    UserWorkloadProjection findCitizenDetails(Long createdBy);
 }
