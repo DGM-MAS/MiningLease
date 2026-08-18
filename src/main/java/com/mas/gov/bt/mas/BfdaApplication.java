@@ -11,6 +11,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class BfdaApplication {
 
     public static void main(String[] args) {
+
         SpringApplication.run(BfdaApplication.class, args);
     }
 

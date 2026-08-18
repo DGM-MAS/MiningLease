@@ -417,49 +417,101 @@ public class MineRestorationService {
 
     @Transactional
     public MineRestorationProgressReportResponse submitProgressReport(
-            MineRestorationProgressReportRequest request, Long userId) {
+            MineRestorationProgressReportRequest request,
+            Long userId) {
 
-        MineRestorationApplication restoration = restorationApplicationRepository
-                .findByApplicationNumber(request.getRestorationApplicationNumber())
-                .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
+        MineRestorationApplication restoration =
+                restorationApplicationRepository
+                        .findByApplicationNumber(
+                                request.getRestorationApplicationNumber())
+                        .orElseThrow(() ->
+                                new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
 
-//        if (!STATUS_RESTORATION_IN_PROGRESS.equals(restoration.getCurrentStatus())
-//                && !STATUS_PROGRESS_REPORT_SUBMITTED.equals(restoration.getCurrentStatus())) {
-//            throw new BusinessException(ErrorCodes.INVALID_STATE);
-//        }
+        boolean isDraft =
+                "DRAFT".equalsIgnoreCase(request.getStatus());
 
-        MineRestorationProgressReport report = new MineRestorationProgressReport();
-        report.setRestorationApplicationNumber(request.getRestorationApplicationNumber());
-        report.setNameOfMine(restoration.getNameOfMine());
-        report.setLeaseAreaAcres(restoration.getLeaseAreaAcres());
-        report.setNameOfLessee(restoration.getApplicantName());
-        report.setLocationImageDocId(request.getLocationImageDocId());
-        report.setStartDateOfMineRestoration(request.getStartDateOfMineRestoration());
-        report.setDateOfProgressReport(request.getDateOfProgressReport());
-        report.setActivityDescription(request.getActivityDescription());
-        report.setFinancialProgress(request.getFinancialProgress());
-        report.setPhysicalProgress(request.getPhysicalProgress());
-        report.setPictorialEvidenceDocId(request.getPictorialEvidenceDocId());
+        /*
+         * Only enforce the six-month rule when the applicant
+         * actually submits the progress report.
+         */
+        if (!isDraft) {
+            validateProgressReportSubmission(restoration);
+        }
+
+        MineRestorationProgressReport report =
+                new MineRestorationProgressReport();
+
+        report.setRestorationApplicationNumber(
+                request.getRestorationApplicationNumber());
+
+        report.setNameOfMine(
+                restoration.getNameOfMine());
+
+        report.setLeaseAreaAcres(
+                restoration.getLeaseAreaAcres());
+
+        report.setNameOfLessee(
+                restoration.getApplicantName());
+
+        report.setLocationImageDocId(
+                request.getLocationImageDocId());
+
+        report.setStartDateOfMineRestoration(
+                request.getStartDateOfMineRestoration());
+
+        report.setDateOfProgressReport(
+                request.getDateOfProgressReport());
+
+        report.setActivityDescription(
+                request.getActivityDescription());
+
+        report.setFinancialProgress(
+                request.getFinancialProgress());
+
+        report.setPhysicalProgress(
+                request.getPhysicalProgress());
+
+        report.setPictorialEvidenceDocId(
+                request.getPictorialEvidenceDocId());
+
         report.setSubmittedBy(userId);
 
-        boolean isDraft = "DRAFT".equalsIgnoreCase(request.getStatus());
         if (isDraft) {
+
             report.setStatus(STATUS_PROGRESS_REPORT_DRAFT);
-            restoration.setCurrentStatus(STATUS_PROGRESS_REPORT_DRAFT);
-            restorationApplicationRepository.save(restoration);
-        } else {
-            long count = progressReportRepository.countSubmittedReports(request.getRestorationApplicationNumber());
-            report.setProgressReportNumber((int) count + 1);
-            report.setStatus("PROGRESS_REPORT_SUBMITTED");
-            restoration.setCurrentStatus(STATUS_PROGRESS_REPORT_SUBMITTED);
+
+            restoration.setCurrentStatus(
+                    STATUS_PROGRESS_REPORT_DRAFT);
+
             restorationApplicationRepository.save(restoration);
 
-            // Auto-assign RC randomly between userId 18 and 21
-            long assignedRcUserId = new Random().nextBoolean() ? 18L : 21L;
+        } else {
+
+            long count =
+                    progressReportRepository.countSubmittedReports(
+                            request.getRestorationApplicationNumber());
+
+            report.setProgressReportNumber(
+                    (int) count + 1);
+
+            report.setStatus(
+                    "PROGRESS_REPORT_SUBMITTED");
+
+            restoration.setCurrentStatus(
+                    STATUS_PROGRESS_REPORT_SUBMITTED);
+
+            restorationApplicationRepository.save(restoration);
+
+            // Auto-assign RC
+            long assignedRcUserId =
+                    new Random().nextBoolean() ? 18L : 21L;
+
             report.setAssignedRcUserId(assignedRcUserId);
+
             notificationClient.sendUserNotification(
                     "Progress Report Assigned for Verification",
-                    "A progress report for application " + restoration.getApplicationNumber()
+                    "A progress report for application "
+                            + restoration.getApplicationNumber()
                             + " has been assigned to you for verification.",
                     assignedRcUserId,
                     MENU_ID_RC,
@@ -470,10 +522,13 @@ public class MineRestorationService {
 
             // Notify ME
             if (restoration.getAssignedMeUserId() != null) {
+
                 notificationClient.sendUserNotification(
                         "Progress Report Submitted",
-                        "Progress report #" + report.getProgressReportNumber()
-                                + " submitted for application " + restoration.getApplicationNumber(),
+                        "Progress report #"
+                                + report.getProgressReportNumber()
+                                + " submitted for application "
+                                + restoration.getApplicationNumber(),
                         restoration.getAssignedMeUserId(),
                         MENU_ID_MINING_ENGINEER,
                         "STAFF",
@@ -484,7 +539,65 @@ public class MineRestorationService {
         }
 
         progressReportRepository.save(report);
+
         return toProgressReportResponse(report);
+    }
+
+    private void validateProgressReportSubmission(
+            MineRestorationApplication restoration) {
+
+        if (restoration.getWorkOrderIssuedAt() == null) {
+            throw new BusinessException(
+                    ErrorCodes.INVALID_STATE,
+                    "Work order has not been issued. Progress report cannot be submitted."
+            );
+        }
+
+        LocalDate today = LocalDate.now();
+
+        Optional<MineRestorationProgressReport> latestReport =
+                progressReportRepository
+                        .findTopByRestorationApplicationNumberAndStatusOrderByDateOfProgressReportDesc(
+                                restoration.getApplicationNumber(),
+                                "PROGRESS_REPORT_SUBMITTED"
+                        );
+
+        LocalDate eligibleDate;
+
+        if (latestReport.isEmpty()) {
+
+            // First progress report
+            eligibleDate = restoration
+                    .getWorkOrderIssuedAt()
+                    .toLocalDate()
+                    .plusMonths(6);
+
+        } else {
+
+            // Subsequent progress report
+            MineRestorationProgressReport previousReport =
+                    latestReport.get();
+
+            if (previousReport.getDateOfProgressReport() == null) {
+                throw new BusinessException(
+                        ErrorCodes.INVALID_STATE,
+                        "Previous progress report does not have a report date."
+                );
+            }
+
+            eligibleDate = previousReport
+                    .getDateOfProgressReport()
+                    .plusMonths(6);
+        }
+
+        if (today.isBefore(eligibleDate)) {
+
+            throw new BusinessException(
+                    ErrorCodes.INVALID_STATE,
+                    "Progress report cannot be submitted before "
+                            + eligibleDate + ". The next progress report is due after six months."
+            );
+        }
     }
 
     // =====================================================
@@ -723,18 +836,46 @@ public class MineRestorationService {
             throw new BusinessException(ErrorCodes.INVALID_STATE);
         }
 
+        LocalDateTime workOrderIssuedAt = LocalDateTime.now();
+
         restoration.setWorkOrderDocId(workOrderDocId);
-        restoration.setWorkOrderIssuedAt(LocalDateTime.now());
-        restoration.setCurrentStatus(STATUS_RESTORATION_IN_PROGRESS);
+
+        restoration.setWorkOrderIssuedAt(
+                workOrderIssuedAt
+        );
+
+        /*
+         * Progress Report #1 is due exactly six months
+         * from the date the work order was issued.
+         */
+        restoration.setNextProgressReportDueDate(
+                workOrderIssuedAt
+                        .toLocalDate()
+                        .plusMonths(6)
+        );
+
+        /*
+         * No reminder has been sent yet because this
+         * is a newly issued work order.
+         */
+        restoration.setProgressReportReminderSentAt(null);
+
+        restoration.setCurrentStatus(
+                STATUS_RESTORATION_IN_PROGRESS
+        );
+
         restoration.setUpdatedBy(userId);
 
         restorationApplicationRepository.save(restoration);
 
+        // Email notification
         notificationClient.sendWorkOrderNotification(
                 restoration.getApplicantEmail(),
                 restoration.getApplicantName(),
                 restoration.getApplicationNumber()
         );
+
+        // Applicant notification
         notificationClient.sendUserNotification(
                 "Work Order Issued",
                 "Work order for the restoration works has been issued. You shall submit a progress report for the "
