@@ -1302,6 +1302,7 @@ public class MiningLeaseRenewalService {
                     miningLeaseRenewalApplication = miningLeaseRenewalApplication1.get();
                     ApplicationMaster applicationMaster = miningLeaseRenewalApplication.getApplicationMaster();
                     miningLeaseRenewalApplication.setFmfsDocId(request.getFmfsDocId());
+                    miningLeaseRenewalApplication.setTorFileId(request.getTorFileId());
                     miningLeaseRenewalApplication.setCurrentStatus("FMFS SUBMITTED");
                     applicationMaster.setCurrentStatus("FMFS SUBMITTED");
                     applicationMasterRepository.save(applicationMaster);
@@ -1310,6 +1311,68 @@ public class MiningLeaseRenewalService {
 
                     createTask(applicationMaster, miningLeaseRenewalApplication, "MINE ENGINEER", userId, taskManagement.getAssignedToUserId());
                     UserWorkloadProjection userWorkloadProjection = miningLeaseRenewalApplicationRepository.findUserDetailsME(taskManagement.getAssignedToUserId());
+                    if (userWorkloadProjection.getEmail() != null) {
+                        notificationClient.sendStatusUpdateNotification(
+                                miningLeaseRenewalApplication.getApplicantEmail(),
+                                miningLeaseRenewalApplication.getApplicantCid(),
+                                miningLeaseRenewalApplication.getApplicationNumber(),
+                                "FMFS SUBMITTED",
+                                "FMFS for application " + miningLeaseRenewalApplication.getApplicationNumber() + " has been submitted by the client.");
+                    }
+
+                    if (userWorkloadProjection.getUserId() != null) {
+                        String title = "Mining lease application has been assigned for FMFS review.";
+                        String message = "Mining lease application has been  assigned for FMFS review.";
+                        String serviceId = MENU_ID_MINE_ENGINEER;
+                        notificationClient.sendUserNotification(title, message, userWorkloadProjection.getUserId(), serviceId, "STAFF", true, miningLeaseRenewalApplication.getApplicationNumber());
+                    }
+                }
+
+            }else {
+                throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
+            }
+        }
+        return mapper.toRenewalResponse(miningLeaseRenewalApplication);
+    }
+
+    @Transactional
+    public MiningLeaseResponse submitEC(@Valid MiningLeaseFMFSRequest request, Long userId) {
+        MiningLeaseRenewalApplication miningLeaseRenewalApplication = null;
+        new TaskManagement();
+        TaskManagement taskManagement;
+
+        if (request.getApplicationNo() != null) {
+            Optional<MiningLeaseRenewalApplication> miningLeaseRenewalApplication1 = miningLeaseRenewalApplicationRepository.findByApplicationNumber(request.getApplicationNo());
+            List<TaskManagement> taskManagements = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNo(),"ASSIGNED", "MINE ENGINEER", SERVICE_CODE);
+
+            if (miningLeaseRenewalApplication1.isPresent()) {
+                if (taskManagements != null && !taskManagements.isEmpty()) {
+                    taskManagement = taskManagements.getFirst();
+
+                    miningLeaseRenewalApplication = miningLeaseRenewalApplication1.get();
+
+                    ApplicationMaster applicationMaster = miningLeaseRenewalApplication.getApplicationMaster();
+
+                    // New Requirement from client side
+                    if(request.getEcFileId() != null && request.getEcNumber() != null && request.getEcExpiryDate() != null) {
+                        miningLeaseRenewalApplication.setEcFileId(request.getEcFileId());
+                        miningLeaseRenewalApplication.setEcNumber(request.getEcNumber());
+                        miningLeaseRenewalApplication.setEcExpiryDate(request.getEcExpiryDate());
+                        miningLeaseRenewalApplication.setECStatus("ACTIVE");
+                    }else{
+                        throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION, "EC DETAILS HAS TO BE SUBMITTED");
+                    }
+
+                    miningLeaseRenewalApplication.setCurrentStatus("EC SUBMITTED");
+                    applicationMaster.setCurrentStatus("EC SUBMITTED");
+                    applicationMasterRepository.save(applicationMaster);
+                    miningLeaseRenewalApplicationRepository.save(miningLeaseRenewalApplication);
+
+
+                    createTask(applicationMaster, miningLeaseRenewalApplication, "MINE ENGINEER", userId, taskManagement.getAssignedToUserId());
+
+                    UserWorkloadProjection userWorkloadProjection = miningLeaseRenewalApplicationRepository.findUserDetailsME(taskManagement.getAssignedToUserId());
+
                     if (userWorkloadProjection.getEmail() != null) {
                         notificationClient.sendStatusUpdateNotification(
                                 miningLeaseRenewalApplication.getApplicantEmail(),
