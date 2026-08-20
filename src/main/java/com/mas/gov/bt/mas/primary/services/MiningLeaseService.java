@@ -2513,6 +2513,14 @@ public class MiningLeaseService {
                     notificationClient.sendUserNotification(title, message, miningleaseapplication.getApplicantUserId(), serviceId, "CITIZEN", true, miningleaseapplication.getApplicationNumber());
                     smsClient.sendApplicationStatusSms(miningleaseapplication.getApplicantUserId(), miningleaseapplication.getApplicationNumber(), "MA-1 Issued");
                 }
+                if (miningleaseapplication.getApplicantEmail() != null) {
+                    notificationClient.sendStatusUpdateNotification(
+                            miningleaseapplication.getApplicantEmail(),
+                            miningleaseapplication.getApplicantName(),
+                            miningleaseapplication.getApplicationNumber(),
+                            "MA-1 ISSUED",
+                            "MA document has been issued. Please log in to upload PA/FC document.");
+                }
 
             }else {
                 throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
@@ -3256,6 +3264,12 @@ public class MiningLeaseService {
                     String serviceId = MENU_ID_PROMOTER;
                     notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN", false, miningLeaseApplication.getApplicationNumber());
                     smsClient.sendApplicationStatusSms(miningLeaseApplication.getApplicantUserId(), miningLeaseApplication.getApplicationNumber(), "Work Order Issued");
+                }
+                if (miningLeaseApplication.getApplicantEmail() != null) {
+                    notificationClient.sendWorkOrderNotification(
+                            miningLeaseApplication.getApplicantEmail(),
+                            miningLeaseApplication.getApplicantName(),
+                            miningLeaseApplication.getApplicationNumber());
                 }
 
                 HouseholdPermitThresholdEntity entity = new HouseholdPermitThresholdEntity();
