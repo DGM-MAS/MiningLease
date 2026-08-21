@@ -380,4 +380,15 @@ public class MiningLeaseController {
         );
     }
 
+    @GetMapping("/terminatedMiningApplication")
+    @Operation(summary = "Get the logged-in promoter's own approved mining lease applications, scoped to their currently active site")
+    public ResponseEntity<SuccessResponse<List<MiningLeaseResponse>>> myTerminatedArchivedApproved(
+            @RequestParam(required = false) String search,
+            Pageable pageable) {
+
+        Long userId = userContext.getCurrentUserId();
+        return ResponseEntity.ok(
+                miningLeaseService.getMyTerminatedApplicationsForActiveSite(userId, pageable, search)
+        );
+    }
 }

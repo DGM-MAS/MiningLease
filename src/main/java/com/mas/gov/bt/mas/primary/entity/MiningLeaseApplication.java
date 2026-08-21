@@ -376,4 +376,10 @@ public class MiningLeaseApplication {
     @Column(name = "other_files_id")
     private String otherFilesId;
 
+    @Column(name = "other_fmfs_file_id")
+    private String otherFMFSFileId;
+
+    @Column(name = "additional_file_gr_id")
+    private String additionalFileGRId;
+
 }

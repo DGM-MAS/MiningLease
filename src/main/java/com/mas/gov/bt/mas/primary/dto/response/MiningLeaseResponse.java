@@ -186,4 +186,8 @@ public class MiningLeaseResponse {
     private String kmzId;
     private String validTaxClearanceId;
     private boolean declarationStatus;
+
+    private String otherFMFSFileId;
+
+    private String additionalFileGRId;
 }
