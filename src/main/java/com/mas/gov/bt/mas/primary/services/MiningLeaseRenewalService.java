@@ -1788,7 +1788,11 @@ public class MiningLeaseRenewalService {
                 .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
 
         String currentStatus = app.getCurrentStatus();
-        if (!"RESUBMIT APP".equals(currentStatus) && !"RESUBMIT-RENEWAL".equals(currentStatus)) {
+        // "RESUBMIT GR"/"RESUBMIT PFS" are also geologist-review revision requests (same switch
+        // block as RESUBMIT-RENEWAL) and route back to the geologist just like it — without these,
+        // a promoter asked to resubmit their GR or PFS by the geologist was permanently stuck.
+        boolean isGeologistResubmit = Set.of("RESUBMIT-RENEWAL", "RESUBMIT GR", "RESUBMIT PFS").contains(currentStatus);
+        if (!"RESUBMIT APP".equals(currentStatus) && !isGeologistResubmit) {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
         }
 
@@ -1833,7 +1837,7 @@ public class MiningLeaseRenewalService {
 
         ApplicationMaster master = app.getApplicationMaster();
 
-        if ("RESUBMIT-RENEWAL".equals(currentStatus)) {
+        if (isGeologistResubmit) {
             // Resubmission after Geologist sent back → re-assign to Geologist
             app.setCurrentStatus("RESUBMITTED APPLICATION GEO");
             if (master != null) {
