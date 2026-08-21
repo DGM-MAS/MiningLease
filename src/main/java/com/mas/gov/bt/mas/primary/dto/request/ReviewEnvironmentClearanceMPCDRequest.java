@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.Date;
+
 @Setter
 @Getter
 @NoArgsConstructor
@@ -26,4 +28,8 @@ public class ReviewEnvironmentClearanceMPCDRequest {
     private String signedEcFileId;
 
     private Long ecFeeAmount;
+
+    private String ecNumber;
+
+    private Date ecExpiryDate;
 }
