@@ -598,6 +598,7 @@ public class MiningLeaseService {
         miningLeaseApplication.setFileUploadIdGr(request.getGRDocId());
         miningLeaseApplication.setFileUploadIdKmz(request.getKmzDocId());
         miningLeaseApplication.setMapFileId(request.getMapFileId());
+        miningLeaseApplication.setAdditionalFileGRId(request.getAdditionalFileGRId());
         miningLeaseApplication.setApplicationType(request.getApplicationType());
         miningLeaseApplication.setApplicationNumber(generateApplicationNumber());
         miningLeaseApplication.setApplicantCid(request.getApplicantCid());
@@ -1124,6 +1125,7 @@ public class MiningLeaseService {
         TaskManagement firstTask = tasks.getFirst();
 
         UserWorkloadProjection userDetails = miningLeaseApplicationRepository.findUserDetails(request.getNewAssigneeUserId());
+
         notificationClient.sendTaskReassignmentNotification(
                 userDetails.getEmail(),
                 userDetails.getUsername(),
@@ -1298,6 +1300,7 @@ public class MiningLeaseService {
                 if(request.getFmfsDocId() != null && request.getTorFileId() != null) {
                     miningLeaseApplication.setFmfsDocId(request.getFmfsDocId());
                     miningLeaseApplication.setTorFileId(request.getTorFileId());
+                    miningLeaseApplication.setOtherFMFSFileId(request.getOtherFMFSFileId());
                 }
 
                 // New Requirement from client side
@@ -1639,6 +1642,8 @@ public class MiningLeaseService {
             case "Other file" -> miningLeaseApplication.setOtherFilesId(null);
             case "Financial Capability" -> miningLeaseApplication.setFinancialCapabilityDocId(null);
             case "TOR file" -> miningLeaseApplication.setTorFileId(null);
+            case "Additional GR file" -> miningLeaseApplication.setAdditionalFileGRId(null);
+            case "Other FMFS File" -> miningLeaseApplication.setOtherFMFSFileId(null);
             case null, default -> miningLeaseApplication.setFmfsDocId(null);
         }
         miningLeaseApplicationRepository.save(miningLeaseApplication);
@@ -3206,7 +3211,7 @@ public class MiningLeaseService {
 
                 if(quarryLeaseApplication1.getApplicantUserId() != null) {
                     String title = "LLC has been uploaded by mine engineer.";
-                    String message = "LLC for you application has been uploaded by mine engineer.";
+                    String message = "LLC for you application has been uploaded by mine engineer. Please submit updated FMFS report";
                     String serviceId = MENU_ID_PROMOTER;
                     notificationClient.sendUserNotification(title, message, quarryLeaseApplication1.getApplicantUserId(), serviceId, "CITIZEN", false, quarryLeaseApplication1.getApplicationNumber());
                 }
@@ -4078,6 +4083,42 @@ public class MiningLeaseService {
         }
 
         Optional<SiteMaster> site = siteMasterRepository.findById(activeSite.get().getSiteId());
+        if (site.isEmpty() || !"MINING_LEASE".equals(site.get().getLeaseType())
+                || !userId.equals(site.get().getApplicantUserId())) {
+            return SuccessResponse.fromPage("Assigned applications fetched successfully", Page.<MiningLeaseApplication>empty(pageable).map(mapper::toResponse));
+        }
+
+        Page<MiningLeaseApplication> page = miningLeaseApplicationRepository.findByStatusInAndOwnerAndApplicationNumber(
+                archivedStatuses, userId, site.get().getLeaseApplicationNumber(),
+                (search == null || search.isBlank()) ? null : search.trim(), pageable);
+
+        Page<MiningLeaseResponse> responsePage = page.map(mapper::toResponse);
+
+        return SuccessResponse.fromPage("Assigned applications fetched successfully", responsePage);
+    }
+
+    /**
+     * Approved Mining Lease applications belonging to the logged-in promotor's own active
+     * site only — used by promotor-facing pickers (Temporary Closure). Unlike
+     * getArchivedApplicationApproved (system-wide, used by RC/MD staff screens), this must
+     * never leak other promotors' leases.
+     */
+    public SuccessResponse<List<MiningLeaseResponse>> getMyTerminatedApplicationsForActiveSite(
+            Long userId, Pageable pageable, String search) {
+
+        List<String> archivedStatuses = List.of(
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED"
+        );
+
+        Optional<UserActiveSite> activeSite = userActiveSiteRepository.findById(userId);
+        if (activeSite.isEmpty()) {
+            return SuccessResponse.fromPage("Assigned applications fetched successfully", Page.<MiningLeaseApplication>empty(pageable).map(mapper::toResponse));
+        }
+
+        Optional<SiteMaster> site = siteMasterRepository.findById(activeSite.get().getSiteId());
+
         if (site.isEmpty() || !"MINING_LEASE".equals(site.get().getLeaseType())
                 || !userId.equals(site.get().getApplicantUserId())) {
             return SuccessResponse.fromPage("Assigned applications fetched successfully", Page.<MiningLeaseApplication>empty(pageable).map(mapper::toResponse));

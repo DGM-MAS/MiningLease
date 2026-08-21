@@ -167,4 +167,8 @@ public class ApplicationListResponse {
     private String kmzMpcdFileId;
 
     private String otherFilesId;
+
+    private String otherFMFSFileId;
+
+    private String additionalFileGRId;
 }
