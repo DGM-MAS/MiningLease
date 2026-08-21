@@ -336,6 +336,47 @@ public class NotificationClient {
         }
     }
 
+    @Async
+    public void sendStatusUpdatePAFCPublicClearanceNotification(String email, String applicantName,
+                                             String applicationNumber, String newStatus, String remarks) {
+        String subject = "Application Status Update - " + applicationNumber;
+        String body = String.format("""
+                Your Mining lease application status has been updated.
+
+                Application Number: %s
+                New Status: %s
+                %s
+
+                The submitted PA, FC, and public clearance have been approved. To facilitate further processing, please submit the following:
+                1. Terms of Reference (ToR) for the Environmental Impact Assessment (EIA).
+                2. Final Mining Feasibility Study (FMFS) Report.
+
+                
+                """,  applicationNumber, newStatus,
+                remarks != null ? "Remarks: " + remarks : "");
+
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
+
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }catch (Exception ex) {
+            log.error(
+                    "Failed to send Mining Lease Application Status Update notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex
+            );
+        }
+    }
+
 
     @Async
     public void sendPAFCPublicClearanceNotification(String email, String applicantName,
@@ -426,17 +467,11 @@ public class NotificationClient {
                                          String applicationNumber) {
         String subject = "Congratulations! Mining Lease Application FMFS Approved - " + applicationNumber;
         String body = String.format("""
-                Your FMFS is approved by the department, please submit IEE/EIA to DECC for the issuance of EC.
-                After getting the EC Please upload the EC in the system.
+                Your FMFS is approved by the department, please submit EIA/IEE as per the approved ToR for issuance of EC from DECC.
+                After getting the Environmental Clearance, Please upload the EC in the system.
 
                 Application Number: %s
 
-                Please log in to the system to:
-                1. View your approved lease details
-                2. Complete any pending payments
-                3. Download your lease certificate
-
-                Thank you for using our services.
                 """, applicationNumber);
 
         EmailRequest request = new EmailRequest();
@@ -634,7 +669,7 @@ public class NotificationClient {
                                            String applicationNumber, String reason) {
         String subject = "Mining Lease Application Update - " + applicationNumber;
         String body = String.format("""
-                We regret to inform you that your mining lease application could not be approved.
+                We regret to inform you that your mining lease application has been be rejected.
 
                 Application Number: %s
                 Reason: %s
@@ -1435,12 +1470,11 @@ public class NotificationClient {
         try {
         String subject = "New Application Assigned - " + applicationNumber;
         String body = String.format("""
-                A new mining lease application has been assigned to you.
+                A new mining lease application has been assigned.
                 Assign MPCD and Geologist focal respectively.
 
                 Application Number: %s
 
-                Please log in to the system to review and take action.
                 """,  applicationNumber);
 
         EmailRequest request = new EmailRequest();
