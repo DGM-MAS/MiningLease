@@ -16,6 +16,7 @@ import com.mas.gov.bt.mas.primary.exception.BusinessException;
 import com.mas.gov.bt.mas.primary.exception.ResourceNotFoundException;
 import com.mas.gov.bt.mas.primary.exception.UnauthorizedOperationException;
 import com.mas.gov.bt.mas.primary.integration.NotificationClient;
+import com.mas.gov.bt.mas.primary.integration.SmsClient;
 import com.mas.gov.bt.mas.primary.mapper.MiningLeaseMapper;
 import com.mas.gov.bt.mas.primary.repository.*;
 import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
@@ -92,6 +93,8 @@ public class MiningLeaseService {
     private final TaskManagementRepository taskManagementRepository;
 
     private final NotificationClient notificationClient;
+
+    private final SmsClient smsClient;
 
     private final ApplicationRevisionHistoryRepository revisionHistoryRepository;
 
@@ -1740,6 +1743,7 @@ public class MiningLeaseService {
 
 
                     }
+                    smsClient.sendApplicationStatusSms(app.getApplicantUserId(), app.getApplicationNumber(), "FMFS Approved");
                     assert master != null;
                     createTask( master, app, "DIRECTOR APPROVED FMFS", userId, app.getCreatedBy());
 
@@ -1774,6 +1778,7 @@ public class MiningLeaseService {
                                 app.getApprovedErb()
                         );
                     }
+                    smsClient.sendApplicationStatusSms(app.getApplicantUserId(), app.getApplicationNumber(), "MLA Issued");
 
                     if (app.getCreatedBy() != null) {
                         String title = "Mining lease application MLA has been signed by the Director.";
@@ -2050,6 +2055,7 @@ public class MiningLeaseService {
                         String message = "Geological Report for application " + miningLeaseApplication.getApplicationNumber() + " has been accepted. Please upload PFS to proceed further.";
                         String serviceId = MENU_ID_PROMOTER;
                         notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN", true, miningLeaseApplication.getApplicationNumber());
+                        smsClient.sendApplicationStatusSms(miningLeaseApplication.getApplicantUserId(), miningLeaseApplication.getApplicationNumber(), "GR Approved");
                     }else {
                         throw new BusinessException(ErrorCodes.DATA_INTEGRITY_VIOLATION, "Applicant user ID is not present.");
                     }
@@ -2121,6 +2127,7 @@ public class MiningLeaseService {
                                 "Geologist Review",
                                 reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     }
+                    smsClient.sendApplicationStatusSms(miningLeaseApplication.getApplicantUserId(), miningLeaseApplication.getApplicationNumber(), "Revision Required");
                 }
                 case "Resubmit GR" -> {
                     miningLeaseApplication.setCurrentStatus("RESUBMIT GR");
@@ -2144,6 +2151,7 @@ public class MiningLeaseService {
                                 "Geologist Review",
                                 reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     }
+                    smsClient.sendApplicationStatusSms(miningLeaseApplication.getApplicantUserId(), miningLeaseApplication.getApplicationNumber(), "Revision Required");
                 }
                 case "FMFS Review" -> {
                     miningLeaseApplication.setCurrentStatus("ADDITIONAL DATA NEEDED FMFS");
@@ -2166,6 +2174,7 @@ public class MiningLeaseService {
                                 "Geologist Review",
                                 reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     }
+                    smsClient.sendApplicationStatusSms(miningLeaseApplication.getApplicantUserId(), miningLeaseApplication.getApplicationNumber(), "Revision Required");
                 }
                 default -> throw new IllegalArgumentException("Application status not recognized");
             }
@@ -2276,6 +2285,7 @@ public class MiningLeaseService {
                     String message = "Your application " + miningLeaseApplication.getApplicationNumber() + " has been forwarded to geologist to review.";
                     String serviceId = MENU_ID_PROMOTER;
                     notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN", false, miningLeaseApplication.getApplicationNumber());
+                    smsClient.sendApplicationStatusSms(miningLeaseApplication.getApplicantUserId(), miningLeaseApplication.getApplicationNumber(), "Application Accepted");
 
                     if (geologistId != null) {
                         String geoTitle = "Mining lease application forwarded for review.";
@@ -2343,6 +2353,7 @@ public class MiningLeaseService {
                             "2. Final Mining Feasibility Study (FMFS) Report.\n";
                     String serviceId = MENU_ID_PROMOTER;
                     notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN", true, miningLeaseApplication.getApplicationNumber());
+                    smsClient.sendApplicationStatusSms(miningLeaseApplication.getApplicantUserId(), miningLeaseApplication.getApplicationNumber(), "PA/FC Approved");
 
                 }
                 case "Rejected" -> {
@@ -2390,6 +2401,7 @@ public class MiningLeaseService {
                                 "MPCD Review",
                                 reviewQuarryLeaseApplication.getMpcdRemarks());
                     }
+                    smsClient.sendApplicationStatusSms(miningLeaseApplication.getApplicantUserId(), miningLeaseApplication.getApplicationNumber(), "Revision Required");
                 }
                 case "Resubmit PA/FC" -> {
                     miningLeaseApplication.setCurrentStatus("RESUBMIT PA/FC");
@@ -2412,6 +2424,7 @@ public class MiningLeaseService {
                                 "MPCD Review",
                                 reviewQuarryLeaseApplication.getMpcdRemarks());
                     }
+                    smsClient.sendApplicationStatusSms(miningLeaseApplication.getApplicantUserId(), miningLeaseApplication.getApplicationNumber(), "Revision Required");
                 }
                 case "Resubmit Application" -> {
                     miningLeaseApplication.setCurrentStatus("RESUBMIT APPLICATION");
@@ -2434,6 +2447,7 @@ public class MiningLeaseService {
                                 "MPCD Review",
                                 reviewQuarryLeaseApplication.getMpcdRemarks());
                     }
+                    smsClient.sendApplicationStatusSms(miningLeaseApplication.getApplicantUserId(), miningLeaseApplication.getApplicationNumber(), "Revision Required");
                 }
                 default -> throw new IllegalArgumentException("Application status not recognized");
             }
@@ -2522,6 +2536,15 @@ public class MiningLeaseService {
                     String message = "Your mining application has been accepted. You are hereby required to print the approved Prefeasibility Study (PFS) report along with the duly completed MA-1 Form and submit the documents to the Dzongkhag Land Lease Committee for obtaining the necessary sectoral clearances.";
                     String serviceId = MENU_ID_PROMOTER;
                     notificationClient.sendUserNotification(title, message, miningleaseapplication.getApplicantUserId(), serviceId, "CITIZEN", true, miningleaseapplication.getApplicationNumber());
+                    smsClient.sendApplicationStatusSms(miningleaseapplication.getApplicantUserId(), miningleaseapplication.getApplicationNumber(), "MA-1 Issued");
+                }
+                if (miningleaseapplication.getApplicantEmail() != null) {
+                    notificationClient.sendStatusUpdateNotification(
+                            miningleaseapplication.getApplicantEmail(),
+                            miningleaseapplication.getApplicantName(),
+                            miningleaseapplication.getApplicationNumber(),
+                            "MA-1 ISSUED",
+                            "MA document has been issued. Please log in to upload PA/FC document.");
                 }
 
             }else {
@@ -3009,6 +3032,7 @@ public class MiningLeaseService {
                                 "Mining Engineer Review",
                                 request.getRemarks());
                     }
+                    smsClient.sendApplicationStatusSms(app.getApplicantUserId(), app.getApplicationNumber(), "Revision Required");
                 }
                 case "Resubmit EC" -> {
                     app.setCurrentStatus("RESUBMIT EC");
@@ -3031,6 +3055,7 @@ public class MiningLeaseService {
                                 "Mining Engineer EC Review",
                                 request.getRemarks());
                     }
+                    smsClient.sendApplicationStatusSms(app.getApplicantUserId(), app.getApplicationNumber(), "Revision Required");
                 }
                 case "Resubmit BG" -> {
                     app.setCurrentStatus("RESUBMIT BG");
@@ -3053,6 +3078,7 @@ public class MiningLeaseService {
                                 "Mining Engineer BG Review",
                                 request.getRemarks());
                     }
+                    smsClient.sendApplicationStatusSms(app.getApplicantUserId(), app.getApplicationNumber(), "Revision Required");
                 }
                 default -> throw new IllegalArgumentException("Application status not recognized");
             }
@@ -3262,6 +3288,13 @@ public class MiningLeaseService {
                     String message = "Work order for your application has been uploaded by mine engineer. Your application " + miningLeaseApplication.getApplicationNumber() + " for Mining Lease has been approved.";
                     String serviceId = MENU_ID_PROMOTER;
                     notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN", false, miningLeaseApplication.getApplicationNumber());
+                    smsClient.sendApplicationStatusSms(miningLeaseApplication.getApplicantUserId(), miningLeaseApplication.getApplicationNumber(), "Work Order Issued");
+                }
+                if (miningLeaseApplication.getApplicantEmail() != null) {
+                    notificationClient.sendWorkOrderNotification(
+                            miningLeaseApplication.getApplicantEmail(),
+                            miningLeaseApplication.getApplicantName(),
+                            miningLeaseApplication.getApplicationNumber());
                 }
 
                 HouseholdPermitThresholdEntity entity = new HouseholdPermitThresholdEntity();
