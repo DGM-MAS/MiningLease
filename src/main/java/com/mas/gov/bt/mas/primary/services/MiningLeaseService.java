@@ -2544,7 +2544,7 @@ public class MiningLeaseService {
                             miningleaseapplication.getApplicantName(),
                             miningleaseapplication.getApplicationNumber(),
                             "MA-1 ISSUED",
-                            "MA document has been issued. Please log in to upload PA/FC document.");
+                            "Your mining application has been accepted. You are hereby required to print the approved Prefeasibility Study (PFS) report along with the duly completed MA-1 Form and submit the documents to the Dzongkhag Land Lease Committee for obtaining the necessary sectoral clearances.");
                 }
 
             }else {
