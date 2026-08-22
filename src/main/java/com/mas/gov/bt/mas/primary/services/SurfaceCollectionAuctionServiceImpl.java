@@ -772,6 +772,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                 .id(bg.getId())
                 .auctionId(bg.getAuctionApplication().getId())
                 .bgFileId(bg.getBgFileId())
+                .upfrontFileId(bg.getUpfrontFileId())
                 .bgInstruction(bg.getBgInstruction())
                 .status(bg.getStatus())
                 .submittedOn(bg.getSubmittedOn())
