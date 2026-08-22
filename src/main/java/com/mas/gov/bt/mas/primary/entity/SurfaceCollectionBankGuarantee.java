@@ -42,6 +42,9 @@ public class SurfaceCollectionBankGuarantee {
     @Column(name = "bg_file_id")
     private String bgFileId;
 
+
+    @Column(name = "upfront_file_id")
+    private String upfrontFileId;
     /**
      * MPCD instruction
      */

@@ -4108,28 +4108,36 @@ public class MiningLeaseService {
 
         List<String> archivedStatuses = List.of(
                 "TERMINATED",
-                "RENEWAL APPLICATION",
                 "TEMPORARY CLOSURE APPROVED"
         );
 
-        Optional<UserActiveSite> activeSite = userActiveSiteRepository.findById(userId);
-        if (activeSite.isEmpty()) {
-            return SuccessResponse.fromPage("Assigned applications fetched successfully", Page.<MiningLeaseApplication>empty(pageable).map(mapper::toResponse));
+        Page<MiningLeaseApplication> page;
+
+        if (search == null || search.isBlank()) {
+
+            page = miningLeaseApplicationRepository
+                    .findByApplicantUserIdAndCurrentStatusIn(
+                            userId,
+                            archivedStatuses,
+                            pageable
+                    );
+
+        } else {
+
+            page = miningLeaseApplicationRepository
+                    .findByStatusInAndSearch(
+                            archivedStatuses,
+                            search,
+                            pageable
+                    );
         }
 
-        Optional<SiteMaster> site = siteMasterRepository.findById(activeSite.get().getSiteId());
+        Page<MiningLeaseResponse> responsePage =
+                page.map(mapper::toResponse);
 
-        if (site.isEmpty() || !"MINING_LEASE".equals(site.get().getLeaseType())
-                || !userId.equals(site.get().getApplicantUserId())) {
-            return SuccessResponse.fromPage("Assigned applications fetched successfully", Page.<MiningLeaseApplication>empty(pageable).map(mapper::toResponse));
-        }
-
-        Page<MiningLeaseApplication> page = miningLeaseApplicationRepository.findByStatusInAndOwnerAndApplicationNumber(
-                archivedStatuses, userId, site.get().getLeaseApplicationNumber(),
-                (search == null || search.isBlank()) ? null : search.trim(), pageable);
-
-        Page<MiningLeaseResponse> responsePage = page.map(mapper::toResponse);
-
-        return SuccessResponse.fromPage("Assigned applications fetched successfully", responsePage);
+        return SuccessResponse.fromPage(
+                "Assigned applications fetched successfully",
+                responsePage
+        );
     }
 }

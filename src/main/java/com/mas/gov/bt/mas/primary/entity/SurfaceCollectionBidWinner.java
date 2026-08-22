@@ -73,4 +73,10 @@ public class SurfaceCollectionBidWinner {
 
     @Column(name = "upfront_amount")
     private String upfrontAmount;
+
+    @Column(name = "additional_file_id")
+    private String additionalFileId;
+
+    @Column(name = "upfront_file_id")
+    private String upfrontFileId;
 }

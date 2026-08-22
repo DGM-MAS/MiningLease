@@ -109,6 +109,7 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
 
         bg.setAuctionApplication(surfaceCollectionAuctionApplication1);
         bg.setBgFileId(dto.getBgFileId());
+        bg.setUpfrontFileId(dto.getUpfrontFileId());
         bg.setStatus("BG SUBMITTED");
         bg.setPromoterRemarks(dto.getPromoterRemarks());
         bg.setSubmittedOn(LocalDateTime.now());
@@ -197,6 +198,7 @@ public class SurfaceCollectionBankGuaranteeServiceImpl
 
         assert surfaceCollectionBankGuarantee != null;
         surfaceCollectionBankGuarantee.setBgFileId(dto.getBgFileId());
+        surfaceCollectionBankGuarantee.setUpfrontFileId(dto.getUpfrontFileId());
         surfaceCollectionBankGuarantee.setStatus("BG RESUBMITTED");
         surfaceCollectionBankGuarantee.setPromoterRemarks(dto.getRemarks());
         surfaceCollectionBankGuarantee.setResubmittedOn(LocalDateTime.now());

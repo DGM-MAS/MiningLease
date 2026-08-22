@@ -27,5 +27,7 @@ public class BidWinnerResponseDTO {
     private String gewogId;
     private String villageId;
 
+    private String additionalFileId;
+
     private String regionId;
 }
