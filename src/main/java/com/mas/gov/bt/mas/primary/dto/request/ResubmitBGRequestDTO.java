@@ -9,5 +9,6 @@ import lombok.*;
 public class ResubmitBGRequestDTO {
     private Long auctionId;
     private String bgFileId;
+    private String upfrontFileId;
     private String remarks;
 }

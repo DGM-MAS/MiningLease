@@ -404,6 +404,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
         citizenRegistrationClient.registerCitizen(registerRequest);
 
         UserWorkloadProjection assignedUser = auctionRepository.findCitizenByEmail(dto.getEmailAddress());
+
         if (assignedUser == null || assignedUser.getUserId() == null) {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Bid winner details not found.");
         }
@@ -426,11 +427,13 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
                         .bankGuaranteeAmount(dto.getBankGuaranteeAmount())
                         .upfrontAmount(dto.getUpfrontAmount())
                         .auctionApplication(entity)
+                        .additionalFileId(dto.getAdditionalFileId())
                         .build();
 
         entity.setBidWinner(winner);
         entity.setAuctionCompleted(true);
-        entity.setAuctionStatus("AUCTION_COMPLETED");
+        entity.setBgInstruction(dto.getBgInstruction());
+        entity.setAuctionStatus("BG_PENDING");
 
         // MPCD will set Site name while adding bid winner
         entity.setSiteName(dto.getSiteName());
@@ -440,7 +443,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
         // Application master and create task for director
         // =====================================================
         ApplicationMaster applicationMaster = entity.getApplicationMaster();
-        applicationMaster.setCurrentStatus("AUCTION_COMPLETED");
+        applicationMaster.setCurrentStatus("BG_PENDING");
         // Was left pointing at whichever staff user filed the original auction listing —
         // must be the winning bidder's own citizen account, since citizen-facing menu/
         // application-tracking queries (findHeldServiceStatuses, findByApplicantId) filter

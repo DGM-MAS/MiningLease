@@ -32,5 +32,9 @@ public class BidWinnerRequestDTO {
     private String gewogId;
     private String villageId;
 
+    private String additionalFileId;
+
+    // Changed after final UTA where bid winner and instruction will be updated together.
+    private String bgInstruction;
 
 }
