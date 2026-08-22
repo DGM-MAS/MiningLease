@@ -213,12 +213,6 @@ public class SampleTransportClearanceServiceImpl
             assignedChief = assignChief(9L);
         }
 
-        if (assignedChief == null) {
-            throw new BusinessException(
-                    "No GSD Chief is available for assignment"
-            );
-        }
-
         entity.setAssignedGSDChiefId(
                 assignedChief.getUserId()
         );
@@ -845,9 +839,9 @@ public class SampleTransportClearanceServiceImpl
         UserWorkloadProjection chief =
                 repository.findChiefGSDSample(regionId);
 
-        if (chief == null && regionId == 9L) {
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "GSD Chief with required permission permission, role and region not found");
-        }
+//        if (chief == null && regionId == 9L) {
+//            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "GSD Chief with required permission permission, role and region not found");
+//        }
         return chief;
     }
 
