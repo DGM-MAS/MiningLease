@@ -14,6 +14,7 @@ public class BGResponseDTO {
     private Long id;
     private Long auctionId;
     private String bgFileId;
+    private String upfrontFileId;
     private String bgInstruction;
     private String status;
     private LocalDateTime submittedOn;
