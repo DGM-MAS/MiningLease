@@ -38,6 +38,7 @@ public class TerminationService {
     private static final int DEFAULT_TAT_DAYS = 2;
 
     private static final String SURFACE_COLLECTION_CATEGORY   = "SURFACE_COLLECTION_PERMIT";
+    private static final String STOCK_LIFTING_CATEGORY   = "STOCK_LIFTING";
     // Real sidebar menu ids (permissions.id) per recipient role for this service — used to target
     // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
     // NOT the same thing as SERVICE_CODE above, which is an unrelated t_application_master.service_code value.
@@ -67,6 +68,8 @@ public class TerminationService {
     private final QuarryLeaseApplicationRepository quarryLeaseApplicationRepository;
 
     private final SurfaceCollectionPermitRepository surfaceCollectionPermitRepository;
+
+    private final StockLiftingRepository stockLiftingRepository;
 
     private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
 
@@ -236,6 +239,37 @@ public class TerminationService {
             );
         }
 
+        Optional<StockLiftingApplication> stockLiftingApplication = stockLiftingRepository.findByStockLiftingPermitNo(appNo);
+
+        if (stockLiftingApplication.isPresent()) {
+
+            StockLiftingApplication application = stockLiftingApplication.get();
+
+            if (!"APPROVED".equalsIgnoreCase(application.getStatus())) {
+                throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION, "The Permit has to be in APPROVED state.");
+            }
+            application.setStatus("UNDER-REVIEW-TERMINATION");
+
+            stockLiftingRepository.save(application);
+
+            Optional<ApplicationMaster> applicationMaster = applicationMasterRepository
+                    .findByApplicationNumberAndServiceCode(appNo, STOCK_LIFTING_CATEGORY);
+
+            ApplicationMaster applicationMaster1 = null;
+
+            if (applicationMaster.isPresent()) {
+                applicationMaster1 = applicationMaster.get();
+            }
+            return new LeaseApplicationRef(
+                    application.getApplicantName(),
+                    application.getApplicantEmail(),
+                    applicationMaster1,
+                    application.getNameOfStockLifting(),
+                    SURFACE_COLLECTION_CATEGORY
+            );
+        }
+
+
         throw new CustomRuntimeException("Invalid application number: " + appNo);
     }
 
@@ -243,7 +277,7 @@ public class TerminationService {
      * Updates the underlying lease application's status once a termination is decided, trying
      * Mining Lease first and falling back to Quarry Lease, mirroring resolveAndMarkUnderReview.
      */
-    private void updateLeaseApplicationStatus(String appNo, String miningStatus, String quarryStatus, String surfaceCollectionStatus) {
+    private void updateLeaseApplicationStatus(String appNo, String miningStatus, String quarryStatus, String surfaceCollectionStatus, String stockLiftingStatus) {
         String serviceType = "";
         ApplicationMaster master = null;
 
@@ -291,6 +325,25 @@ public class TerminationService {
             serviceType = "SURFACE_COLLECTION_PERMIT";
             applicationMasterRepository.save(master);
             surfaceCollectionPermitRepository.save(surfaceCollectionPermitEntity);
+        }
+
+        Optional<StockLiftingApplication> stockLiftingApplication = stockLiftingRepository.findByStockLiftingPermitNo(appNo);
+        if (stockLiftingApplication.isPresent()) {
+            StockLiftingApplication stockLiftingApplication1 = stockLiftingApplication.get();
+
+            Optional<ApplicationMaster> applicationMaster2 = applicationMasterRepository
+                    .findByApplicationNumberAndServiceCode(appNo, STOCK_LIFTING_CATEGORY);
+
+            ApplicationMaster applicationMaster3 = null;
+
+            if (applicationMaster2.isPresent()) {
+                applicationMaster3 = applicationMaster2.get();
+                stockLiftingApplication1.setStatus(stockLiftingStatus);
+                applicationMaster3.setCurrentStatus(stockLiftingStatus);
+                serviceType = STOCK_LIFTING_CATEGORY;
+                applicationMasterRepository.save(applicationMaster3);
+                stockLiftingRepository.save(stockLiftingApplication1);
+            }
         }
 
         Optional<HouseholdPermitThresholdEntity> householdPermitThresholdEntity = householdPermitThresholdRepository.findByApplicationNoAndServiceType(appNo, serviceType);
@@ -460,7 +513,7 @@ public class TerminationService {
                     assert master != null;
                     createTask( master, app, "DIRECTOR CMS APPROVED", userId, app.getCreatedBy());
 
-                    updateLeaseApplicationStatus(app.getApplicationNumber(), "TERMINATED", "TERMINATED", "TERMINATED");
+                    updateLeaseApplicationStatus(app.getApplicationNumber(), "TERMINATED", "TERMINATED", "TERMINATED", "TERMINATED");
                 }
                 case "Rectification" -> {
                     LocalDateTime now = LocalDateTime.now();
@@ -526,7 +579,7 @@ public class TerminationService {
                     assert master != null;
                     createTask( master, app, "TERMINATION CANCELED", userId, app.getCreatedBy());
 
-                    updateLeaseApplicationStatus(app.getApplicationNumber(), "MINING LEASE APPROVED", "QUARRY LEASE APPROVED", "PERMIT_ISSUED");
+                    updateLeaseApplicationStatus(app.getApplicationNumber(), "MINING LEASE APPROVED", "QUARRY LEASE APPROVED", "PERMIT_ISSUED", "APPROVED");
                 }
                 default -> throw new IllegalArgumentException("Application status not recognized");
             }
