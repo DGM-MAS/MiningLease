@@ -34,6 +34,8 @@ public class TemporaryClosureService {
     private static final String SERVICE_CODE = "TEMPORARY CLOSURE SERVICE";
     private static final String SERVICE_ID = "108";
     private static final int DEFAULT_TAT_DAYS = 2;
+    private static final String SURFACE_COLLECTION_CATEGORY   = "SURFACE_COLLECTION_PERMIT";
+    private static final String STOCK_LIFTING_CATEGORY   = "STOCK_LIFTING";
 
     // Real sidebar menu ids (permissions.id) per recipient role — used to target
     // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
@@ -57,7 +59,13 @@ public class TemporaryClosureService {
     private final QuarryLeaseApplicationRepository queryLeaseApplicationRepository;
     private final ApplicationRevisionHistoryRepository revisionHistoryRepository;
 
+    private final SurfaceCollectionPermitRepository surfaceCollectionPermitRepository;
+
+    private final StockLiftingRepository stockLiftingRepository;
+
     private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
+
+    private final DzongkhagLookupRepository dzongkhagLookupRepository;
 
     @jakarta.annotation.PostConstruct
     private void resolveMenuIds() {
@@ -72,9 +80,13 @@ public class TemporaryClosureService {
     public TemporaryClosureNotificationResponse submitApplication(@Valid TemporaryClosureNotificationRequest request, Long userId, String email, String applicantType) {
         Optional<MiningLeaseApplication> miningLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationId());
         Optional<QuarryLeaseApplication> quarryLeaseApplication = queryLeaseApplicationRepository.findByApplicationNumber(request.getApplicationId());
+        Optional<SurfaceCollectionPermitEntity> surfaceCollectionAuctionApplication = surfaceCollectionPermitRepository.findByApplicationNo(request.getApplicationId());
+        Optional<StockLiftingApplication> stockLiftingApplication = stockLiftingRepository.findByStockLiftingPermitNo(request.getApplicationId());
 
         MiningLeaseApplication miningLeaseApplication1 = null;
         QuarryLeaseApplication quarryLeaseApplication1 = null;
+        SurfaceCollectionPermitEntity surfaceCollectionPermitEntity = null;
+        StockLiftingApplication stockLiftingApplicationEntity = null;
 
         String applicationType = null;
         String siteName = null;
@@ -91,7 +103,18 @@ public class TemporaryClosureService {
             applicationType = "QUARRY_LEASE";
             siteName = quarryLeaseApplication1.getNameOfQuarry();
         }
-        if (miningLeaseApplication1 == null && quarryLeaseApplication1 == null){
+        if (surfaceCollectionAuctionApplication.isPresent()) {
+            surfaceCollectionPermitEntity = surfaceCollectionAuctionApplication.get();
+            applicantType  = "SURFACE_COLLECTION_PERMIT";
+            siteName = surfaceCollectionPermitEntity.getNameOfSurfaceCollection();
+        }
+        if (stockLiftingApplication.isPresent()) {
+            stockLiftingApplicationEntity = stockLiftingApplication.get();
+            applicantType  = "STOCK_LIFTING";
+            siteName = stockLiftingApplicationEntity.getNameOfStockLifting();
+        }
+
+        if (miningLeaseApplication1 == null && quarryLeaseApplication1 == null && surfaceCollectionPermitEntity == null && stockLiftingApplicationEntity == null){
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Application Detail not found for the given Id.");
         }
 
@@ -104,18 +127,59 @@ public class TemporaryClosureService {
 
         assert miningLeaseApplication1 != null;
 
-        if(applicationType.equalsIgnoreCase("MINING_LEASE")){
-            temporaryClosureEntity.setApplicantName(miningLeaseApplication1.getApplicantName());
-            temporaryClosureEntity.setApplicantCid(miningLeaseApplication1.getApplicantCid());
-            temporaryClosureEntity.setApplicantContact(miningLeaseApplication1.getApplicantContact());
-            temporaryClosureEntity.setApplicationId(miningLeaseApplication1.getApplicationNumber());
+        switch (applicationType.toUpperCase()) {
 
-        }
-        if(applicationType.equalsIgnoreCase("QUARRY_LEASE")){
-            temporaryClosureEntity.setApplicantName(quarryLeaseApplication1.getApplicantName());
-            temporaryClosureEntity.setApplicantCid(quarryLeaseApplication1.getApplicantCid());
-            temporaryClosureEntity.setApplicantContact(quarryLeaseApplication1.getApplicantContact());
-            temporaryClosureEntity.setApplicationId(quarryLeaseApplication1.getApplicationNumber());
+            case "MINING_LEASE" -> {
+                temporaryClosureEntity.setApplicantName(
+                        miningLeaseApplication1.getApplicantName());
+                temporaryClosureEntity.setApplicantCid(
+                        miningLeaseApplication1.getApplicantCid());
+                temporaryClosureEntity.setApplicantContact(
+                        miningLeaseApplication1.getApplicantContact());
+                temporaryClosureEntity.setApplicationId(
+                        miningLeaseApplication1.getApplicationNumber());
+            }
+
+            case "QUARRY_LEASE" -> {
+                assert quarryLeaseApplication1 != null;
+                temporaryClosureEntity.setApplicantName(
+                        quarryLeaseApplication1.getApplicantName());
+                temporaryClosureEntity.setApplicantCid(
+                        quarryLeaseApplication1.getApplicantCid());
+                temporaryClosureEntity.setApplicantContact(
+                        quarryLeaseApplication1.getApplicantContact());
+                temporaryClosureEntity.setApplicationId(
+                        quarryLeaseApplication1.getApplicationNumber());
+            }
+
+            case "SURFACE_COLLECTION_PERMIT" -> {
+                assert surfaceCollectionPermitEntity != null;
+                temporaryClosureEntity.setApplicantName(
+                        surfaceCollectionPermitEntity.getApplicantName());
+                temporaryClosureEntity.setApplicantCid(
+                        surfaceCollectionPermitEntity.getApplicantCid());
+                temporaryClosureEntity.setApplicantContact(
+                        surfaceCollectionPermitEntity.getMobileNo());
+                temporaryClosureEntity.setApplicationId(
+                        surfaceCollectionPermitEntity.getApplicationNo());
+            }
+
+            case "STOCK_LIFTING" -> {
+                assert stockLiftingApplicationEntity != null;
+                temporaryClosureEntity.setApplicantName(
+                        stockLiftingApplicationEntity.getApplicantName());
+                temporaryClosureEntity.setApplicantCid(
+                        stockLiftingApplicationEntity.getApplicantCid());
+                temporaryClosureEntity.setApplicantContact(
+                        stockLiftingApplicationEntity.getApplicantContact());
+                temporaryClosureEntity.setApplicationId(
+                        stockLiftingApplicationEntity.getApplicationNo());
+            }
+
+            default -> throw new BusinessException(
+                    ErrorCodes.INVALID_INPUT_DATA,
+                    "Unsupported application type: " + applicationType
+            );
         }
 
         temporaryClosureEntity.setApplicantEmail(email);
@@ -131,9 +195,49 @@ public class TemporaryClosureService {
         // =====================================================
         // 2. ASSIGN RC
         // =====================================================
-        Long regionId = miningLeaseApplication1 != null
-                ? miningLeaseApplication1.getRegionId()
-                : quarryLeaseApplication1.getRegionId();
+        Long regionId;
+
+        switch (applicationType.trim().toUpperCase()) {
+
+            case "MINING_LEASE" -> {
+                regionId = miningLeaseApplication1 != null
+                        ? miningLeaseApplication1.getRegionId()
+                        : null;
+            }
+
+            case "QUARRY_LEASE" -> {
+                regionId = quarryLeaseApplication1 != null
+                        ? quarryLeaseApplication1.getRegionId()
+                        : null;
+            }
+
+            case "SURFACE_COLLECTION_PERMIT" -> {
+                regionId = surfaceCollectionPermitEntity != null
+                        ? surfaceCollectionPermitEntity.getRegionId()
+                        : null;
+            }
+
+            case "STOCK_LIFTING" -> {
+                assert stockLiftingApplicationEntity != null;
+                Optional<DzongkhagLookup> dzongkhagLookup = dzongkhagLookupRepository.findById(stockLiftingApplicationEntity.getDzongkhagId());
+                DzongkhagLookup dzongkhagLookupStockLifting = dzongkhagLookup.orElse(null);
+                assert dzongkhagLookupStockLifting != null;
+                regionId = dzongkhagLookupStockLifting.getRegion().getId();
+            }
+
+            default -> throw new BusinessException(
+                    ErrorCodes.INVALID_INPUT_DATA,
+                    "Unsupported application type: " + applicationType
+            );
+        }
+
+        if (regionId == null) {
+            throw new BusinessException(
+                    ErrorCodes.RECORD_NOT_FOUND,
+                    "Region could not be determined for application type: " + applicationType
+            );
+        }
+
         UserWorkloadProjection assignedRC = assignRC(regionId);
 
         if (assignedRC == null) {
@@ -408,15 +512,26 @@ public class TemporaryClosureService {
                         queryLeaseApplicationRepository.save(quarryLeaseApplicationEntity);
                     }
 
-                    if(app.getApplicationType().equalsIgnoreCase("QUARRY_LEASE")){
-                        Optional<QuarryLeaseApplication> quarryLeaseApplication = queryLeaseApplicationRepository.findByApplicationNumber(app.getApplicationId());
-                        QuarryLeaseApplication quarryLeaseApplicationEntity = null;
-                        if (quarryLeaseApplication.isPresent()) {
-                            quarryLeaseApplicationEntity = quarryLeaseApplication.get();
+                    if(app.getApplicationType().equalsIgnoreCase("SURFACE_COLLECTION_PERMIT")){
+                        Optional<SurfaceCollectionPermitEntity> surfaceCollectionPermitEntity = surfaceCollectionPermitRepository.findByApplicationNo(app.getApplicationId());
+                        SurfaceCollectionPermitEntity surfaceCollectionPermitEntity1 = null;
+                        if (surfaceCollectionPermitEntity.isPresent()) {
+                            surfaceCollectionPermitEntity1 = surfaceCollectionPermitEntity.get();
                         }
-                        assert quarryLeaseApplicationEntity != null;
-                        quarryLeaseApplicationEntity.setCurrentStatus("TEMPORARY CLOSURE APPROVED");
-                        queryLeaseApplicationRepository.save(quarryLeaseApplicationEntity);
+                        assert surfaceCollectionPermitEntity1 != null;
+                        surfaceCollectionPermitEntity1.setStatus("TEMPORARY CLOSURE APPROVED");
+                        surfaceCollectionPermitRepository.save(surfaceCollectionPermitEntity1);
+                    }
+
+                    if(app.getApplicationType().equalsIgnoreCase("STOCK_LIFTING")){
+                        Optional<StockLiftingApplication> stockLiftingApplication = stockLiftingRepository.findByStockLiftingPermitNo(app.getApplicationId());
+                        StockLiftingApplication stockLiftingApplication1 = null;
+                        if (stockLiftingApplication.isPresent()) {
+                            stockLiftingApplication1 = stockLiftingApplication.get();
+                        }
+                        assert stockLiftingApplication1 != null;
+                        stockLiftingApplication1.setStatus("TEMPORARY CLOSURE APPROVED");
+                        stockLiftingRepository.save(stockLiftingApplication1);
                     }
 
 
