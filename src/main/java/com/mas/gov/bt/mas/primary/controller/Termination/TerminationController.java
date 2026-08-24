@@ -1,6 +1,7 @@
 package com.mas.gov.bt.mas.primary.controller.Termination;
 
 import com.mas.gov.bt.mas.primary.config.UserContext;
+import com.mas.gov.bt.mas.primary.dto.request.TerminationApplicationDataRequest;
 import com.mas.gov.bt.mas.primary.dto.request.TerminationApplicationRequest;
 import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
 import com.mas.gov.bt.mas.primary.dto.response.TerminationApplicationResponse;
@@ -150,14 +151,23 @@ public class TerminationController {
         return ResponseEntity.ok(terminationService.getAllApplicationAdmin(pageable, search));
     }
 
-    @GetMapping("/applications/{applicationNo}")
-    @Operation(summary = "Get application by number", description = "Get application details by application number. Agency users can view any application, others can only view their own.")
+    @PostMapping("/applications/details")
+    @Operation(
+            summary = "Get application by number",
+            description = "Get termination application details using application number and termination ID."
+    )
     public ResponseEntity<SuccessResponse<TerminationApplicationResponse>> getApplicationByNumber(
-            @PathVariable String applicationNo) {
+            @RequestBody TerminationApplicationDataRequest request) {
 
-        TerminationApplicationResponse response = terminationService.getApplicationByNumber(applicationNo);
+        TerminationApplicationResponse response =
+                terminationService.getApplicationByNumber(
+                        request.getApplicationNo(),
+                        request.getTerminationId()
+                );
 
-        return ResponseEntity.ok(new SuccessResponse<>("Application retrieved successfully", response));
+        return ResponseEntity.ok(
+                new SuccessResponse<>("Application retrieved successfully", response)
+        );
     }
 
 

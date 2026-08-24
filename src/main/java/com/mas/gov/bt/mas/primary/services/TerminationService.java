@@ -239,7 +239,7 @@ public class TerminationService {
             );
         }
 
-        Optional<StockLiftingApplication> stockLiftingApplication = stockLiftingRepository.findByStockLiftingPermitNo(appNo);
+        Optional<StockLiftingApplication> stockLiftingApplication = stockLiftingRepository.findByApplicationNo(appNo);
 
         if (stockLiftingApplication.isPresent()) {
 
@@ -265,7 +265,7 @@ public class TerminationService {
                     application.getApplicantEmail(),
                     applicationMaster1,
                     application.getNameOfStockLifting(),
-                    SURFACE_COLLECTION_CATEGORY
+                    STOCK_LIFTING_CATEGORY
             );
         }
 
@@ -277,90 +277,192 @@ public class TerminationService {
      * Updates the underlying lease application's status once a termination is decided, trying
      * Mining Lease first and falling back to Quarry Lease, mirroring resolveAndMarkUnderReview.
      */
-    private void updateLeaseApplicationStatus(String appNo, String miningStatus, String quarryStatus, String surfaceCollectionStatus, String stockLiftingStatus) {
-        String serviceType = "";
-        ApplicationMaster master = null;
+    private void updateLeaseApplicationStatus(
+            String appNo,
+            String miningStatus,
+            String quarryStatus,
+            String surfaceCollectionStatus,
+            String stockLiftingStatus) {
 
+        String siteServiceType = null;
+        String householdServiceType = null;
+        String status = null;
+
+        /*
+         * 1. Mining Lease
+         */
         Optional<MiningLeaseApplication> miningLeaseApplication =
                 miningLeaseApplicationRepository.findByApplicationNumber(appNo);
 
         if (miningLeaseApplication.isPresent()) {
+
             MiningLeaseApplication application = miningLeaseApplication.get();
+
             application.setCurrentStatus(miningStatus);
-            master = application.getApplicationMaster();
-            master.setCurrentStatus(miningStatus);
-            serviceType = "MINING_LEASE";
-            applicationMasterRepository.save(master);
-            miningLeaseApplicationRepository.save(application);
-        }
 
-        Optional<QuarryLeaseApplication> application = quarryLeaseApplicationRepository.findByApplicationNumber(appNo);
-
-        if (application.isPresent()) {
-            QuarryLeaseApplication quarryLeaseApplication = application.get();
-            quarryLeaseApplication.setCurrentStatus(quarryStatus);
-            master = quarryLeaseApplication.getApplicationMaster();
-            master.setCurrentStatus(quarryStatus);
-            serviceType = "QUARRY_LEASE";
-            applicationMasterRepository.save(master);
-            quarryLeaseApplicationRepository.save(quarryLeaseApplication);
-        }
-
-        Optional<SurfaceCollectionPermitEntity> applicationSurfaceCollection = surfaceCollectionPermitRepository.findByApplicationNo(appNo);
-
-        Optional<ApplicationMaster> applicationMaster = applicationMasterRepository
-                .findByApplicationNumberAndServiceCode(appNo, SURFACE_COLLECTION_CATEGORY);
-
-        ApplicationMaster applicationMaster1 = null;
-
-        if (applicationMaster.isPresent()) {
-            applicationMaster1 = applicationMaster.get();
-        }
-
-        if (applicationSurfaceCollection.isPresent()) {
-            SurfaceCollectionPermitEntity surfaceCollectionPermitEntity = applicationSurfaceCollection.get();
-            surfaceCollectionPermitEntity.setStatus(surfaceCollectionStatus);
-            master = applicationMaster1;
-            master.setCurrentStatus(surfaceCollectionStatus);
-            serviceType = "SURFACE_COLLECTION_PERMIT";
-            applicationMasterRepository.save(master);
-            surfaceCollectionPermitRepository.save(surfaceCollectionPermitEntity);
-        }
-
-        Optional<StockLiftingApplication> stockLiftingApplication = stockLiftingRepository.findByStockLiftingPermitNo(appNo);
-        if (stockLiftingApplication.isPresent()) {
-            StockLiftingApplication stockLiftingApplication1 = stockLiftingApplication.get();
-
-            Optional<ApplicationMaster> applicationMaster2 = applicationMasterRepository
-                    .findByApplicationNumberAndServiceCode(appNo, STOCK_LIFTING_CATEGORY);
-
-            ApplicationMaster applicationMaster3 = null;
-
-            if (applicationMaster2.isPresent()) {
-                applicationMaster3 = applicationMaster2.get();
-                stockLiftingApplication1.setStatus(stockLiftingStatus);
-                applicationMaster3.setCurrentStatus(stockLiftingStatus);
-                serviceType = STOCK_LIFTING_CATEGORY;
-                applicationMasterRepository.save(applicationMaster3);
-                stockLiftingRepository.save(stockLiftingApplication1);
+            ApplicationMaster master = application.getApplicationMaster();
+            if (master != null) {
+                master.setCurrentStatus(miningStatus);
+                applicationMasterRepository.save(master);
             }
+
+            miningLeaseApplicationRepository.save(application);
+
+            siteServiceType = "MINING_LEASE";
+            householdServiceType = "MINING_LEASE";
+            status = miningStatus;
         }
 
-        Optional<HouseholdPermitThresholdEntity> householdPermitThresholdEntity = householdPermitThresholdRepository.findByApplicationNoAndServiceType(appNo, serviceType);
+        /*
+         * 2. Quarry Lease
+         */
+        Optional<QuarryLeaseApplication> quarryApplication =
+                quarryLeaseApplicationRepository.findByApplicationNumber(appNo);
 
-        if (householdPermitThresholdEntity.isPresent()) {
-            HouseholdPermitThresholdEntity thresholdEntity = householdPermitThresholdEntity.get();
-            thresholdEntity.setStatus(quarryStatus);
+        if (quarryApplication.isPresent()) {
+
+            QuarryLeaseApplication application = quarryApplication.get();
+
+            application.setCurrentStatus(quarryStatus);
+
+            ApplicationMaster master = application.getApplicationMaster();
+            if (master != null) {
+                master.setCurrentStatus(quarryStatus);
+                applicationMasterRepository.save(master);
+            }
+
+            quarryLeaseApplicationRepository.save(application);
+
+            siteServiceType = "QUARRY_LEASE";
+            householdServiceType = "QUARRY_LEASE";
+            status = quarryStatus;
+        }
+
+        /*
+         * 3. Surface Collection
+         *
+         * Site master:
+         *     SURFACE_COLLECTION
+         *
+         * Household master:
+         *     SURFACE_COLLECTION_PERMIT
+         */
+        Optional<SurfaceCollectionPermitEntity> surfaceCollectionApplication =
+                surfaceCollectionPermitRepository.findByApplicationNo(appNo);
+
+        if (surfaceCollectionApplication.isPresent()) {
+
+            SurfaceCollectionPermitEntity application =
+                    surfaceCollectionApplication.get();
+
+            application.setStatus(surfaceCollectionStatus);
+
+            Optional<ApplicationMaster> master =
+                    applicationMasterRepository
+                            .findByApplicationNumberAndServiceCode(
+                                    appNo,
+                                    SURFACE_COLLECTION_CATEGORY
+                            );
+
+            if (master.isPresent()) {
+                master.get().setCurrentStatus(surfaceCollectionStatus);
+                applicationMasterRepository.save(master.get());
+            }
+
+            surfaceCollectionPermitRepository.save(application);
+
+            siteServiceType = "SURFACE_COLLECTION";
+            householdServiceType = "SURFACE_COLLECTION_PERMIT";
+            status = surfaceCollectionStatus;
+        }
+
+        /*
+         * 4. Stock Lifting
+         */
+        Optional<StockLiftingApplication> stockLiftingApplication =
+                stockLiftingRepository.findByApplicationNo(appNo);
+
+        if (stockLiftingApplication.isPresent()) {
+
+            StockLiftingApplication application =
+                    stockLiftingApplication.get();
+
+            application.setStatus(stockLiftingStatus);
+
+            Optional<ApplicationMaster> master =
+                    applicationMasterRepository
+                            .findByApplicationNumberAndServiceCode(
+                                    appNo,
+                                    STOCK_LIFTING_CATEGORY
+                            );
+
+            if (master.isPresent()) {
+                master.get().setCurrentStatus(stockLiftingStatus);
+                applicationMasterRepository.save(master.get());
+            }
+
+            stockLiftingRepository.save(application);
+
+            siteServiceType = STOCK_LIFTING_CATEGORY;
+            householdServiceType = STOCK_LIFTING_CATEGORY;
+            status = stockLiftingStatus;
+        }
+
+        /*
+         * No application found
+         */
+        if (siteServiceType == null) {
+            throw new BusinessException(
+                    ErrorCodes.BUSINESS_RULE_VIOLATION,
+                    "Application not found."
+            );
+        }
+
+        /*
+         * 5. Update household permit threshold
+         *
+         * IMPORTANT:
+         * Surface Collection uses:
+         *
+         * Site     -> SURFACE_COLLECTION
+         * Household -> SURFACE_COLLECTION_PERMIT
+         */
+        Optional<HouseholdPermitThresholdEntity> threshold =
+                householdPermitThresholdRepository
+                        .findByApplicationNoAndServiceType(
+                                appNo,
+                                householdServiceType
+                        );
+
+        if (threshold.isPresent()) {
+
+            HouseholdPermitThresholdEntity thresholdEntity =
+                    threshold.get();
+
+            thresholdEntity.setStatus(status);
 
             householdPermitThresholdRepository.save(thresholdEntity);
-        }else {
-            throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION, "The application is not present in household permit table.");
+
+        } else {
+
+            throw new BusinessException(
+                    ErrorCodes.BUSINESS_RULE_VIOLATION,
+                    "The application is not present in household permit table."
+            );
         }
 
-        // "TERMINATED" deactivates the site (blocks Mine TP/etc.); a cancelled termination
-        // restores it back to "MINING LEASE APPROVED"/"QUARRY LEASE APPROVED" and reactivates.
-        boolean active = !"TERMINATED".equals(miningStatus);
-        siteProvisioningService.setSiteActive(serviceType, appNo, active);
+        /*
+         * 6. Update site provisioning
+         *
+         * Site uses the site service type.
+         */
+        boolean active = !"TERMINATED".equalsIgnoreCase(status);
+
+        siteProvisioningService.setSiteActive(
+                siteServiceType,
+                appNo,
+                active
+        );
     }
 
     @Transactional(readOnly = true)
@@ -815,8 +917,10 @@ public class TerminationService {
         return SuccessResponse.fromPage("Applications fetched successfully", page.map(terminationMapper::toResponse));
     }
 
-    public TerminationApplicationResponse getApplicationByNumber(String applicationNo) {
-        TerminationApplicationEntity application = terminationApplicationRepository.findByTerminationId(applicationNo)
+    public TerminationApplicationResponse getApplicationByNumber(String applicationNo, String terminationId) {
+        TerminationApplicationEntity application = terminationApplicationRepository.findByTerminationIdAndApplicationNumber(
+                terminationId, applicationNo
+                )
                 .orElseThrow(() -> new ResourceNotFoundException("Application not found: " + applicationNo));
 
         return terminationMapper.toResponse(application);

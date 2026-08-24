@@ -53,8 +53,12 @@ public interface MiningLeaseMapper {
     }
 
     @Mapping(target = "currentStatusDisplayName", expression = "java(getStatusDisplayName(miningLeaseApplication.getCurrentStatus()))")
-    @Mapping(target = "gewog", ignore = true)
-    @Mapping(target = "nearestVillage", ignore = true)
+    @Mapping(target = "dzongkhagName", source = "dzongkhag.dzongkhagName")
+    @Mapping(target = "dzongkhagId", source = "dzongkhag.id")
+    @Mapping(target = "gewog", source = "gewog.gewogName")
+    @Mapping(target = "gewogId", source = "gewog.gewogId")
+    @Mapping(target = "nearestVillage", source = "nearestVillage.villageName")
+    @Mapping(target = "nearestVillageId", source = "nearestVillage.villageSerialNo")
     ApplicationListResponse toListResponse(MiningLeaseApplication miningLeaseApplication);
 
     @Mapping(target = "dzongkhag", source = "dzongkhag.dzongkhagName")
