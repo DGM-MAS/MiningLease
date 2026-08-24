@@ -808,7 +808,8 @@ public class MiningLeaseService {
                 "TEMPORARY CLOSURE APPROVED",
                 "UNDER-REVIEW-TERMINATION",
                 "MINING RENEWAL APPROVED",
-                "QUARRY RENEWAL APPROVED"
+                "QUARRY RENEWAL APPROVED",
+                "UNDER-REVIEW-CLOSURE"
         );
         Page<MiningLeaseApplication> applications;
 
@@ -895,7 +896,8 @@ public class MiningLeaseService {
                 "TERMINATED",
                 "RENEWAL APPLICATION",
                 "TEMPORARY CLOSURE APPROVED",
-                "UNDER-REVIEW-TERMINATION"
+                "UNDER-REVIEW-TERMINATION",
+                "UNDER-REVIEW-CLOSURE"
         );
 
         Page<MiningLeaseApplication> applications;
@@ -931,7 +933,8 @@ public class MiningLeaseService {
                 "TEMPORARY CLOSURE APPROVED",
                 "UNDER-REVIEW-TERMINATION",
                 "MINING RENEWAL APPROVED",
-                "QUARRY RENEWAL APPROVED"
+                "QUARRY RENEWAL APPROVED",
+                "UNDER-REVIEW-CLOSURE"
         );
         Page<MiningLeaseApplication> applications ;
 
@@ -993,7 +996,8 @@ public class MiningLeaseService {
                 "TEMPORARY CLOSURE APPROVED",
                 "UNDER-REVIEW-TERMINATION",
                 "MINING RENEWAL APPROVED",
-                "QUARRY RENEWAL APPROVED"
+                "QUARRY RENEWAL APPROVED",
+                "UNDER-REVIEW-CLOSURE"
         );
 
         if (search == null || search.isBlank()) {

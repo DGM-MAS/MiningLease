@@ -88,8 +88,8 @@ public interface ImmediateSuspensionApplicationRepository extends JpaRepository<
     FROM ImmediateSuspensionApplication q
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
-    WHERE t.createdBy = :currentUserId
-    AND t.taskStatus IN ('SUBMITTED', 'RECTIFICATION BY CMS', 'SUSPENSION LIFTING')
+    WHERE q.createdBy = :currentUserId
+    AND t.taskStatus IN ('SUBMITTED', 'Under-Review-Suspension', 'RECTIFICATION BY CMS', 'RECTIFICATION BY PROMOTER', 'SUSPENSION LIFTING')
 """)
     Page<ImmediateSuspensionApplication> findAssignedToUserRCME(Long currentUserId, Pageable pageable);
 
@@ -98,8 +98,8 @@ public interface ImmediateSuspensionApplicationRepository extends JpaRepository<
     FROM ImmediateSuspensionApplication q
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
-    WHERE t.createdBy = :currentUserId
-    AND t.taskStatus IN ('SUBMITTED', 'RECTIFICATION BY CMS', 'SUSPENSION LIFTING')
+    WHERE q.createdBy = :currentUserId
+    AND t.taskStatus IN ('SUBMITTED', 'Under-Review-Suspension', 'RECTIFICATION BY CMS', 'RECTIFICATION BY PROMOTER', 'SUSPENSION LIFTING')
 """)
     long countAssignedToUserRCME(Long currentUserId);
 
@@ -108,7 +108,7 @@ public interface ImmediateSuspensionApplicationRepository extends JpaRepository<
     FROM ImmediateSuspensionApplication q
     JOIN TaskManagement t
         ON t.applicationNumber = q.applicationNumber
-    WHERE t.createdBy = :currentUserId
+    WHERE q.createdBy = :currentUserId
     AND t.taskStatus IN ('SUBMITTED', 'RECTIFICATION BY CMS', 'SUSPENSION LIFTING')
     AND LOWER(q.applicationNumber) LIKE LOWER(CONCAT('%', :search, '%'))
 """)

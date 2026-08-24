@@ -24,4 +24,6 @@ public interface StockLiftingRepository extends JpaRepository<StockLiftingApplic
     List<StockLiftingApplication> findByIsManualEntryAndManualEntryBy(String isManual, Long userId);
 
     Optional<StockLiftingApplication> findByStockLiftingPermitNo(String appNo);
+
+    Optional<StockLiftingApplication> findByApplicationNo(String appNo);
 }
