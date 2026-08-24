@@ -58,9 +58,11 @@ public class ApplicationListResponse {
     // Location Details
     private String dungkhag;
     private String dzongkhagName;
+    private String dzongkhagId;
     private String gewog;
+    private String gewogId;
     private String nearestVillage;
-
+    private Integer nearestVillageId;
     // Status
     private String currentStatus;
     private String currentStatusDisplayName;

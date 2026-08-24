@@ -37,7 +37,7 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     UserWorkloadProjection findCMSTermination();
 
     @Query("""
-    SELECT q
+    SELECT DISTINCT q
     FROM TerminationApplicationEntity q
     JOIN TaskManagement t
         ON t.applicationNumber = q.terminationId
@@ -57,7 +57,7 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     long countAssignedToUserMI(Long userId);
 
     @Query("""
-    SELECT q
+    SELECT DISTINCT q
     FROM TerminationApplicationEntity q
     JOIN TaskManagement t
         ON t.applicationNumber = q.terminationId
@@ -269,4 +269,6 @@ public interface TerminationApplicationRepository extends JpaRepository<Terminat
     List<Long> findUserDetails(Long miFocalId);
 
     Optional<TerminationApplicationEntity> findByTerminationId(String applicationNo);
+
+    Optional<TerminationApplicationEntity> findByTerminationIdAndApplicationNumber(String terminationId, String applicationNo);
 }

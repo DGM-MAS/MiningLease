@@ -32,6 +32,7 @@ import java.util.Optional;
 public class ImmediateSuspensionService {
 
     private static final String SERVICE_CODE = "IMMEDIATE_SUSPENSION";
+    private static final String STOCK_LIFTING_CATEGORY   = "STOCK_LIFTING";
     private static final int DEFAULT_TAT_DAYS = 2;
 
     // Real sidebar menu ids (permissions.id) per recipient role for this service — used to target
@@ -66,6 +67,8 @@ public class ImmediateSuspensionService {
 
     private final SurfaceCollectionPermitRepository surfaceCollectionPermitRepository;
 
+    private final StockLiftingRepository stockLiftingRepository;
+
     private final DzongkhagLookupRepository dzongkhagLookupRepository;
 
     private final GewogLookupRepository  gewogLookupRepository;
@@ -91,12 +94,100 @@ public class ImmediateSuspensionService {
             case "S":
                 return processSurfaceCollectionSuspension(request, userId);
 
-//            case "SL":
-//                return processStockLiftingSuspension(request, userId);
+            case "SL":
+                return processStockLiftingSuspension(request, userId);
 
             default:
                 throw new BusinessException(ErrorCodes.BAD_REQUEST);
         }
+    }
+
+    private ImmediateSuspensionApplicationResponse processStockLiftingSuspension(@Valid ImmediateSuspensionApplicationRequest request, Long userId) {
+        Optional<StockLiftingApplication> stockLiftingApplication = stockLiftingRepository.findByApplicationNo(request.getApplicationNumber());
+
+        ImmediateSuspensionApplication suspension = new ImmediateSuspensionApplication();
+
+        if (stockLiftingApplication.isPresent()) {
+
+            StockLiftingApplication application = stockLiftingApplication.get();
+
+            if (!"APPROVED".equalsIgnoreCase(application.getStatus())) {
+                throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION, "The Permit has to be in APPROVED state.");
+            }
+            application.setStatus("Under-Review-Suspension");
+
+            stockLiftingRepository.save(application);
+
+            Optional<ApplicationMaster> applicationMaster = applicationMasterRepository
+                    .findByApplicationNumberAndServiceCode(
+                            request.getApplicationNumber(),
+                            STOCK_LIFTING_CATEGORY
+                    );
+
+            ApplicationMaster applicationMaster1 = null;
+
+            if (applicationMaster.isPresent()) {
+                applicationMaster1 = applicationMaster.get();
+            }
+
+            Long regionId = null;
+            String regionName = "";
+            String dzongkhagName = "";
+            String gewogName = "";
+            String villageName = "";
+            String placeOfMiningActivity = "";
+            if (application.getDzongkhag() != null && !application.getDzongkhag().isEmpty()) {
+                dzongkhagName = application.getDzongkhag();
+                Optional<DzongkhagLookup> dzongkhagLookup = dzongkhagLookupRepository.findById(application.getDzongkhagId());
+                DzongkhagLookup dzongkhagLookupStockLifting = dzongkhagLookup.orElse(null);
+                assert dzongkhagLookupStockLifting != null;
+                regionId = dzongkhagLookupStockLifting.getRegion().getId();
+                regionName = dzongkhagLookupStockLifting.getRegion().getRegionName();
+            }
+
+            if (application.getGewog() != null && !application.getGewog().isEmpty()) {
+                gewogName = application.getGewog();
+            }
+
+            if (application.getPlaceVillage() != null && !application.getPlaceVillage().isEmpty()) {
+
+                villageName = application.getPlaceVillage();
+            }
+
+            suspension =
+                    buildSuspensionApplication(request,
+                            userId,
+                            application.getCreatedBy(),
+                            application.getApplicantName(),
+                            application.getApplicantCid(),
+                            application.getApplicantEmail(),
+                            application.getApplicationNo(),
+                            application.getNameOfStockLifting(),
+                            regionId,
+                            regionName,
+                            dzongkhagName,
+                            gewogName,
+                            villageName,
+                            placeOfMiningActivity
+                    );
+
+            assert applicationMaster1 != null;
+            applicationMaster1.setCurrentStatus("Under-Review-Suspension");
+            applicationMasterRepository.save(applicationMaster1);
+
+            suspension.setApplicationMaster(applicationMaster1);
+            immediateSuspensionApplicationRepository.save(suspension);
+
+
+            createTask(applicationMaster1, suspension, "APPLICANT", userId, application.getCreatedBy());
+
+            sendNotifications(application.getApplicantEmail(),
+                    application.getApplicantName(),
+                    application.getCreatedBy(),
+                    request.getApplicationNumber());
+
+        }
+        return immediateSuspensionMapper.toResponse(suspension);
     }
 
     // Used to process Mining lease application during application submission
