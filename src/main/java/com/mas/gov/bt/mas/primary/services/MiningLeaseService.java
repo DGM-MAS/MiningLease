@@ -2619,12 +2619,26 @@ public class MiningLeaseService {
                                 request.getRemarks());
                     }
 
+                    if (app.getCreatedBy() != null) {
+                        String title = "Mining lease application has been forwarded to Director for FMFS Approval.";
+                        String message = "Mining lease application has been forwarded to Director for FMFS approval Application No. " + app.getApplicationNumber() ;
+                        String serviceId = MENU_ID_PROMOTER;
+                        notificationClient.sendUserNotification(title, message, app.getCreatedBy(), serviceId, "CITIZEN", false, app.getApplicationNumber());
+                    }
+
                     if (fetchDirectorDetails.getEmail() != null) {
                         notificationClient.sendAssignmentNotification(
                                 fetchDirectorDetails.getEmail(),
                                 fetchDirectorDetails.getUsername(),
                                 app.getApplicationNumber(),
                                 "Director Review");
+                    }
+
+                    if (directorId != null) {
+                        String title = "Mining lease application has been forwarded to Director for FMFS Approval.";
+                        String message = "Mining lease application has been forwarded to Director for FMFS approval Application No. " + app.getApplicationNumber() + "Please review the FMFS document forwarded to you by the mining chief.";
+                        String serviceId = MENU_ID_DIRECTOR;
+                        notificationClient.sendUserNotification(title, message, directorId, serviceId, "STAFF", true, app.getApplicationNumber());
                     }
                 }
                 case "Rejected" -> {
@@ -2652,8 +2666,23 @@ public class MiningLeaseService {
                                 app.getApplicationNumber(),
                                 request.getRemarks());
                     }
+
+                    if (app.getCreatedBy() != null) {
+                        String title = "Mining lease application has been rejected.";
+                        String message = "We regret to inform you that your mining lease application has been rejected. Application No. : " + app.getApplicationNumber() + "Please view the application details to view the remarks provided." ;
+                        String serviceId = MENU_ID_PROMOTER;
+                        notificationClient.sendUserNotification(title, message, app.getCreatedBy(), serviceId, "CITIZEN", false, app.getApplicationNumber());
+                    }
                 }
                 case "Return" -> {
+
+                    TaskManagement taskEngineer = taskManagementRepository.findByApplicationNumberAndAssignedToRoleAndTaskStatusAndServiceCode
+                            (app.getApplicationNumber(),"MINE ENGINEER", "FMFS SUBMITTED", SERVICE_CODE);
+
+                    Long miningEngineerId = taskEngineer.getAssignedToUserId();
+
+                    UserWorkloadProjection fetchMiningEngineerDetails  = miningLeaseApplicationRepository.findUserDetails(miningEngineerId);
+
                     // Return to Mining Engineer
                     app.setCurrentStatus("ME_REVIEW");
                     app.setRemarksChief(request.getRemarks());
@@ -2675,6 +2704,30 @@ public class MiningLeaseService {
                                 "Mining Engineer Review",
                                 "Your application has been returned to the Mining Engineer for review.");
                     }
+
+                    if (app.getCreatedBy() != null) {
+                        String title = "Mining lease application has been returned to mining engineer for review.";
+                        String message = "Mining lease application has been returned to mining engineer for review by the mining chief. " + app.getApplicationNumber() ;
+                        String serviceId = MENU_ID_PROMOTER;
+                        notificationClient.sendUserNotification(title, message, app.getCreatedBy(), serviceId, "CITIZEN", false, app.getApplicationNumber());
+                    }
+
+                    if ( fetchMiningEngineerDetails.getUserId() != null) {
+                        notificationClient.sendStatusUpdateNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber(),
+                                "Mining Engineer Review",
+                                "Your application has been returned to the Mining Engineer for review.");
+                    }
+
+                    if (fetchMiningEngineerDetails.getUserId() != null) {
+                        String title = "Mining lease application has been returned to mining engineer for review.";
+                        String message = "Mining lease application has been returned to mining engineer for review by the mining chief. " + app.getApplicationNumber() + "Please review the application.";
+                        String serviceId = MENU_ID_PROMOTER;
+                        notificationClient.sendUserNotification(title, message, app.getCreatedBy(), serviceId, "STAFF", true, app.getApplicationNumber());
+                    }
+
                 }
                 default -> throw new IllegalArgumentException("Application status not recognized");
             }
