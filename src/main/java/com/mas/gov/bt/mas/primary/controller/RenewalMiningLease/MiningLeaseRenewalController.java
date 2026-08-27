@@ -270,4 +270,16 @@ public class MiningLeaseRenewalController {
         miningLeaseRenewalService.onErbPaymentConfirmed(dto.getApplicationNo());
         return SuccessResponse.buildSuccessResponse("Your ERB regularization payment for application " + dto.getApplicationNo() + " has been confirmed.");
     }
+
+    // Used by user to submit FMFS
+    @PostMapping("/applicationsBankDetails")
+    @Operation(summary = "Submit MLA file application", description = "Submit MLA file for mining lease application")
+    public ResponseEntity<SuccessResponse<MiningLeaseResponse>> submitBankDetailsFile(
+            @Valid @RequestBody MiningLeaseBankDetailsRequest request) {
+
+        MiningLeaseResponse response = miningLeaseRenewalService.submitBankDetails(request);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new SuccessResponse<>("Application created successfully", response));
+    }
 }

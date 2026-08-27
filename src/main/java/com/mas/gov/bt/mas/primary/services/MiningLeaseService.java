@@ -656,11 +656,6 @@ public class MiningLeaseService {
                     log.info("Email notification sent to director: {}", assignedDirector.getEmail());
                 } catch (Exception ex) {
                     log.warn("Failed to send email notification to director", ex);
-                    throw new BusinessException(
-                            ErrorCodes.RECORD_NOT_FOUND,
-                            "Director Email is missing",
-                            ex
-                    );
                 }
             }
 
@@ -672,19 +667,10 @@ public class MiningLeaseService {
                 notificationClient.sendUserNotification(title, message, assignedDirector.getUserId(), serviceId, "STAFF", true, miningLeaseApplication.getApplicationNumber());
             }catch (Exception ex) {
                 log.warn("Failed to send in-app notification to director", ex);
-                throw new BusinessException(
-                        ErrorCodes.RECORD_NOT_FOUND,
-                        "Director User ID  is missing",
-                        ex
-                );
             }
         }
         } catch (Exception ex) {
             log.error("Unexpected error sending notifications", ex);
-            throw new BusinessException(
-                    ErrorCodes.EXTERNAL_SERVICE_ERROR,
-                    "Failed to send notifications to director",
-                    ex);
         }
 
         return mapper.toResponse(miningLeaseApplication);
