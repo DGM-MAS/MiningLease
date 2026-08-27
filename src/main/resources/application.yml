@@ -111,30 +111,8 @@ spring:
             trust: smtp.gmail.com
             protocols: TLSv1.2
 
-  # Redis Cache Configuration
-  # To enable Redis caching:
-  # 1. Install Redis (Docker: docker run -d -p 6379:6379 redis:latest)
-  # 2. Change cache.type from 'none' to 'redis'
-#  data:
-#    redis:
-#      host: localhost
-#      port: 6379
-#      password:
-#      timeout: 60000
-#      jedis:
-#        pool:
-#          max-active: 20
-#          max-idle: 10
-#          min-idle: 5
-#          max-wait: -1ms
-
   cache:
-    type: none  # Using in-memory token blacklist instead of Redis
-    redis:
-      time-to-live: 3600000
-      cache-null-values: false
-      use-key-prefix: true
-      key-prefix: "mas::"
+    type: none  # Using in-memory token blacklist
 
 internal:
   api-key: ${INTERNAL_API_KEY:kjJ/7D4TrEUZ9YTx3wm+fRFqvcYEDEqqcTfvS8J7IQ8=}
@@ -184,10 +162,8 @@ management:
         include: health,info
   endpoint:
     health:
-      show-details: always
+      show-details: never
   health:
-    redis:
-      enabled: false
     mail:
       enabled: false
 
