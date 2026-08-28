@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Date;
@@ -230,6 +231,45 @@ public class MiningLeaseRenewalApplication {
 
     @Column(name = "ec_expiry_date", length = 30)
     private Date ecExpiryDate;
+
+    @Column(name = "type_of_mines", length = 100)
+    private String typeOfMines;
+
+    @Column(name = "type_of_minerals_products", length = 255)
+    private String typeOfMineralsProducts;
+
+    @Column(name = "previous_lease_start_date")
+    private LocalDate previousLeaseStartDate;
+
+    @Column(name = "previous_lease_end_date")
+    private LocalDate previousLeaseEndDate;
+
+    @Column(name = "approved_area", length = 100)
+    private String approvedArea;
+
+    @Column(name = "approved_erb", length = 100)
+    private String approvedErb;
+
+    @Column(name = "geological_reserve")
+    private String geologicalReserve;
+
+    @Column(name = "mineable_reserve")
+    private String mineableReserve;
+
+    @Column(name = "stripping_ratio")
+    private String strippingRatio;
+
+    @Column(name = "bank_gurantor_doc_id")
+    private Long bankGuarantorDocId;
+
+    @Column(name = "upfront_payment_amount")
+    private BigDecimal upfrontPaymentAmount;
+
+    @Column(name = "company_registration_no", length = 255)
+    private String companyRegistrationNo;
+
+    @Column(name = "license_no", length = 50)
+    private String licenseNo;
 
     /* ===== Soft Delete ===== */
     @Column(name = "is_active")

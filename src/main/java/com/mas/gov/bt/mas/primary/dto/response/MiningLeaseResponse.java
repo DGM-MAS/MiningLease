@@ -1,5 +1,6 @@
 package com.mas.gov.bt.mas.primary.dto.response;
 
+import jakarta.persistence.Column;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -40,6 +41,7 @@ public class MiningLeaseResponse {
     private String ecFileId;
     private String ecNumber;
     private Date ecExpiryDate;
+    private String eCStatus;
     // Mining Details
     private String typeOfMines;
     private String typeOfMineralsProducts;
@@ -190,4 +192,9 @@ public class MiningLeaseResponse {
     private String otherFMFSFileId;
 
     private String additionalFileGRId;
+
+    private LocalDate previousLeaseStartDate;
+    private LocalDate previousLeaseEndDate;
+
+    private Integer proposedLeaseRenewalPeriod;
 }

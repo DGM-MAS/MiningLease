@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Date;
 
 @Data
 @NoArgsConstructor
@@ -88,4 +89,18 @@ public class MiningLeaseRenewalApplicationResponse {
     private String rejectionReason;
     private Boolean isActive;
     private String approvedGeologicalFileId;
+
+    private LocalDate previousLeaseStartDate;
+
+    private LocalDate previousLeaseEndDate;
+
+    //Newly added Name of Mine
+    private String nameOfMine;
+    private String ecFileId;
+    private String ecNumber;
+    private Date ecExpiryDate;
+    private String eCStatus;
+
+    private String typeOfMines;
+    private String typeOfMineralsProducts;
 }
