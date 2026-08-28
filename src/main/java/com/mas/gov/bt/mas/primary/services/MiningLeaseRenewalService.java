@@ -138,12 +138,13 @@ public class MiningLeaseRenewalService {
         // Check if a renewal application (e.g. DRAFT) already exists for this application number
         Optional<MiningLeaseRenewalApplication> existingRenewal =
                 miningLeaseRenewalApplicationRepository.findByApplicationNumber(request.getApplicationNumber());
+
         if (existingRenewal.isPresent() && !"DRAFT".equals(existingRenewal.get().getCurrentStatus())) {
             throw new BusinessException(ErrorCodes.DUPLICATE_ENTRY);
         }
 
-
         MiningLeaseRenewalApplication miningLeaseRenewalApplication = existingRenewal.orElse(new MiningLeaseRenewalApplication());
+
         if (miningLeaseApplication.isPresent()) {
             MiningLeaseApplication miningLeaseApplication1 = miningLeaseApplication.get();
 
@@ -156,6 +157,20 @@ public class MiningLeaseRenewalService {
             // 1
             // Map all data to renewal application table
             // IF THE DATA IS PRESENT
+            miningLeaseRenewalApplication.setPreviousLeaseEndDate(miningLeaseApplication1.getLeaseEndDate());
+            miningLeaseRenewalApplication.setPreviousLeaseStartDate(miningLeaseApplication1.getLeaseStartDate());
+            miningLeaseRenewalApplication.setTypeOfMineralsProducts(miningLeaseApplication1.getTypeOfMineralsProducts());
+            miningLeaseRenewalApplication.setTypeOfMines(miningLeaseApplication1.getTypeOfMines());
+            miningLeaseRenewalApplication.setEcFileId(miningLeaseApplication1.getEcFileId());
+            miningLeaseRenewalApplication.setECStatus(miningLeaseApplication1.getECStatus());
+            miningLeaseRenewalApplication.setEcExpiryDate(miningLeaseApplication1.getEcExpiryDate());
+            miningLeaseRenewalApplication.setEcNumber(miningLeaseApplication1.getEcNumber());
+            miningLeaseRenewalApplication.setApprovedArea(miningLeaseApplication1.getApprovedArea());
+            miningLeaseRenewalApplication.setApprovedErb(miningLeaseApplication1.getApprovedErb());
+            miningLeaseRenewalApplication.setGeologicalReserve(miningLeaseApplication1.getGeologicalReserve());
+            miningLeaseRenewalApplication.setMineableReserve(miningLeaseApplication1.getMineableReserve());
+            miningLeaseRenewalApplication.setStrippingRatio(miningLeaseApplication1.getStrippingRatio());
+
             miningLeaseRenewalApplication.setApplicationNumber(request.getApplicationNumber());
             miningLeaseRenewalApplication.setApplicantCid(request.getApplicantCid());
             miningLeaseRenewalApplication.setApplicantName(request.getApplicantName());
@@ -164,8 +179,9 @@ public class MiningLeaseRenewalService {
             miningLeaseRenewalApplication.setApplicantType(request.getApplicantType());
             miningLeaseRenewalApplication.setPostalAddress(request.getPostalAddress());
             miningLeaseRenewalApplication.setTelephoneNo(request.getTelephoneNo());
-            miningLeaseRenewalApplication.setLeaseEndDate(request.getLeaseEndDate());
-            miningLeaseRenewalApplication.setLeasePeriodYears(request.getLeasePeriodYears());
+
+//            miningLeaseRenewalApplication.setLeaseEndDate(request.getLeaseEndDate());
+//            miningLeaseRenewalApplication.setLeasePeriodYears(request.getLeasePeriodYears());
             miningLeaseRenewalApplication.setProposedLeaseRenewalPeriod(request.getProposedLeaseRenewalPeriod());
             miningLeaseRenewalApplication.setCreatedBy(userId);
             miningLeaseRenewalApplication.setRegionId(miningLeaseApplication1.getRegionId());
@@ -207,12 +223,47 @@ public class MiningLeaseRenewalService {
             miningLeaseRenewalApplication.setDeclarationStatus(request.isDeclarationStatus());
             miningLeaseRenewalApplication.setCurrentStatus("RENEWAL APPLICATION");
 
+
             // =====================================================
             // 2. ASSIGN DIRECTOR
             // =====================================================
             UserWorkloadProjection assignedDirector = assignDirector(
                     miningLeaseRenewalApplication.getRegionId(), miningLeaseRenewalApplication.getApplicationNumber());
 
+            try {
+                if (assignedDirector.getEmail() != null && !assignedDirector.getEmail().trim().isEmpty()) {
+                    try {
+                        notificationClient.sendMiningLeaseMailToDirectorAssigned(
+                                assignedDirector.getEmail(),
+                                assignedDirector.getUsername(),
+                                miningLeaseApplication1.getApplicationNumber());
+                        log.info("Email notification sent to director: {}", assignedDirector.getEmail());
+                    } catch (Exception ex) {
+                        log.warn("Failed to send email notification to director", ex);
+                    }
+                }
+
+                if(assignedDirector.getUserId()!= null) {
+                    try {
+                        String title = "Mining lease application has been assigned.";
+                        String message = "An application for mining lease has been assigned for review. Application No. " + miningLeaseApplication1.getApplicationNumber();
+                        String serviceId = MENU_ID_DIRECTOR;
+                        notificationClient.sendUserNotification(
+                                title,
+                                message,
+                                assignedDirector.getUserId(),
+                                serviceId,
+                                "STAFF",
+                                true,
+                                miningLeaseApplication1.getApplicationNumber()
+                        );
+                    }catch (Exception ex) {
+                        log.warn("Failed to send in-app notification to director", ex);
+                    }
+                }
+            } catch (Exception ex) {
+                log.error("Unexpected error sending notifications", ex);
+            }
             // =====================================================
             // 3. APPLICATION MASTER CREATION
             // =====================================================
@@ -234,6 +285,7 @@ public class MiningLeaseRenewalService {
         } else {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
         }
+
 
         return mapper.toRenewalResponse(miningLeaseRenewalApplication);
     }
@@ -793,6 +845,13 @@ public class MiningLeaseRenewalService {
                     app.setFmfsStatus(request.getFmfsStatus());
                     app.setMeReviewedAt(LocalDateTime.now());
 
+                    // Final data change this data to be included as the mining engineer will edit this data if needed
+                    app.setApprovedArea(request.getApprovedArea());
+                    app.setApprovedErb(request.getApprovedErb());
+                    app.setGeologicalReserve(request.getGeologicalReserve());
+                    app.setMineableReserve(request.getMineableReserve());
+                    app.setStrippingRatio(request.getStrippingRatio());
+
                     if (master != null) {
                         master.setCurrentStatus("MINING_CHIEF_REVIEW");
                         applicationMasterRepository.save(master);
@@ -900,6 +959,35 @@ public class MiningLeaseRenewalService {
                                 "Mining Engineer Review",
                                 request.getRemarks());
                     }
+                }
+                case "Resubmit BG" -> {
+                    app.setCurrentStatus("RESUBMIT BG");
+                    app.setRemarksME(request.getRemarks());
+                    app.setMeReviewedAt(LocalDateTime.now());
+
+                    if (master != null) {
+                        master.setCurrentStatus("RESUBMIT BG");
+                        applicationMasterRepository.save(master);
+                    }
+
+                    createRevisionRecord(app, "ME_REVIEW", request.getRemarks(), userId);
+                    createTask(master, app, "APPLICANT", userId, app.getCreatedBy());
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendRevisionRequestNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber(),
+                                "Mining Engineer BG Review",
+                                request.getRemarks());
+                    }
+                    if (app.getCreatedBy() != null) {
+                        String title = "Mining lease application Revision Required.";
+                        String message = "Mining Engineer has requested BG resubmission. Application No. " + app.getApplicationNumber() + "Your FMFS is approved by the department, please submit IEE/EIA to DECC for the issuance of EC”. After getting the EC Please upload the EC in the system.";
+                        String serviceId = MENU_ID_APPLICANT;
+                        notificationClient.sendUserNotification(title, message, app.getCreatedBy(), serviceId, "STAFF", true, app.getApplicationNumber());
+                    }
+//                    smsClient.sendApplicationStatusSms(app.getApplicantUserId(), app.getApplicationNumber(), "Revision Required");
                 }
                 default -> throw new IllegalArgumentException("Application status not recognized");
             }
@@ -1608,6 +1696,16 @@ public class MiningLeaseRenewalService {
             application.setApprovedLeasePeriod(String.valueOf(miningLeaseRenewalApplication.getProposedLeaseRenewalPeriod()));
             application.setLeaseStartDate(now);
             application.setLeaseEndDate(endDate);
+
+            // Update data to be populated in main application table
+            // These data will be updated by the Mining engineer
+            // New change after final UAT
+            application.setApprovedArea(miningLeaseRenewalApplication.getApprovedArea());
+            application.setApprovedErb(miningLeaseRenewalApplication.getApprovedErb());
+            application.setGeologicalReserve(miningLeaseRenewalApplication.getGeologicalReserve());
+            application.setMineableReserve(miningLeaseRenewalApplication.getMineableReserve());
+            application.setStrippingRatio(miningLeaseRenewalApplication.getStrippingRatio());
+
             application.setCurrentStatus(miningStatus);
             master = application.getApplicationMaster();
             master.setCurrentStatus(miningStatus);
@@ -1645,8 +1743,8 @@ public class MiningLeaseRenewalService {
                 miningLeaseRenewalApplication.setMlaStatus("SUBMITTED");
                 miningLeaseRenewalApplication.setCurrentStatus("MLA SUBMITTED");
 
-                miningLeaseRenewalApplication.setLeaseStartDate(request.getLeaseStartDate());
-                miningLeaseRenewalApplication.setLeaseEndDate(request.getLeaseEndDate());
+//                miningLeaseRenewalApplication.setLeaseStartDate(request.getLeaseStartDate());
+//                miningLeaseRenewalApplication.setLeaseEndDate(request.getLeaseEndDate());
 
                 applicationMaster.setCurrentStatus("MLA SUBMITTED");
 
@@ -1706,6 +1804,9 @@ public class MiningLeaseRenewalService {
         app.setPayableAmount(request.getPayableAmount());
         app.setCurrentStatus("MLA SUBMITTED");
 
+        app.setLeaseStartDate(request.getLeaseStartDate());
+        app.setLeaseEndDate(request.getLeaseEndDate());
+
         if (master != null) {
             master.setCurrentStatus("MLA SUBMITTED");
             applicationMasterRepository.save(master);
@@ -1737,6 +1838,8 @@ public class MiningLeaseRenewalService {
         ApplicationMaster master = app.getApplicationMaster();
         app.setNoteSheetDocId(request.getNoteSheetDocId());
         app.setCurrentStatus("APPROVED BY MINISTRY");
+        app.setLeaseStartDate(request.getLeaseStartDate());
+        app.setLeaseEndDate(request.getLeaseEndDate());
 
         if (master != null) {
             master.setCurrentStatus("APPROVED BY MINISTRY");
@@ -1986,10 +2089,15 @@ public class MiningLeaseRenewalService {
     public SuccessResponse<List<MiningLeaseResponse>> getMyApplications(Long userId, Pageable pageable, String search) {
         Page<MiningLeaseRenewalApplication> page;
 
+        List<String> ApplicationStatus = List.of(
+                "REJECTED",
+                "MINING RENEWAL APPROVED"
+        );
+
         if (search == null || search.isBlank()) {
-            page = miningLeaseRenewalApplicationRepository.findByCreatedBy(userId, pageable);
+            page = miningLeaseRenewalApplicationRepository.findByCreatedByAndCurrentStatusNotIn(userId, ApplicationStatus, pageable);
         } else {
-            page = miningLeaseRenewalApplicationRepository.findByCreatedByAndSearch(userId, search.trim(), pageable);
+            page = miningLeaseRenewalApplicationRepository.findByCreatedByAndSearch(userId, search.trim(), ApplicationStatus, pageable);
         }
 
         return SuccessResponse.fromPage("Applications fetched successfully", page.map(mapper::toRenewalResponse));
@@ -2266,4 +2374,92 @@ public class MiningLeaseRenewalService {
         );
     }
 
+    @Transactional
+    public MiningLeaseResponse submitBankDetails(@Valid MiningLeaseBankDetailsRequest request) {
+        MiningLeaseRenewalApplication miningLeaseRenewalApplication = null;
+        if (request.getApplicationNo() != null) {
+
+            Optional<MiningLeaseRenewalApplication> miningLeaseRenewalApplication1 = miningLeaseRenewalApplicationRepository.findByApplicationNumber(request.getApplicationNo());
+
+            if (miningLeaseRenewalApplication1.isPresent()) {
+                miningLeaseRenewalApplication = miningLeaseRenewalApplication1.get();
+
+                ApplicationMaster applicationMaster = miningLeaseRenewalApplication.getApplicationMaster();
+
+                miningLeaseRenewalApplication.setBankGuarantorDocId(request.getBankGuarantorDocId());
+                miningLeaseRenewalApplication.setUpfrontPaymentAmount(request.getUpfrontPaymentAmount());
+
+                PaymentMaster bgFeeRow = paymentMasterRepository
+                        .resolveApplicable(SERVICE_CODE, "BG_UPFRONT_FEE", "BG SUBMITTED").orElse(null);
+
+                boolean bgFeeEnabled = bgFeeRow != null && Boolean.TRUE.equals(bgFeeRow.getIsEnabled());
+
+                if (bgFeeEnabled && paymentEnabled) {
+
+                    if (request.getUpfrontPaymentAmount() == null) {
+                        throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Upfront payment amount is required");
+                    }
+
+                    miningLeaseRenewalApplication.setCurrentStatus("BG PAYMENT PENDING");
+                    applicationMaster.setCurrentStatus("BG PAYMENT PENDING");
+                    applicationMasterRepository.save(applicationMaster);
+                    miningLeaseRenewalApplicationRepository.save(miningLeaseRenewalApplication);
+
+                    PaymentInitiationResponse paymentResp = mastersPaymentClient.initiate(
+                            buildBgPaymentRequest(miningLeaseRenewalApplication, bgFeeRow.getServiceCode(), request.getUpfrontPaymentAmount()));
+
+                    MiningLeaseResponse response = mapper.toRenewalResponse(miningLeaseRenewalApplication);
+                    response.setRedirectUrl(paymentResp.getRedirectUrl());
+                    log.info("BG upfront payment initiated for application {}", request.getApplicationNo());
+                    return response;
+                }
+
+                miningLeaseRenewalApplication.setCurrentStatus("BG SUBMITTED");
+                applicationMaster.setCurrentStatus("BG SUBMITTED");
+                applicationMasterRepository.save(applicationMaster);
+                miningLeaseRenewalApplicationRepository.save(miningLeaseRenewalApplication);
+
+                if (miningLeaseRenewalApplication.getCreatedBy() != null) {
+                    notificationClient.sendUserNotification(
+                            "Bank guarantee details submitted.",
+                            "Your Bank Guarantee for application " + miningLeaseRenewalApplication.getApplicationNumber() + " has been submitted.",
+                            miningLeaseRenewalApplication.getCreatedBy(), MENU_ID_APPLICANT, "CITIZEN", false, miningLeaseRenewalApplication.getApplicationNumber());
+                }
+            }
+        }
+        return mapper.toRenewalResponse(miningLeaseRenewalApplication);
+    }
+
+    private PaymentInitiationRequest buildBgPaymentRequest(MiningLeaseRenewalApplication application, String serviceCode, BigDecimal upfrontAmount) {
+        PaymentInitiationRequest.PaymentItemRequest item = new PaymentInitiationRequest.PaymentItemRequest();
+        item.setFeeType("BG_UPFRONT_FEE");
+        item.setServiceCode(serviceCode);
+        item.setDescription("Mining Lease Bank Guarantee Upfront Payment");
+        item.setQuantity(1);
+        item.setAmount(upfrontAmount); // caller-supplied — this amount is inherently case-specific, never centrally configured
+
+        String documentNo = resolveDocumentNo(application);
+
+        PaymentInitiationRequest req = new PaymentInitiationRequest();
+        req.setApplicationId(application.getApplicationNumber());
+        req.setApplicationType("MINING_LEASE");
+        req.setTaxPayerName(application.getApplicantName());
+        req.setTaxPayerDocumentNo(documentNo);
+        req.setTaxPayerNo(documentNo);
+        req.setPlatform("MAS");
+        req.setOnPaidStatus("BG SUBMITTED");
+        req.setCallbackUrl(selfBaseUrl + "/api/mining-lease/bg-payment-callback");
+        req.setPaymentItems(List.of(item));
+        return req;
+    }
+
+    private String resolveDocumentNo(MiningLeaseRenewalApplication application) {
+        String type = application.getApplicantType();
+        if (type == null) return application.getApplicantCid();
+        return switch (type.toUpperCase()) {
+            case "REGISTERED_COMPANY" -> application.getCompanyRegistrationNo();
+            case "BUSINESS_LICENSE"   -> application.getLicenseNo();
+            default                   -> application.getApplicantCid();
+        };
+    }
 }
