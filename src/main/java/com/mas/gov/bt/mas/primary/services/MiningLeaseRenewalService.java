@@ -960,6 +960,35 @@ public class MiningLeaseRenewalService {
                                 request.getRemarks());
                     }
                 }
+                case "Resubmit BG" -> {
+                    app.setCurrentStatus("RESUBMIT BG");
+                    app.setRemarksME(request.getRemarks());
+                    app.setMeReviewedAt(LocalDateTime.now());
+
+                    if (master != null) {
+                        master.setCurrentStatus("RESUBMIT BG");
+                        applicationMasterRepository.save(master);
+                    }
+
+                    createRevisionRecord(app, "ME_REVIEW", request.getRemarks(), userId);
+                    createTask(master, app, "APPLICANT", userId, app.getCreatedBy());
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendRevisionRequestNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber(),
+                                "Mining Engineer BG Review",
+                                request.getRemarks());
+                    }
+                    if (app.getCreatedBy() != null) {
+                        String title = "Mining lease application Revision Required.";
+                        String message = "Mining Engineer has requested BG resubmission. Application No. " + app.getApplicationNumber() + "Your FMFS is approved by the department, please submit IEE/EIA to DECC for the issuance of EC”. After getting the EC Please upload the EC in the system.";
+                        String serviceId = MENU_ID_APPLICANT;
+                        notificationClient.sendUserNotification(title, message, app.getCreatedBy(), serviceId, "STAFF", true, app.getApplicationNumber());
+                    }
+//                    smsClient.sendApplicationStatusSms(app.getApplicantUserId(), app.getApplicationNumber(), "Revision Required");
+                }
                 default -> throw new IllegalArgumentException("Application status not recognized");
             }
             miningLeaseRenewalApplicationRepository.save(app);
@@ -1714,8 +1743,8 @@ public class MiningLeaseRenewalService {
                 miningLeaseRenewalApplication.setMlaStatus("SUBMITTED");
                 miningLeaseRenewalApplication.setCurrentStatus("MLA SUBMITTED");
 
-                miningLeaseRenewalApplication.setLeaseStartDate(request.getLeaseStartDate());
-                miningLeaseRenewalApplication.setLeaseEndDate(request.getLeaseEndDate());
+//                miningLeaseRenewalApplication.setLeaseStartDate(request.getLeaseStartDate());
+//                miningLeaseRenewalApplication.setLeaseEndDate(request.getLeaseEndDate());
 
                 applicationMaster.setCurrentStatus("MLA SUBMITTED");
 
@@ -1775,6 +1804,9 @@ public class MiningLeaseRenewalService {
         app.setPayableAmount(request.getPayableAmount());
         app.setCurrentStatus("MLA SUBMITTED");
 
+        app.setLeaseStartDate(request.getLeaseStartDate());
+        app.setLeaseEndDate(request.getLeaseEndDate());
+
         if (master != null) {
             master.setCurrentStatus("MLA SUBMITTED");
             applicationMasterRepository.save(master);
@@ -1806,6 +1838,8 @@ public class MiningLeaseRenewalService {
         ApplicationMaster master = app.getApplicationMaster();
         app.setNoteSheetDocId(request.getNoteSheetDocId());
         app.setCurrentStatus("APPROVED BY MINISTRY");
+        app.setLeaseStartDate(request.getLeaseStartDate());
+        app.setLeaseEndDate(request.getLeaseEndDate());
 
         if (master != null) {
             master.setCurrentStatus("APPROVED BY MINISTRY");
@@ -2055,10 +2089,15 @@ public class MiningLeaseRenewalService {
     public SuccessResponse<List<MiningLeaseResponse>> getMyApplications(Long userId, Pageable pageable, String search) {
         Page<MiningLeaseRenewalApplication> page;
 
+        List<String> ApplicationStatus = List.of(
+                "REJECTED",
+                "MINING RENEWAL APPROVED"
+        );
+
         if (search == null || search.isBlank()) {
-            page = miningLeaseRenewalApplicationRepository.findByCreatedBy(userId, pageable);
+            page = miningLeaseRenewalApplicationRepository.findByCreatedByAndCurrentStatusNotIn(userId, ApplicationStatus, pageable);
         } else {
-            page = miningLeaseRenewalApplicationRepository.findByCreatedByAndSearch(userId, search.trim(), pageable);
+            page = miningLeaseRenewalApplicationRepository.findByCreatedByAndSearch(userId, search.trim(), ApplicationStatus, pageable);
         }
 
         return SuccessResponse.fromPage("Applications fetched successfully", page.map(mapper::toRenewalResponse));

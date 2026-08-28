@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -15,4 +16,6 @@ public class RenewalNotesheetMlaRequest {
     private String remarks;
     private boolean erbRegularizationRequired;
     private BigDecimal payableAmount;
+    private LocalDate leaseStartDate;
+    private LocalDate leaseEndDate;
 }
