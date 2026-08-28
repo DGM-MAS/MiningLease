@@ -2,11 +2,18 @@ package com.mas.gov.bt.mas.primary.config;
 
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 
+// Must run ahead of springSecurityFilterChain (order -100). An unordered @Component
+// Filter defaults to LOWEST_PRECEDENCE, which puts it behind Spring Security — and on a
+// 401/403 Spring Security never calls chain.doFilter, so these headers were never written
+// on exactly the responses an unauthenticated client (or a scanner) sees.
 @Component
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class HstsFilter implements Filter {
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
