@@ -173,6 +173,23 @@
 
     <build>
         <plugins>
+            <!-- Not bound to any lifecycle phase on purpose: a normal `mvn package` never
+                 resolves or runs it. Its only job is to make `mvn org.owasp:dependency-check-maven:check`
+                 pick up dependency-check-suppressions.xml automatically, so the 216 known false
+                 positives (reactor-netty CPE mismatch, CVE-2018-1258 on spring-security) stay
+                 suppressed even when the scan job forgets to pass the suppression file on the command line. A scan driven
+                 by the standalone CLI still needs that flag - this cannot fix that case. -->
+            <plugin>
+                <groupId>org.owasp</groupId>
+                <artifactId>dependency-check-maven</artifactId>
+                <version>12.1.3</version>
+                <configuration>
+                    <suppressionFiles>
+                        <suppressionFile>${project.basedir}/dependency-check-suppressions.xml</suppressionFile>
+                    </suppressionFiles>
+                </configuration>
+            </plugin>
+
             <!-- Compiler Plugin -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

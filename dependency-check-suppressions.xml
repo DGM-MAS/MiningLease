@@ -2,7 +2,10 @@
 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
 
     <!--
-      Pass this file to the scan with:  --suppression dependency-check-suppressions.xml
+      Pass this file to the scan on the command line with the suppression option, naming
+      this file. (NOTE: the option's two leading hyphens are deliberately not written out
+      here - a double hyphen is illegal inside an XML comment and makes this whole file
+      unparseable, which silently disables every suppression in it.)
       (or, for the Maven plugin, <suppressionFiles> in its configuration).
 
       Only entries that are demonstrably wrong for this codebase belong here. Anything that is
