@@ -26,7 +26,14 @@
             it pulls in are NOT suppressed and must keep reporting. Those are pinned via
             <netty.version> in each pom (4.1.137.Final at the time of writing).
 
-            Affects api-gateway, backend-ndi, backend-quarrying-lease.
+            SCOPE NARROWED 2026-08-31: only mas-api-gateway still ships reactor-netty. NDI never
+            used its webflux starter at all (removed), and Quarrying-Lease now runs WebClient on
+            JdkClientHttpConnector with spring-boot-starter-reactor-netty excluded, so the jar is
+            gone from both. The gateway cannot follow them: Spring Cloud Gateway's WebSocketClient
+            bean comes from NettyConfiguration, and without it the context fails to start outright
+            (verified - filteringWebHandler -> websocketRoutingFilter -> no WebSocketClient bean).
+            This rule is kept in the other repos as a safety net in case a webflux starter returns
+            transitively; it currently matches nothing there, which is the intended state.
         ]]></notes>
         <filePath regex="true">.*[\/]reactor-netty-core-.*\.jar</filePath>
         <cpe>cpe:/a:netty:netty</cpe>
