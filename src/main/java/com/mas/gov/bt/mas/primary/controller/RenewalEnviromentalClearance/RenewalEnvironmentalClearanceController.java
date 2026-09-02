@@ -256,7 +256,12 @@ public class RenewalEnvironmentalClearanceController {
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
-                        ContentDisposition.inline().filename(ecNo + ".pdf").build().toString())
+                        ContentDisposition.inline()
+                                // ecNo is an untrusted @PathVariable. filename(name, UTF_8)
+                                // emits the RFC 5987 filename* form, percent-encoding CR/LF
+                                // rather than letting them into the header (CVE-2026-59314).
+                                .filename(ecNo + ".pdf", java.nio.charset.StandardCharsets.UTF_8)
+                                .build().toString())
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(document);
     }
