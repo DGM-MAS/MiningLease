@@ -53,4 +53,52 @@
         <cve>CVE-2018-1258</cve>
     </suppress>
 
+    <suppress>
+        <notes><![CDATA[
+            NOT APPLICABLE / NO OSS FIX AVAILABLE. Two Spring Framework advisories published
+            2026-08-20 against spring-core 6.2.0 - 6.2.19. Both are rated LOW by VMware in their
+            own advisories; NVD's 9.8 CRITICAL score on CVE-2026-59313 is an NVD scoring artifact,
+            not the maintainer's assessment.
+
+            CVE-2026-59313 (SSE stream corruption) requires ALL of: the MVC functional web
+            framework (RouterFunction / ServerResponse.sse()), Server-Sent Events streaming,
+            attacker-controlled stream content, and plain-text (non-JSON) messages. MAS uses none
+            of it -- RouterFunction, ServerResponse.sse, SseEmitter and text/event-stream have
+            ZERO occurrences across every backend in the estate. Re-verify that grep each round.
+
+            CVE-2026-59314 (ContentDisposition response splitting) is blocked twice over here:
+            every service runs on Tomcat, which the advisory states already rejects CR/LF in
+            header values, and the three ContentDisposition call sites in the estate
+            (mas-backend-masters PublicWebsiteController, mas-file-upload DocumentController,
+            MiningLease RenewalEnvironmentalClearanceController) all now use the
+            filename(name, Charset) overload, which emits the RFC 5987 filename* form and
+            percent-encodes CR/LF. The outbound-multipart case does not exist in this codebase.
+
+            WHY NOT SIMPLY UPGRADE: the fix for the 6.2.x line is 6.2.20, which VMware ships as
+            "Enterprise Support Only" -- it is not on Maven Central. 6.2.19 is the last OSS
+            release of that line (2026-06-08), as 3.5.16 is the last OSS Spring Boot 3.5 release
+            (2026-06-25). The only OSS fix is Spring Framework 7.0.9, i.e. a Spring Boot 3.5 -> 4.0
+            major migration, tracked separately. mas-backend-report already runs Boot 4.0.8 /
+            spring-core 7.0.9 and does NOT report these.
+
+            Scoped to spring-core 6.2.x by file path on purpose: it stops matching the moment a
+            service moves to the Boot 4 / spring-core 7.0.9+ line, so the rule expires by itself
+            rather than masking a future finding.
+        ]]></notes>
+        <filePath regex="true">.*[\/]spring-core-6\.2\.\d+\.jar</filePath>
+        <cve>CVE-2026-59313</cve>
+    </suppress>
+
+    <suppress>
+        <notes><![CDATA[
+            See the CVE-2026-59313 entry above -- same advisory batch, same reasoning, same
+            scoping. CVE-2026-59314 is ContentDisposition response splitting; LOW (3.7), blocked
+            by the Tomcat connector and by the RFC 5987 filename* encoding now used at every
+            ContentDisposition call site in the estate. Fixed in 6.2.20 (Enterprise Support Only)
+            or 7.0.9 (OSS, Boot 4).
+        ]]></notes>
+        <filePath regex="true">.*[\/]spring-core-6\.2\.\d+\.jar</filePath>
+        <cve>CVE-2026-59314</cve>
+    </suppress>
+
 </suppressions>
