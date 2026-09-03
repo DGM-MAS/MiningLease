@@ -55,50 +55,96 @@
 
     <suppress>
         <notes><![CDATA[
-            NOT APPLICABLE / NO OSS FIX AVAILABLE. Two Spring Framework advisories published
-            2026-08-20 against spring-core 6.2.0 - 6.2.19. Both are rated LOW by VMware in their
-            own advisories; NVD's 9.8 CRITICAL score on CVE-2026-59313 is an NVD scoring artifact,
-            not the maintainer's assessment.
+            NOT APPLICABLE / NO OSS FIX AVAILABLE. The full run of Spring Framework advisories
+            published against spring-core 6.2.0 - 6.2.19 (the 2026-08-20 batch of two, plus the
+            2026-11 batch of eight). Every one of them lists its 6.2.x fix as 6.2.20, which VMware
+            ships as "Enterprise Support Only" -- it is not on Maven Central. 6.2.19 (2026-06-08)
+            is the last OSS release of the 6.2 line, as Spring Boot 3.5.16 (2026-06-25) is the
+            last OSS Boot 3.5 release. The only OSS fix is Spring Framework 7.0.8.1 / 7.0.9, i.e.
+            a Spring Boot 3.5 -> 4.0 major migration, tracked separately. mas-backend-report and
+            mas-backend-geo already run Boot 4 (spring-core 7.0.9) and do NOT report any of these.
 
-            CVE-2026-59313 (SSE stream corruption) requires ALL of: the MVC functional web
-            framework (RouterFunction / ServerResponse.sse()), Server-Sent Events streaming,
-            attacker-controlled stream content, and plain-text (non-JSON) messages. MAS uses none
-            of it -- RouterFunction, ServerResponse.sse, SseEmitter and text/event-stream have
-            ZERO occurrences across every backend in the estate. Re-verify that grep each round.
+            NVD scores several of these 9.8 / 9.1 CRITICAL; VMware's own advisories rate the same
+            CVEs LOW or MEDIUM. The NVD numbers are scoring artifacts -- go by the vendor rating
+            and by reachability, below.
 
-            CVE-2026-59314 (ContentDisposition response splitting) is blocked twice over here:
-            every service runs on Tomcat, which the advisory states already rejects CR/LF in
-            header values, and the three ContentDisposition call sites in the estate
-            (mas-backend-masters PublicWebsiteController, mas-file-upload DocumentController,
-            MiningLease RenewalEnvironmentalClearanceController) all now use the
-            filename(name, Charset) overload, which emits the RFC 5987 filename* form and
-            percent-encodes CR/LF. The outbound-multipart case does not exist in this codebase.
+            Per-CVE reachability, all re-verified by grep across every backend in the estate on
+            2026-09-03 (all counts ZERO):
+              CVE-2026-47890  SSE stream corruption with view fragments -- needs Spring MVC/WebFlux
+                              SSE + view fragments. No RouterFunction / ServerResponse.sse /
+                              SseEmitter / text/event-stream anywhere.
+              CVE-2026-47891  Aalto XML processor ignores maxInMemorySize -- needs WebFlux + the
+                              Aalto async XML parser. No WebFlux; no aalto/Aalto on any classpath.
+              CVE-2026-47892  WebFlux functional endpoints on DispatcherServlet, pre-flight header
+                              predicate bypass -- needs WebFlux functional endpoints. None exist.
+              CVE-2026-47893  WebFlux WebSocket exception leaks request headers -- needs a WebFlux
+                              WebSocket application. The eight Boot 3.5 services are servlet-stack;
+                              the gateway proxies WebSocket frames but runs no WebFlux WS handler.
+              CVE-2026-59280  FreeMarker + SpringTemplateLoader path traversal from an untrusted
+                              view name -- no FreeMarker on any classpath, no SpringTemplateLoader.
+              CVE-2026-59281  Reflected XSS via the no-argument Errors.getFieldErrors() /
+                              getFieldError() accessors during server-side form rendering -- MAS is
+                              a JSON REST API consumed by an Angular SPA; zero server-side form or
+                              error-tag rendering, zero getFieldError(s)() call sites.
+              CVE-2026-59282  Data-binding DoS via user-supplied nested property paths -- MAS binds
+                              request bodies as JSON through Jackson (@RequestBody), not through
+                              WebDataBinder onto nested Java-bean property paths; no @ModelAttribute
+                              form binding on untrusted nested paths.
+              CVE-2026-59283  SpEL SimpleEvaluationContext safety-guard bypass when the SpEL
+                              compiler is active -- no dynamic SpEL evaluation, no SimpleEvaluation
+                              Context, no spring.expression.compiler.mode set.
+              CVE-2026-59313  SSE stream corruption -- same requirements as CVE-2026-47890.
+              CVE-2026-59314  ContentDisposition response splitting -- blocked by the Tomcat
+                              connector (rejects CR/LF in header values per the advisory), and the
+                              three ContentDisposition call sites in the estate (mas-backend-masters
+                              PublicWebsiteController, mas-file-upload DocumentController, MiningLease
+                              RenewalEnvironmentalClearanceController) all use the
+                              filename(name, Charset) overload, which emits the RFC 5987 filename*
+                              form and percent-encodes CR/LF regardless of Spring version.
 
-            WHY NOT SIMPLY UPGRADE: the fix for the 6.2.x line is 6.2.20, which VMware ships as
-            "Enterprise Support Only" -- it is not on Maven Central. 6.2.19 is the last OSS
-            release of that line (2026-06-08), as 3.5.16 is the last OSS Spring Boot 3.5 release
-            (2026-06-25). The only OSS fix is Spring Framework 7.0.9, i.e. a Spring Boot 3.5 -> 4.0
-            major migration, tracked separately. mas-backend-report already runs Boot 4.0.8 /
-            spring-core 7.0.9 and does NOT report these.
-
-            Scoped to spring-core 6.2.x by file path on purpose: it stops matching the moment a
-            service moves to the Boot 4 / spring-core 7.0.9+ line, so the rule expires by itself
-            rather than masking a future finding.
+            Scoped to spring-core 6.2.x by file path on purpose: the rule stops matching the moment
+            a service moves to the Boot 4 / spring-core 7.0.9+ line, so it expires by itself rather
+            than masking a future finding. RE-REVIEW the grep list above each round.
         ]]></notes>
         <filePath regex="true">.*[\/]spring-core-6\.2\.\d+\.jar</filePath>
+        <cve>CVE-2026-47890</cve>
+        <cve>CVE-2026-47891</cve>
+        <cve>CVE-2026-47892</cve>
+        <cve>CVE-2026-47893</cve>
+        <cve>CVE-2026-59280</cve>
+        <cve>CVE-2026-59281</cve>
+        <cve>CVE-2026-59282</cve>
+        <cve>CVE-2026-59283</cve>
         <cve>CVE-2026-59313</cve>
+        <cve>CVE-2026-59314</cve>
     </suppress>
 
     <suppress>
         <notes><![CDATA[
-            See the CVE-2026-59313 entry above -- same advisory batch, same reasoning, same
-            scoping. CVE-2026-59314 is ContentDisposition response splitting; LOW (3.7), blocked
-            by the Tomcat connector and by the RFC 5987 filename* encoding now used at every
-            ContentDisposition call site in the estate. Fixed in 6.2.20 (Enterprise Support Only)
-            or 7.0.9 (OSS, Boot 4).
+            NOT APPLICABLE / NO OSS FIX AVAILABLE. CVE-2026-59284: Spring Cloud Commons applies no
+            allow-list to property keys when the WRITABLE /actuator/env endpoint is enabled
+            (POST /actuator/env). Affects spring-cloud-commons 4.3.0 - 4.3.3 (fixed 4.3.4) and
+            5.0.0 - 5.0.2 (fixed 5.0.3). Dependency-Check attaches it to both spring-cloud-commons
+            and spring-cloud-context.
+
+            Only mas-api-gateway ships spring-cloud-commons; this rule is a no-op safety net in the
+            other repos. The gateway is not exposed:
+              - management.endpoints.web.exposure.include is "health" (prod) / "health,info"
+                (default) -- the env endpoint is not exposed at all, read or write.
+              - the writable variant additionally needs management.endpoint.env.post.enabled=true,
+                which is false by default and is not set anywhere.
+              - actuator listens on management.server.port 9080, and no Kubernetes Service maps
+                that port, so nothing outside the pod can reach any actuator endpoint.
+              - the CVE also requires PR:H (an already-authenticated high-privilege caller).
+
+            No OSS fix for the 4.3.x line: 4.3.3 is the last spring-cloud-commons 4.3.x on Maven
+            Central (verified against repo1.maven.org), 4.3.4 is Enterprise Support Only. The OSS
+            fix is 5.0.3, which ships in Spring Cloud 2025.1.x on Spring Boot 4 -- same migration
+            as the spring-core entry above. Scoped to the 4.x file path so it expires on the move
+            to spring-cloud-commons 5.x.
         ]]></notes>
-        <filePath regex="true">.*[\/]spring-core-6\.2\.\d+\.jar</filePath>
-        <cve>CVE-2026-59314</cve>
+        <filePath regex="true">.*[\/]spring-cloud-(commons|context)-4\.\d+\.\d+\.jar</filePath>
+        <cve>CVE-2026-59284</cve>
     </suppress>
 
 </suppressions>
