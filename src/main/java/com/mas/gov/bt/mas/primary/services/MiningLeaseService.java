@@ -1715,6 +1715,9 @@ public class MiningLeaseService {
                     app.setRemarksDirector(request.getRemarks());
                     app.setDirectorReviewedAt(now);
                     app.setApprovedAt(now);
+                    // New added to keep latest remarks from focal side.
+                    // The remarks will be saved in their respective field as well
+                    app.setLatestRemarkFocal(request.getRemarks());
 
 //                    List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(app.getApplicationNumber(),"FMFS SUBMITTED","MINE ENGINEER", SERVICE_CODE);
 //                    Long mineEngineerId = null;
@@ -1758,6 +1761,8 @@ public class MiningLeaseService {
                     app.setDirectorReviewedAt(now);
                     app.setApprovedAt(now);
 
+                    app.setLatestRemarkFocal(request.getRemarks());
+
                     if (master != null) {
                         master.setCurrentStatus("APPROVED BY DIRECTOR");
                         master.setApprovedAt(now);
@@ -1794,6 +1799,8 @@ public class MiningLeaseService {
                     app.setDirectorReviewedAt(LocalDateTime.now());
                     app.setRejectedAt(LocalDateTime.now());
                     app.setRejectionReason(request.getRemarks());
+
+                    app.setLatestRemarkFocal(request.getRemarks());
 
                     if (master != null) {
                         master.setCurrentStatus("REJECTED");
@@ -1978,6 +1985,8 @@ public class MiningLeaseService {
                     miningLeaseApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     miningLeaseApplication.setGeologistReviewedAt(LocalDateTime.now());
 
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+
                     if (applicationMaster != null) {
                         applicationMaster.setCurrentStatus(miningLeaseApplication.getCurrentStatus());
                         applicationMasterRepository.save(applicationMaster);
@@ -2026,6 +2035,8 @@ public class MiningLeaseService {
                     miningLeaseApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     miningLeaseApplication.setGeologistReviewedAt(LocalDateTime.now());
 
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+
                     if (applicationMaster != null) {
                         applicationMaster.setCurrentStatus("APPROVED GR");
                         applicationMasterRepository.save(applicationMaster);
@@ -2060,6 +2071,8 @@ public class MiningLeaseService {
                     miningLeaseApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     miningLeaseApplication.setGeologistReviewedAt(LocalDateTime.now());
 
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+
                     if (applicationMaster != null) {
                         applicationMaster.setCurrentStatus("ACCEPTED FMFS");
                         applicationMasterRepository.save(applicationMaster);
@@ -2088,6 +2101,8 @@ public class MiningLeaseService {
                     miningLeaseApplication.setRejectedAt(LocalDateTime.now());
                     miningLeaseApplication.setRejectionReason(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
 
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+
                     if (applicationMaster != null) {
                         applicationMaster.setCurrentStatus("REJECTED");
                         applicationMasterRepository.save(applicationMaster);
@@ -2105,6 +2120,8 @@ public class MiningLeaseService {
                     miningLeaseApplication.setCurrentStatus("RESUBMIT PFS GEOLOGIST");
                     miningLeaseApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     miningLeaseApplication.setGeologistReviewedAt(LocalDateTime.now());
+
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
 
                     if (applicationMaster != null) {
                         applicationMaster.setCurrentStatus("RESUBMIT PFS GEOLOGIST");
@@ -2129,6 +2146,8 @@ public class MiningLeaseService {
                     miningLeaseApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     miningLeaseApplication.setGeologistReviewedAt(LocalDateTime.now());
 
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+
                     if (applicationMaster != null) {
                         applicationMaster.setCurrentStatus("RESUBMIT GR");
                         applicationMasterRepository.save(applicationMaster);
@@ -2152,6 +2171,8 @@ public class MiningLeaseService {
                     miningLeaseApplication.setCurrentStatus("ADDITIONAL DATA NEEDED FMFS");
                     miningLeaseApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
                     miningLeaseApplication.setGeologistReviewedAt(LocalDateTime.now());
+
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
 
                     if (applicationMaster != null) {
                         applicationMaster.setCurrentStatus("ADDITIONAL DATA NEEDED FMFS");
@@ -2259,6 +2280,8 @@ public class MiningLeaseService {
                     miningLeaseApplication.setRemarksMPCD(reviewQuarryLeaseApplication.getMpcdRemarks());
                     miningLeaseApplication.setMpcdReviewedAt(LocalDateTime.now());
 
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplication.getMpcdRemarks());
+
                     if (applicationMaster != null) {
                         applicationMaster.setCurrentStatus("GEOLOGIST_REVIEW");
                         applicationMasterRepository.save(applicationMaster);
@@ -2297,6 +2320,8 @@ public class MiningLeaseService {
                     miningLeaseApplication.setRemarksMPCD(reviewQuarryLeaseApplication.getMpcdRemarks());
                     miningLeaseApplication.setMpcdReviewedAt(LocalDateTime.now());
 
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplication.getMpcdRemarks());
+
                     if (applicationMaster != null) {
                         applicationMaster.setCurrentStatus(miningLeaseApplication.getCurrentStatus());
                         applicationMasterRepository.save(applicationMaster);
@@ -2324,6 +2349,8 @@ public class MiningLeaseService {
                     miningLeaseApplication.setCurrentStatus("APPROVED PA/FC");
                     miningLeaseApplication.setRemarksMPCD(reviewQuarryLeaseApplication.getMpcdRemarks());
                     miningLeaseApplication.setMpcdReviewedAt(LocalDateTime.now());
+
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplication.getMpcdRemarks());
 
                     if (applicationMaster != null) {
                         applicationMaster.setCurrentStatus(miningLeaseApplication.getCurrentStatus());
@@ -2362,6 +2389,8 @@ public class MiningLeaseService {
                     miningLeaseApplication.setRejectedAt(LocalDateTime.now());
                     miningLeaseApplication.setRejectionReason(reviewQuarryLeaseApplication.getMpcdRemarks());
 
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplication.getMpcdRemarks());
+
                     if (applicationMaster != null) {
                         applicationMaster.setCurrentStatus("REJECTED");
                         applicationMasterRepository.save(applicationMaster);
@@ -2379,6 +2408,8 @@ public class MiningLeaseService {
                     miningLeaseApplication.setCurrentStatus("RESUBMIT PFS MPCD");
                     miningLeaseApplication.setRemarksMPCD(reviewQuarryLeaseApplication.getMpcdRemarks());
                     miningLeaseApplication.setMpcdReviewedAt(LocalDateTime.now());
+
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplication.getMpcdRemarks());
 
                     if (applicationMaster != null) {
                         applicationMaster.setCurrentStatus("RESUBMIT PFS MPCD");
@@ -2403,6 +2434,8 @@ public class MiningLeaseService {
                     miningLeaseApplication.setRemarksMPCD(reviewQuarryLeaseApplication.getMpcdRemarks());
                     miningLeaseApplication.setMpcdReviewedAt(LocalDateTime.now());
 
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplication.getMpcdRemarks());
+
                     if (applicationMaster != null) {
                         applicationMaster.setCurrentStatus("RESUBMIT PA/FC");
                         applicationMasterRepository.save(applicationMaster);
@@ -2425,6 +2458,8 @@ public class MiningLeaseService {
                     miningLeaseApplication.setCurrentStatus("RESUBMIT APPLICATION");
                     miningLeaseApplication.setRemarksMPCD(reviewQuarryLeaseApplication.getMpcdRemarks());
                     miningLeaseApplication.setMpcdReviewedAt(LocalDateTime.now());
+
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplication.getMpcdRemarks());
 
                     if (applicationMaster != null) {
                         applicationMaster.setCurrentStatus("RESUBMIT APPLICATION");
@@ -2586,6 +2621,9 @@ public class MiningLeaseService {
                     app.setRemarksChief(request.getRemarks());
                     app.setChiefReviewedAt(LocalDateTime.now());
                     app.setFmfsId(generateFMFSId());
+
+                    app.setLatestRemarkFocal(request.getRemarks());
+
                     if (master != null) {
                         master.setCurrentStatus("FORWARDED TO DIRECTOR");
                         applicationMasterRepository.save(master);
@@ -2637,6 +2675,8 @@ public class MiningLeaseService {
                     app.setRejectedAt(LocalDateTime.now());
                     app.setRejectionReason(request.getRemarks());
 
+                    app.setLatestRemarkFocal(request.getRemarks());
+
                     if (master != null) {
                         master.setCurrentStatus("REJECTED");
                         master.setRejectedAt(LocalDateTime.now());
@@ -2673,6 +2713,8 @@ public class MiningLeaseService {
                     app.setCurrentStatus("ME_REVIEW");
                     app.setRemarksChief(request.getRemarks());
                     app.setChiefReviewedAt(LocalDateTime.now());
+
+                    app.setLatestRemarkFocal(request.getRemarks());
 
                     if (master != null) {
                         master.setCurrentStatus("ME_REVIEW");
@@ -2822,6 +2864,8 @@ public class MiningLeaseService {
                     app.setApprovedMineral(request.getApprovedMineral());
                     app.setMeReviewedAt(LocalDateTime.now());
 
+                    app.setLatestRemarkFocal(request.getRemarks());
+
                         if (master != null) {
                             master.setCurrentStatus("APPROVED");
                             applicationMasterRepository.save(master);
@@ -2881,6 +2925,7 @@ public class MiningLeaseService {
                     app.setLeaseStartDate(request.getLeaseStartDate());
                     app.setLeaseEndDate(request.getLeaseEndDate());
 
+                    app.setLatestRemarkFocal(request.getRemarks());
 
                     FmfsDetails fmfsDetails = fmfsDetailsRepository
                             .findFirstByApplicationNumberOrderByUpdatedAtDescIdDesc(app.getApplicationNumber())
@@ -3046,6 +3091,8 @@ public class MiningLeaseService {
                     app.setRejectedAt(LocalDateTime.now());
                     app.setRejectionReason(request.getRemarks());
 
+                    app.setLatestRemarkFocal(request.getRemarks());
+
                     if (master != null) {
                         master.setCurrentStatus("REJECTED");
                         applicationMasterRepository.save(master);
@@ -3063,6 +3110,8 @@ public class MiningLeaseService {
                     app.setCurrentStatus("RESUBMIT FMFS");
                     app.setRemarksME(request.getRemarks());
                     app.setMeReviewedAt(LocalDateTime.now());
+
+                    app.setLatestRemarkFocal(request.getRemarks());
 
                     if (master != null) {
                         master.setCurrentStatus("RESUBMIT FMFS");
@@ -3087,6 +3136,8 @@ public class MiningLeaseService {
                     app.setRemarksME(request.getRemarks());
                     app.setMeReviewedAt(LocalDateTime.now());
 
+                    app.setLatestRemarkFocal(request.getRemarks());
+
                     if (master != null) {
                         master.setCurrentStatus("RESUBMIT EC");
                         applicationMasterRepository.save(master);
@@ -3109,6 +3160,8 @@ public class MiningLeaseService {
                     app.setCurrentStatus("RESUBMIT BG");
                     app.setRemarksME(request.getRemarks());
                     app.setMeReviewedAt(LocalDateTime.now());
+
+                    app.setLatestRemarkFocal(request.getRemarks());
 
                     if (master != null) {
                         master.setCurrentStatus("RESUBMIT BG");

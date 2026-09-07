@@ -497,6 +497,8 @@ public class MiningLeaseRenewalService {
         MiningLeaseRenewalApplication app = findApplicationById(request.getId());
         ApplicationMaster master = app.getApplicationMaster();
 
+        app.setLatestRemarkFocal(request.getRemarks());
+
         completeCurrentTask(master, request.getStatus(), request.getRemarks());
 
         if (request.getStatus() != null) {
@@ -779,6 +781,8 @@ public class MiningLeaseRenewalService {
 
         MiningLeaseRenewalApplication app = findApplicationById(request.getId());
         ApplicationMaster master = app.getApplicationMaster();
+
+        app.setLatestRemarkFocal(request.getRemarks());
 
         if (request.getStatus() != null) {
             switch (request.getStatus()) {
@@ -1098,6 +1102,8 @@ public class MiningLeaseRenewalService {
 
         MiningLeaseRenewalApplication miningLeaseRenewalApplication = findApplicationById(reviewQuarryLeaseApplicationGeologist.getId());
         ApplicationMaster applicationMaster = miningLeaseRenewalApplication.getApplicationMaster();
+
+        miningLeaseRenewalApplication.setLatestRemarkFocal(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
 
         if(reviewQuarryLeaseApplicationGeologist.getStatus() != null) {
             switch (reviewQuarryLeaseApplicationGeologist.getStatus()) {
@@ -1496,6 +1502,8 @@ public class MiningLeaseRenewalService {
                 (app.getApplicationNumber(),"DIRECTOR", "RENEWAL APPLICATION", SERVICE_CODE);
 
         Long directorId = task.getAssignedToUserId();
+
+        app.setLatestRemarkFocal(request.getRemarks());
 
         if (request.getStatus() != null) {
             switch (request.getStatus()) {

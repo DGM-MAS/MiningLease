@@ -132,6 +132,9 @@ public class EnvironmentClearanceRenewal {
 
     private String updatedBy;
 
+    @Column(name = "latest_remarks")
+    private String latestRemarks;
+
     @PrePersist
     public void prePersist() {
         createdOn = LocalDateTime.now();

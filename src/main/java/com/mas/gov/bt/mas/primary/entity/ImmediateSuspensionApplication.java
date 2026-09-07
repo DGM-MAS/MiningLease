@@ -120,4 +120,7 @@ public class ImmediateSuspensionApplication {
 
     @Column(name = "region_name")
     private String regionName;
+
+    @Column(name = "latest_remarks", columnDefinition = "TEXT")
+    private String latestRemarks;
 }

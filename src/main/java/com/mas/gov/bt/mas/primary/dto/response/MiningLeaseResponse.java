@@ -197,4 +197,6 @@ public class MiningLeaseResponse {
     private LocalDate previousLeaseEndDate;
 
     private Integer proposedLeaseRenewalPeriod;
+
+    private String latestRemarkFocal;
 }
