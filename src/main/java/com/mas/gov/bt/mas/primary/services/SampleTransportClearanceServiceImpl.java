@@ -458,6 +458,9 @@ public class SampleTransportClearanceServiceImpl
                     }
                     sampleTransportClearanceEntity.setStatus("REJECTED");
                     sampleTransportClearanceEntity.setAssignedGSDChiefRemarks(request.getRemarks());
+
+                    sampleTransportClearanceEntity.setLatestRemarks(request.getRemarks());
+
                     repository.save(sampleTransportClearanceEntity);
 
                     completeCurrentTask(sampleTransportClearanceEntity.getApplicationNo(), "GSD_CHIEF", "REJECTED", request.getRemarks());
@@ -490,6 +493,8 @@ public class SampleTransportClearanceServiceImpl
                     sampleTransportClearanceEntity.setStatus("APPROVED");
                     sampleTransportClearanceEntity.setSampleTransportClearanceCertificateFileId(request.getSampleTransportClearanceCertificateFileId());
                     sampleTransportClearanceEntity.setAssignedGSDChiefRemarks(request.getRemarks());
+
+                    sampleTransportClearanceEntity.setLatestRemarks(request.getRemarks());
 
                     repository.save(sampleTransportClearanceEntity);
 
@@ -638,6 +643,9 @@ public class SampleTransportClearanceServiceImpl
                     }
                     sampleTransportClearanceEntity.setStatus("REJECTED");
                     sampleTransportClearanceEntity.setAssignedGSDFocalRemarks(request.getRemarksGSDFocal());
+
+                    sampleTransportClearanceEntity.setLatestRemarks(request.getRemarksGSDFocal());
+
                     repository.save(sampleTransportClearanceEntity);
 
                     completeCurrentTask(sampleTransportClearanceEntity.getApplicationNo(), "GSD_FOCAL", "REJECTED", request.getRemarksGSDFocal());
@@ -671,6 +679,9 @@ public class SampleTransportClearanceServiceImpl
                     sampleTransportClearanceEntity.setStatus("ACCEPTED");
                     sampleTransportClearanceEntity.setFileIdGSDFocal(request.getFileIdGSDFocal());
                     sampleTransportClearanceEntity.setAssignedGSDFocalRemarks(request.getRemarksGSDFocal());
+
+                    sampleTransportClearanceEntity.setLatestRemarks(request.getRemarksGSDFocal());
+
                     repository.save(sampleTransportClearanceEntity);
 
                     completeCurrentTask(sampleTransportClearanceEntity.getApplicationNo(), "GSD_FOCAL", "ACCEPTED", request.getRemarksGSDFocal());

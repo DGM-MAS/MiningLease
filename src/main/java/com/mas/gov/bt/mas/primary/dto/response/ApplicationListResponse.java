@@ -173,4 +173,6 @@ public class ApplicationListResponse {
     private String otherFMFSFileId;
 
     private String additionalFileGRId;
+
+    private String latestRemarkFocal;
 }

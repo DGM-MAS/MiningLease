@@ -54,4 +54,6 @@ public class SampleTransportClearanceResponseDTO {
 
     private String assignedGSDChiefRemarks;
     private String assignedGSDFocalRemarks;
+
+    private String latestRemarks;
 }
