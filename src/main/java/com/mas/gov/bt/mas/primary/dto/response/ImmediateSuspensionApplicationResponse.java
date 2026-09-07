@@ -70,4 +70,7 @@ public class ImmediateSuspensionApplicationResponse {
 
     private Long regionId;
 
+    private String latestRemarks;
+
+
 }

@@ -377,6 +377,8 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             entity.setRemarkMPCD(
                     request.getAdditionalRemarks()
             );
+
+            entity.setLatestRemarks(request.getAdditionalRemarks());
         }
 
         if (Boolean.TRUE.equals(request.getSubmitIOM())) {
@@ -778,6 +780,10 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                 request.getNewAssigneeUserId()
         );
 
+        if(request.getRemarks() != null) {
+            entity.setLatestRemarks(request.getRemarks());
+        }
+
         renewalEnvironmentalClearanceRepository.save(entity);
 
         TaskManagement firstTask = task.getFirst();
@@ -1166,6 +1172,9 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         validateMPCDAssignment(entity, userId);
 
         entity.setRemarkMPCD(request.getRemarks());
+
+        entity.setLatestRemarks(request.getRemarks());
+
         entity.setStatus("RESUBMISSION_REQUIRED");
         entity.setPendingRevisionStage("MPCD");
 
@@ -1204,6 +1213,9 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         validateRCAssignment(entity, userId);
 
         entity.setRemarkRC(request.getRemarks());
+
+        entity.setLatestRemarks(request.getRemarks());
+
         entity.setStatus("RESUBMISSION_REQUIRED");
         entity.setPendingRevisionStage("RC");
 
@@ -1240,6 +1252,8 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                                 ));
 
         validateMIAssignment(entity, userId);
+
+        entity.setLatestRemarks(request.getRemarks());
 
         entity.setRemarkMI(request.getRemarks());
         entity.setStatus("RESUBMISSION_REQUIRED");
@@ -1280,6 +1294,9 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         validateMDAssignment(entity, userId);
 
         entity.setRemarkMD(request.getRemarks());
+
+        entity.setLatestRemarks(request.getRemarks());
+
         entity.setStatus("RESUBMISSION_REQUIRED");
         entity.setPendingRevisionStage("MD");
 
@@ -1332,6 +1349,8 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                 request.getRejectionRemarks()
         );
 
+        entity.setLatestRemarks(request.getRejectionRemarks());
+
         entity.setStatus("REJECTED");
 
         entity.getApplicationMaster()
@@ -1371,6 +1390,10 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
 
         entity.setAssignedRCId(request.getRcUserId());
         entity.setRemarkRC(request.getRemarks());
+
+        entity.setLatestRemarks(request.getRemarks());
+
+        entity.setLatestRemarks(request.getRemarks());
         entity.setStatus("ASSIGNED_TO_RC");
 
         entity.getApplicationMaster()
@@ -1463,6 +1486,8 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                 request.getRemarks()
         );
 
+        entity.setLatestRemarks(request.getRemarks());
+
         entity.setRcReportSubmittedOn(
                 LocalDateTime.now()
         );
@@ -1501,6 +1526,9 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
 
         entity.setAssignedMIId(request.getMiUserId());
         entity.setRemarkMI(request.getRemarks());
+
+        entity.setLatestRemarks(request.getRemarks());
+
         entity.setStatus("ASSIGNED_TO_MI");
 
         entity.getApplicationMaster()
@@ -1590,6 +1618,8 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         entity.setMiSiteReportFileId(
                 request.getMiSiteReportFileId()
         );
+
+        entity.setLatestRemarks(request.getRemarks());
 
         entity.setRemarkMI(
                 request.getRemarks()

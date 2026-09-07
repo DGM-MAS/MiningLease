@@ -656,6 +656,8 @@ public class ImmediateSuspensionService {
         ImmediateSuspensionApplication app = findApplicationById(request.getId());
         ApplicationMaster master = app.getApplicationMaster();
 
+        app.setLatestRemarks(request.getRemarks());
+
         if (request.getStatus() != null) {
 
             if (request.getStatus().equals("Rectification")) {
@@ -729,6 +731,8 @@ public class ImmediateSuspensionService {
 
         ImmediateSuspensionApplication app = findApplicationById(request.getId());
         ApplicationMaster master = app.getApplicationMaster();
+
+        app.setLatestRemarks(request.getRemarks());
 
         if (request.getStatus() != null) {
 
