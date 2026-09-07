@@ -382,4 +382,6 @@ public class MiningLeaseApplication {
     @Column(name = "additional_file_gr_id")
     private String additionalFileGRId;
 
+    @Column(name = "latest_remark_focal", columnDefinition = "TEXT")
+    private String latestRemarkFocal;
 }
