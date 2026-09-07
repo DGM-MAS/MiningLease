@@ -275,6 +275,9 @@ public class MiningLeaseRenewalApplication {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
+    @Column(name = "latest_remark_focal", columnDefinition = "TEXT")
+    private String latestRemarkFocal;
+
     @PrePersist
     public void onCreate() {
         this.createdOn = LocalDateTime.now();
