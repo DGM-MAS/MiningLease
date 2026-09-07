@@ -98,4 +98,8 @@ public class EnvironmentClearanceRenewalResponseDTO {
 
     // Not entity-backed — set manually by payEcFee() when a payment redirect is needed
     private String redirectUrl;
+
+    private String latestRemarks;
+
+
 }

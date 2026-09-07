@@ -173,6 +173,9 @@ public class SampleTransportClearanceEntity {
     @Column(name = "sample_transport_clearance_certificate_file_id")
     private String sampleTransportClearanceCertificateFileId;
 
+    @Column(name = "latest_remarks")
+    private String latestRemarks;
+
     @PrePersist
     protected void onCreate() {
         this.createdOn = LocalDateTime.now();
