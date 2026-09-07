@@ -156,6 +156,12 @@ data-hub:
     url: https://staging-datahub-apim.tech.gov.bt/moea_businessinformationapi/1.0.0/businesslicensedetails
 
 management:
+  # Actuator listens on its own port. The Kubernetes Service for each backend maps a
+  # single app port, so nothing outside the pod can reach /actuator once it moves here —
+  # this is what closed ZAP's "Spring Actuator Information Leak" on promotor-reporting.
+  # No Deployment defines a liveness/readiness probe, so nothing depends on the old path.
+  server:
+    port: 9085
   endpoints:
     web:
       exposure:
