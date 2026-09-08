@@ -1858,6 +1858,8 @@ public class MiningLeaseService {
             throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
         }
 
+        miningLeaseApplication.setLatestRemarkFocal(request.getRemarks());
+
         if (request.getMpcdFocalId() != null && request.getGeologistId() != null) {
             miningLeaseApplication.setCurrentStatus("MPCD ASSIGNED");
             applicationMaster.setCurrentStatus("MPCD ASSIGNED");
@@ -1865,6 +1867,7 @@ public class MiningLeaseService {
             miningLeaseApplication.setCurrentStatus("ASSIGNED");
             applicationMaster.setCurrentStatus("ASSIGNED");
         }
+
         applicationMasterRepository.save(applicationMaster);
         miningLeaseApplicationRepository.save(miningLeaseApplication);
 

@@ -9,4 +9,5 @@ public class AssignTaskDirector {
     private Long mpcdFocalId;
     private Long geologistId;
     private Long applicationId;
+    private String remarks;
 }
