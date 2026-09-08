@@ -3368,6 +3368,7 @@ public class MiningLeaseService {
                 applicationMaster.setApprovedAt(now);
                 applicationMaster.setCompletedAt(now);
                 miningLeaseApplication.setWorkOrderDocId(request.getWorkOrderDocId());
+                miningLeaseApplication.setLatestRemarkFocal(request.getRemarks());
                 miningLeaseApplication.setWorkOrderRemarks(request.getRemarks());
                 miningLeaseApplication.setCurrentStatus("MINING LEASE APPROVED");
                 applicationMasterRepository.save(applicationMaster);
