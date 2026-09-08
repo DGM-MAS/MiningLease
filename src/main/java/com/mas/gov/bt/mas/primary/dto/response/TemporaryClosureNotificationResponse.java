@@ -52,9 +52,6 @@ public class TemporaryClosureNotificationResponse {
     private Long fileUploadIdRC;
 
 
-
-
-
-
+    private String latestRemarks;
 
 }
