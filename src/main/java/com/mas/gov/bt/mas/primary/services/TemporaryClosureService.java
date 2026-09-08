@@ -525,6 +525,7 @@ public class TemporaryClosureService {
 
                     app.setCurrentStatus("TEMPORARY CLOSURE APPROVED");
                     app.setRemarksRC(request.getRemarks());
+                    app.setLatestRemarks(request.getRemarks());
                     app.setFileUploadIdRC(request.getFileUploadIdRC());
                     app.setRcReviewedAt(now);
                     app.setApprovedAt(now);
@@ -712,6 +713,7 @@ public class TemporaryClosureService {
                 case "Rectification" -> {
                     app.setCurrentStatus("RECTIFICATION BY RC");
                     app.setRemarksRC(request.getRemarks());
+                    app.setLatestRemarks(request.getRemarks());
                     app.setRcReviewedAt(LocalDateTime.now());
                     app.setApplicantFileId(null);
 
@@ -800,6 +802,7 @@ public class TemporaryClosureService {
                 LocalDateTime now = LocalDateTime.now();
                 app.setCurrentStatus("MI REVIEWED");
                 app.setRemarksMI(request.getRemarks());
+                app.setLatestRemarks(request.getRemarks());
                 app.setFileIdMI(request.getFileId());
                 app.setMiReviewedAt(now);
                 app.setApprovedAt(now);
