@@ -1,5 +1,6 @@
 package com.mas.gov.bt.mas.primary.dto.response;
 
+import jakarta.persistence.Column;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -175,4 +176,5 @@ public class ApplicationListResponse {
     private String additionalFileGRId;
 
     private String latestRemarkFocal;
+
 }
