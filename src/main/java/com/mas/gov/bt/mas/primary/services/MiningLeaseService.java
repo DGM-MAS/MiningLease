@@ -2364,7 +2364,7 @@ public class MiningLeaseService {
                     createTask(applicationMaster, miningLeaseApplication, "APPLICANT", userId, miningLeaseApplication.getApplicantUserId());
 
                     if (miningLeaseApplication.getApplicantEmail() != null) {
-                        notificationClient.sendStatusUpdatePAFCPublicClearanceNotification(
+                        notificationClient.sendPAFCPublicClearanceNotification(
                                 miningLeaseApplication.getApplicantEmail(),
                                 miningLeaseApplication.getApplicantName(),
                                 miningLeaseApplication.getApplicationNumber(),
