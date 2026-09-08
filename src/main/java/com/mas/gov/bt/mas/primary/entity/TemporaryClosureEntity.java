@@ -100,4 +100,7 @@ public class TemporaryClosureEntity {
     @Column(name = "file_upload_id_rc")
     private Long fileUploadIdRC;
 
+    @Column(name = "latest_remarks")
+    private String latestRemarks;
+
 }
