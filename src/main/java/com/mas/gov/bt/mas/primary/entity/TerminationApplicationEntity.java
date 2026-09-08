@@ -98,4 +98,7 @@ public class TerminationApplicationEntity {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "latest_remarks")
+    private String latestRemarks;
 }

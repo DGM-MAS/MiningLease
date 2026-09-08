@@ -65,4 +65,6 @@ public class TerminationApplicationResponse {
     private Long updatedBy;
 
     private LocalDateTime updatedAt;
+
+    private String latestRemarks;
 }

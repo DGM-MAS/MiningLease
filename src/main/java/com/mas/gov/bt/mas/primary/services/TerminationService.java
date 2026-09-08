@@ -107,6 +107,7 @@ public class TerminationService {
             entity.setCreatedBy(userId);
             entity.setCreatedAt(LocalDateTime.now());
             entity.setRemarksChief(request.getRemarksChief());
+            entity.setLatestRemarks(request.getRemarksChief());
             entity.setCurrentStatus("SUBMITTED");
             entity.setPermanentTermination(request.isPermanentTermination());
             if(!request.isPermanentTermination()) {
@@ -533,6 +534,8 @@ public class TerminationService {
 
         TerminationApplicationEntity app = findApplicationById(request.getId());
 
+        app.setLatestRemarks(request.getRemarks());
+
         List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleInAndServiceCode(
                 app.getTerminationId(),
                 "SUBMITTED",
@@ -588,6 +591,7 @@ public class TerminationService {
                     LocalDateTime now = LocalDateTime.now();
                     app.setCurrentStatus("TERMINATED");
                     app.setRemarksCMSHead(request.getRemarks());
+                    app.setLatestRemarks(request.getRemarks());
                     app.setCmsHeadReviewedAt(now);
                     app.setCmsHeadFileId(request.getFileId());
                     app.setApprovedAt(now);
@@ -621,6 +625,7 @@ public class TerminationService {
                     LocalDateTime now = LocalDateTime.now();
                     app.setCurrentStatus("RECTIFICATION BY CMS");
                     app.setRemarksCMSHead(request.getRemarks());
+                    app.setLatestRemarks(request.getRemarks());
                     app.setCmsHeadReviewedAt(now);
                     app.setCmsHeadFileId(request.getFileId());
 
@@ -652,6 +657,7 @@ public class TerminationService {
                     LocalDateTime now = LocalDateTime.now();
                     app.setCurrentStatus("TERMINATION CANCELED");
                     app.setRemarksCMSHead(request.getRemarks());
+                    app.setLatestRemarks(request.getRemarks());
                     app.setCmsHeadReviewedAt(now);
                     if (request.getFileId() != null) {
                         app.setCmsHeadFileId(request.getFileId());
