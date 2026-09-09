@@ -118,6 +118,11 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                 environmentClearanceRenewalMapper.toEntity(request);
 
         Long regionId = 0L;
+        String ecNumber = "";
+
+        Date ecExpiryDate = null;
+
+        String ecFileId = "";
 
         entity.setApplicationNo(generateApplicationNumber());
         entity.setCreatedBy(userId);
@@ -138,6 +143,9 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
 
                 if (application.isPresent()) {
                     regionId = application.get().getRegionId();
+                    ecNumber = application.get().getEcNumber();
+                    ecExpiryDate = application.get().getEcExpiryDate();
+                    ecFileId = application.get().getEcFileId();
                 }
             }
 
@@ -147,6 +155,9 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
 
                 if (application.isPresent()) {
                     regionId = application.get().getRegionId();
+                    ecNumber = application.get().getEcNumber();
+                    ecExpiryDate = application.get().getECExpiryDate();
+                    ecFileId = application.get().getEcFileId();
                 }
             }
 
@@ -176,6 +187,14 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
 
             if (surfaceCollectionPermitEntity.isPresent()) {
                 regionId = surfaceCollectionPermitEntity.get().getRegionId();
+                ecNumber = surfaceCollectionPermitEntity.get().getEcNo();
+                ecFileId = surfaceCollectionPermitEntity.get().getEcFileId();
+
+                LocalDate ecValidUpto = surfaceCollectionPermitEntity.get().getEcValidUpto();
+
+                ecExpiryDate = Date.from(
+                        ecValidUpto.atStartOfDay(ZoneId.systemDefault()).toInstant()
+                );
             }
 
             UserWorkloadProjection assignedMPCD = assignMPCD(regionId);
@@ -206,6 +225,10 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
             notificationClient.sendUserNotification(title, message, assignedMPCD.getUserId(), serviceId, "STAFF", true, entity.getApplicationNo());
 
         }
+
+        entity.setPreviousEcExpiryDate(ecExpiryDate);
+        entity.setPreviousEcFileId(ecFileId);
+        entity.setPreviousEcNumber(ecNumber);
 
         EnvironmentClearanceRenewal saved =
                 renewalEnvironmentalClearanceRepository.save(entity);
@@ -1013,7 +1036,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         entity.setLocation(request.getLocation());
         entity.setArea(request.getArea());
         entity.setPreviousEcFileId(
-                request.getPreviousEcFileId()
+                String.valueOf(request.getPreviousEcFileId())
         );
         entity.setSelfMonitoringReportFileId(
                 request.getSelfMonitoringReportFileId()
@@ -1057,7 +1080,7 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         entity.setLocation(request.getLocation());
         entity.setArea(request.getArea());
         entity.setPreviousEcFileId(
-                request.getPreviousEcFileId()
+                String.valueOf(request.getPreviousEcFileId())
         );
         entity.setSelfMonitoringReportFileId(
                 request.getSelfMonitoringReportFileId()

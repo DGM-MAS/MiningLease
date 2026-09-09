@@ -23,7 +23,11 @@ public class EnvironmentClearanceRenewalResponseDTO {
 
     private String area;
 
-    private Long previousEcFileId;
+    private String previousEcFileId;
+
+    private String previousEcNumber;
+
+    private Date previousEcExpiryDate;
 
     private Long selfMonitoringReportFileId;
 

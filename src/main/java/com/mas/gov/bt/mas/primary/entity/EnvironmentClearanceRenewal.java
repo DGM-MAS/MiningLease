@@ -29,7 +29,11 @@ public class EnvironmentClearanceRenewal {
     private String area;
 
     // references to uploaded files
-    private Long previousEcFileId;
+    private String previousEcFileId;
+
+    private String previousEcNumber;
+
+    private Date previousEcExpiryDate;
 
     private Long selfMonitoringReportFileId;
 

@@ -628,7 +628,9 @@ public class MiningLeaseService {
         // 2. ASSIGN DIRECTOR
         // =====================================================
         UserWorkloadProjection assignedDirector = assignDirector(
-                miningLeaseApplication.getRegionId(), miningLeaseApplication.getApplicationNumber());
+                miningLeaseApplication.getRegionId(),
+                miningLeaseApplication.getApplicationNumber()
+        );
 
         // =====================================================
         // 3. Application master and create task for director
@@ -673,6 +675,24 @@ public class MiningLeaseService {
             log.error("Unexpected error sending notifications", ex);
         }
 
+        try {
+            if (request.getApplicantEmail() != null && !request.getApplicantEmail().trim().isEmpty()) {
+                try {
+                    notificationClient.sendMiningLeaseGRSubmittedNotification(
+                            request.getApplicantEmail(),
+                            request.getApplicantName(),
+                            miningLeaseApplication.getApplicationNumber());
+
+                    log.info("Email notification sent to Applicant: {}", request.getApplicantEmail());
+
+                } catch (Exception ex) {
+                    log.warn("Failed to send email notification to director", ex);
+                }
+        }
+        }catch (Exception ex) {
+            log.error("Unexpected error sending notifications", ex);
+        }
+
         return mapper.toResponse(miningLeaseApplication);
     }
 
@@ -706,6 +726,12 @@ public class MiningLeaseService {
 
         ExplorationPermit permit = explorationPermitRepository.findByPermitNumber(request.getExpPermitNo());
 
+        MiningLeaseApplication application = miningLeaseApplicationRepository.findByExpPermitNoAndCurrentStatus(request.getExpPermitNo(), "PERMIT_ISSUED");
+
+        if(application != null) {
+            throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION,
+                    "Mining lease with this exploration has been issued.");
+        }
         Long permitIssuedTo = null;
 
         if(permit == null ){
