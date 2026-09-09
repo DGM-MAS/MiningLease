@@ -36,6 +36,8 @@ public class MineRestorationService {
 
     private static final String SERVICE_CODE = "MINE RESTORATION";
 
+    private static final String STOCK_LIFTING_CATEGORY   = "STOCK_LIFTING";
+
     // Real sidebar menu ids (permissions.id) per recipient role for this service — used to target
     // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
     // NOT the same thing as SERVICE_CODE above, which is an unrelated t_application_master.service_code value.
@@ -68,9 +70,17 @@ public class MineRestorationService {
     private final MiningLeaseApplicationRepository miningLeaseApplicationRepository;
     private final NotificationClient notificationClient;
 
+    private final DzongkhagLookupRepository dzongkhagLookupRepository;
+
+    private final ApplicationMasterRepository applicationMasterRepository;
+
     private final MenuIdResolver menuIdResolver;
 
     private final QuarryLeaseApplicationRepository queryLeaseApplicationRepository;
+
+    private final SurfaceCollectionPermitRepository surfaceCollectionPermitRepository;
+
+    private final StockLiftingRepository stockLiftingRepository;
 
     private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
 
@@ -90,6 +100,8 @@ public class MineRestorationService {
 
         MiningLeaseApplication miningLeaseApplication = null;
         QuarryLeaseApplication quarryLeaseApplication = null;
+        SurfaceCollectionPermitEntity surfaceCollectionPermitEntity = null;
+        StockLiftingApplication stockLiftingApplication = null;
 
         // =========================================================
         // FIND MINING / QUARRY APPLICATION
@@ -102,14 +114,29 @@ public class MineRestorationService {
 
         if (lease.isPresent()){
             miningLeaseApplication = lease.get();
-        }else{
-            Optional<QuarryLeaseApplication> quarry = queryLeaseApplicationRepository.findByApplicationNumber(request.getMiningLeaseApplicationNumber());
+        }
 
-            if(quarry.isPresent()){
+        Optional<QuarryLeaseApplication> quarry = queryLeaseApplicationRepository.findByApplicationNumber(request.getMiningLeaseApplicationNumber());
+
+        if(quarry.isPresent()){
                 quarryLeaseApplication = quarry.get();
-            }else {
-                throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "The application number is not present in Quarry and Mining lease table.");
-            }
+        }
+
+        Optional<SurfaceCollectionPermitEntity> surfaceCollectionPermitEntity1 =
+                surfaceCollectionPermitRepository
+                        .findByApplicationNo(request.getMiningLeaseApplicationNumber());
+
+        if(surfaceCollectionPermitEntity1.isPresent()){
+            surfaceCollectionPermitEntity = surfaceCollectionPermitEntity1.get();
+        }
+
+        Optional<StockLiftingApplication> stockLiftingApplication1 =
+                stockLiftingRepository.findByApplicationNo(
+                request.getMiningLeaseApplicationNumber()
+                );
+
+        if (stockLiftingApplication1.isPresent()) {
+           stockLiftingApplication = stockLiftingApplication1.get();
         }
 
         // =========================================================
@@ -152,6 +179,53 @@ public class MineRestorationService {
                 regionId = quarryLeaseApplication.getRegionId();
             }
 
+            if (surfaceCollectionPermitEntity != null){
+                restoration.setApplicantName(surfaceCollectionPermitEntity.getApplicantName());
+                restoration.setApplicantEmail(surfaceCollectionPermitEntity.getEmail());
+                restoration.setNameOfMine(surfaceCollectionPermitEntity.getNameOfSurfaceCollection());
+                restoration.setLeaseAreaAcres(String.valueOf(surfaceCollectionPermitEntity.getProposedAreaSrf()));
+                Date permitValidityTo =
+                        surfaceCollectionPermitEntity.getPermitValidityTo();
+
+                if (permitValidityTo != null) {
+                    restoration.setLeaseEndDate(
+                            permitValidityTo.toInstant()
+                                    .atZone(ZoneId.systemDefault())
+                                    .toLocalDate()
+                    );
+                }
+
+                restoration.setRegionId(surfaceCollectionPermitEntity.getRegionId());
+                regionId = surfaceCollectionPermitEntity.getRegionId();
+            }
+
+            if(stockLiftingApplication != null){
+                restoration.setApplicantName(stockLiftingApplication.getApplicantName());
+                restoration.setApplicantEmail(stockLiftingApplication.getApplicantEmail());
+                restoration.setApplicantContact(stockLiftingApplication.getApplicantContact());
+                restoration.setNameOfMine(stockLiftingApplication.getNameOfStockLifting());
+                LocalDateTime validityDate = stockLiftingApplication.getValidityDate();
+
+                if (validityDate != null) {
+                    restoration.setLeaseEndDate(validityDate.toLocalDate());
+                }
+
+                Optional<DzongkhagLookup> dzongkhagLookup =
+                        dzongkhagLookupRepository.findById(
+                                stockLiftingApplication.getDzongkhagId()
+                        );
+
+                DzongkhagLookup dzongkhagLookupStockLifting = dzongkhagLookup.orElse(null);
+
+                assert dzongkhagLookupStockLifting != null;
+
+                regionId = dzongkhagLookupStockLifting.getRegion().getId();
+
+                restoration.setRegionId(dzongkhagLookupStockLifting.getRegion().getId());
+
+            }
+
+
             restoration.setCreatedBy(userId);
 
         }
@@ -174,7 +248,9 @@ public class MineRestorationService {
             LocalDateTime deadline =
                     validateMRPSubmissionEligibility(
                             miningLeaseApplication,
-                            quarryLeaseApplication
+                            quarryLeaseApplication,
+                            surfaceCollectionPermitEntity,
+                            stockLiftingApplication
                     );
 
             restoration.setCurrentStatus(STATUS_MRP_SUBMITTED);
@@ -242,7 +318,9 @@ public class MineRestorationService {
 
     private LocalDateTime validateMRPSubmissionEligibility(
             MiningLeaseApplication miningLeaseApplication,
-            QuarryLeaseApplication quarryLeaseApplication) {
+            QuarryLeaseApplication quarryLeaseApplication,
+            SurfaceCollectionPermitEntity surfaceCollectionPermitEntity,
+            StockLiftingApplication stockLiftingApplication) {
 
         String leaseStatus;
         ApplicationMaster applicationMaster;
@@ -252,7 +330,34 @@ public class MineRestorationService {
             leaseStatus = miningLeaseApplication.getCurrentStatus();
             applicationMaster = miningLeaseApplication.getApplicationMaster();
 
-        } else {
+        }else if (surfaceCollectionPermitEntity != null) {
+            leaseStatus = surfaceCollectionPermitEntity.getStatus();
+
+            Optional<ApplicationMaster> applicationMaster1 = applicationMasterRepository.findByApplicationNumberAndServiceCode(surfaceCollectionPermitEntity.getApplicationNo(), "SURFACE_COLLECTION_PERMIT");
+
+            ApplicationMaster applicationMasterEntity = applicationMaster1.orElseThrow(() -> new BusinessException(ErrorCodes.BAD_REQUEST));
+
+            applicationMaster = applicationMasterEntity;
+
+        }
+        else if(stockLiftingApplication != null) {
+            leaseStatus = stockLiftingApplication.getStatus();
+
+            Optional<ApplicationMaster> applicationMasterStockLifting = applicationMasterRepository
+                    .findByApplicationNumberAndServiceCode(
+                            stockLiftingApplication.getApplicationNo(),
+                            STOCK_LIFTING_CATEGORY
+                    );
+
+            ApplicationMaster applicationMaster1 = null;
+
+            if (applicationMasterStockLifting.isPresent()) {
+                applicationMaster1 = applicationMasterStockLifting.get();
+            }
+
+            applicationMaster = applicationMaster1;
+        }
+        else {
 
             leaseStatus = quarryLeaseApplication.getCurrentStatus();
             applicationMaster = quarryLeaseApplication.getApplicationMaster();
@@ -775,7 +880,12 @@ public class MineRestorationService {
                         false,
                         restoration.getApplicationNumber()
                 );
-                updateLeaseApplicationStatus(restoration.getMiningLeaseApplicationNumber(),STATUS_MRP_APPROVED,STATUS_MRP_APPROVED);
+
+                updateLeaseApplicationStatus(
+                        restoration.getMiningLeaseApplicationNumber(),
+                        STATUS_MRP_APPROVED,
+                        STATUS_MRP_APPROVED
+                );
             }
             case "REVISION_REQUESTED" -> {
                 restoration.setCurrentStatus(STATUS_MRP_REVISION_REQUESTED);
@@ -1367,6 +1477,10 @@ public class MineRestorationService {
      * Mining Lease first and falling back to Quarry Lease, mirroring resolveAndMarkUnderReview.
      */
     private void updateLeaseApplicationStatus(String appNo, String miningStatus, String quarryStatus) {
+        String siteServiceType = null;
+        String householdServiceType = null;
+        String status = null;
+
         Optional<MiningLeaseApplication> miningLeaseApplication =
                 miningLeaseApplicationRepository.findByApplicationNumber(appNo);
 
@@ -1374,23 +1488,74 @@ public class MineRestorationService {
             MiningLeaseApplication application = miningLeaseApplication.get();
             application.setCurrentStatus(miningStatus);
             miningLeaseApplicationRepository.save(application);
+
+            siteServiceType = "MINING_LEASE";
+            householdServiceType = "MINING_LEASE";
+            status = miningStatus;
             return;
         }
 
-        QuarryLeaseApplication application = queryLeaseApplicationRepository.findByApplicationNumber(appNo)
-                .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND));
-        application.setCurrentStatus(quarryStatus);
-        queryLeaseApplicationRepository.save(application);
+        Optional<QuarryLeaseApplication> application = queryLeaseApplicationRepository.findByApplicationNumber(appNo);
+        if (application.isPresent()) {
+            QuarryLeaseApplication quarryLeaseApplication = application.get();
+            quarryLeaseApplication.setCurrentStatus(quarryStatus);
+            queryLeaseApplicationRepository.save(quarryLeaseApplication);
 
-        Optional<HouseholdPermitThresholdEntity> householdPermitThresholdEntity = householdPermitThresholdRepository.findByApplicationNoAndServiceType(appNo, SERVICE_CODE);
+            siteServiceType = "QUARRY_LEASE";
+            householdServiceType = "QUARRY_LEASE";
+            status = quarryStatus;
+        }
+
+
+        Optional<SurfaceCollectionPermitEntity> surfaceCollectionPermitEntity
+                = surfaceCollectionPermitRepository.findByApplicationNo(appNo);
+
+        if (surfaceCollectionPermitEntity.isPresent()) {
+            SurfaceCollectionPermitEntity entity = surfaceCollectionPermitEntity.get();
+            entity.setStatus(quarryStatus);
+            surfaceCollectionPermitRepository.save(entity);
+
+            siteServiceType = "SURFACE_COLLECTION";
+            householdServiceType = "SURFACE_COLLECTION_PERMIT";
+            status = quarryStatus;
+        }
+
+        Optional<StockLiftingApplication> stockLiftingApplication
+                = stockLiftingRepository.findByApplicationNo(appNo);
+
+        if (stockLiftingApplication.isPresent()) {
+            StockLiftingApplication stockLiftingApplication1 = stockLiftingApplication.get();
+            stockLiftingApplication1.setStatus(quarryStatus);
+            stockLiftingRepository.save(stockLiftingApplication1);
+
+            siteServiceType = STOCK_LIFTING_CATEGORY;
+            householdServiceType = STOCK_LIFTING_CATEGORY;
+            status = miningStatus;
+        }
+
+        /*
+         * No application found
+         */
+        if (siteServiceType == null) {
+            throw new BusinessException(
+                    ErrorCodes.BUSINESS_RULE_VIOLATION,
+                    "Application not found."
+            );
+        }
+
+        Optional<HouseholdPermitThresholdEntity> householdPermitThresholdEntity
+                = householdPermitThresholdRepository.findByApplicationNoAndServiceType
+                ( appNo,householdServiceType  );
 
         if (householdPermitThresholdEntity.isPresent()) {
             HouseholdPermitThresholdEntity thresholdEntity = householdPermitThresholdEntity.get();
-            thresholdEntity.setStatus(quarryStatus);
+            thresholdEntity.setStatus(status);
 
             householdPermitThresholdRepository.save(thresholdEntity);
         }else {
             throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION, "The application is not present in household permit table.");
         }
+
+
     }
 }
