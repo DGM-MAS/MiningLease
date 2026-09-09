@@ -1471,7 +1471,7 @@ public class NotificationClient {
     public void sendUserNotification(String title, String message, Long userId, String serviceId, String recipientType, boolean actionRequired, String applicationNumber) {
 
         UriComponentsBuilder urlBuilder = UriComponentsBuilder
-                .fromHttpUrl(notificationApiUrl + "/user/{userId}")
+                .fromUriString(notificationApiUrl + "/user/{userId}")
                 .queryParam("title", title)
                 .queryParam("message", message)
                 .queryParam("serviceId", serviceId)
