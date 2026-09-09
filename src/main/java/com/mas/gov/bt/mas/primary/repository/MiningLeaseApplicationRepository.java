@@ -649,4 +649,6 @@ SELECT
     // archived-applications endpoint (mirrors getMyArchivedApplications()). Not used by the 5 staff
     // role dashboards but kept symmetric with the non-agency-user branch of that endpoint.
     long countByApplicantUserIdAndCurrentStatusIn(Long userId, List<String> archivedStatuses);
+
+    MiningLeaseApplication findByExpPermitNoAndCurrentStatus(String expPermitNo, String permitIssued);
 }
