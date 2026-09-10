@@ -76,9 +76,10 @@
             via reactor / the Spring Boot BOM -- and it is built with Maven, runs no Gradle and
             reads no build cache at runtime.
 
-            Scoped to the kotlin-stdlib jar by file path. Present today in mas-api-gateway and
-            mas-backend-master; kept in the other repos as a safety net for transitive returns,
-            where it currently matches nothing.
+            FIXED AT SOURCE 2026-09-10 (VAPT round 6): mas-api-gateway and mas-backend-master
+            both pin <kotlin.version>2.4.20</kotlin.version>, so kotlin-stdlib now ships at 2.4.20
+            (>= the fix) and this rule matches nothing anywhere. Retained as a dormant safety net
+            in every backend repo in case a transitive drags an older kotlin-stdlib back in.
         ]]></notes>
         <filePath regex="true">.*[\/]kotlin-stdlib-.*\.jar</filePath>
         <cve>CVE-2026-53914</cve>
