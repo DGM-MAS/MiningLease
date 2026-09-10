@@ -173,7 +173,7 @@ public class SampleTransportClearanceEntity {
     @Column(name = "sample_transport_clearance_certificate_file_id")
     private String sampleTransportClearanceCertificateFileId;
 
-    @Column(name = "latest_remarks")
+    @Column(name = "latest_remarks", columnDefinition = "TEXT")
     private String latestRemarks;
 
     @PrePersist

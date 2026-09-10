@@ -172,11 +172,12 @@ public class MiningLeaseService {
                             ? generateDraftApplicationNumber()
                             : generateApplicationNumber();
                 } else {
-                    if(Objects.equals(request.getApplicationType(), "Submitted") && Objects.equals(application.getCurrentStatus(), "DRAFT")) {
-                        applicationNumber = generateApplicationNumber();
-                    }else {
+//                    if(Objects.equals(request.getApplicationType(), "Submitted") && Objects.equals(application.getCurrentStatus(), "DRAFT")) {
+//                        applicationNumber = generateApplicationNumber();
+//                    }
+
                         applicationNumber = request.getApplicationNo();
-                    }
+
                 }
 
                 // =====================================================
