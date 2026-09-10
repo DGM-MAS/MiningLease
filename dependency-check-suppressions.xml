@@ -28,6 +28,12 @@
             match as low confidence. reactor-netty is a separate Spring project artifact and is not
             the software those advisories describe.
 
+            EXTENDED 2026-09-10 (VAPT round 6): the same false match now also lands on
+            spring-boot-netty-4.0.8.jar -- Spring Boot 4's own Netty web-server module, whose
+            manifest package is also "netty" -- adding a second identical 65-CVE block on
+            mas-api-gateway. Same reasoning; filePath widened to cover both jars. The real
+            io.netty:* jars (netty-transport 4.2.17 etc.) are still NOT suppressed.
+
             Scoped to the reactor-netty-core jar by file path on purpose: the real io.netty:* jars
             it pulls in are NOT suppressed and must keep reporting. Those are managed by the Spring
             Boot BOM.
@@ -41,7 +47,7 @@
             This rule is kept in the other repos as a safety net in case a webflux starter returns
             transitively; it currently matches nothing there, which is the intended state.
         ]]></notes>
-        <filePath regex="true">.*[\/]reactor-netty-core-.*\.jar</filePath>
+        <filePath regex="true">.*[\/](?:reactor-netty-core|spring-boot-netty)-.*\.jar</filePath>
         <cpe>cpe:/a:netty:netty</cpe>
     </suppress>
 
@@ -57,6 +63,25 @@
         ]]></notes>
         <filePath regex="true">.*[\/]spring-security-.*\.jar</filePath>
         <cve>CVE-2018-1258</cve>
+    </suppress>
+
+    <suppress>
+        <notes><![CDATA[
+            FALSE POSITIVE (wrong component). CVE-2026-53914 is a code-execution flaw in the
+            Kotlin Gradle build cache -- unsafe deserialization of build-cache metadata during a
+            Gradle build, fixed in Kotlin 2.4.20. Dependency-Check attaches it to kotlin-stdlib
+            through the bare cpe:2.3:a:jetbrains:kotlin wildcard (any version below 2.4.20), but
+            the vulnerable code path lives in the Kotlin build tooling, not in kotlin-stdlib.
+            kotlin-stdlib is all that ships in the MAS runtime image -- pulled in transitively
+            via reactor / the Spring Boot BOM -- and it is built with Maven, runs no Gradle and
+            reads no build cache at runtime.
+
+            Scoped to the kotlin-stdlib jar by file path. Present today in mas-api-gateway and
+            mas-backend-master; kept in the other repos as a safety net for transitive returns,
+            where it currently matches nothing.
+        ]]></notes>
+        <filePath regex="true">.*[\/]kotlin-stdlib-.*\.jar</filePath>
+        <cve>CVE-2026-53914</cve>
     </suppress>
 
 </suppressions>
