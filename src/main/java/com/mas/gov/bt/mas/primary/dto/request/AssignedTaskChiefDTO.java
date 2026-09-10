@@ -10,4 +10,5 @@ import lombok.*;
 public class AssignedTaskChiefDTO {
     private Long gsdFocalId;
     private String applicationNo;
+    private String remarks;
 }
