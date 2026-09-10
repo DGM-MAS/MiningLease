@@ -379,6 +379,8 @@ public class SampleTransportClearanceServiceImpl
         if (request.getGsdFocalId() != null) {
             sampleTransportClearanceEntity.setStatus("ASSIGNED");
             sampleTransportClearanceEntity.setAssignedGSDFocalId(request.getGsdFocalId());
+            sampleTransportClearanceEntity.setAssignedGSDChiefRemarks(request.getRemarks());
+            sampleTransportClearanceEntity.setLatestRemarks(request.getRemarks());
         } else {
             throw new BusinessException("GSD FocalId is null");
         }
