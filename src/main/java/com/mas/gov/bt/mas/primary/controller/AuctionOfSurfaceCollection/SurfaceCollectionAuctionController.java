@@ -36,6 +36,7 @@ public class SurfaceCollectionAuctionController {
             @RequestBody SurfaceCollectionAuctionRequestDTO dto
     ) {
         Long userId = userContext.getCurrentUserId();
+
         String userName = userContext.getCurrentUsername();
 
         SurfaceCollectionAuctionResponseDTO response =
