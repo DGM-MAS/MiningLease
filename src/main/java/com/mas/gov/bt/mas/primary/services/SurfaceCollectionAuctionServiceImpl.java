@@ -113,6 +113,16 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
             assignedMD = assignMD(9L);
         }
 
+        UserWorkloadProjection applicantNameDetails = null;
+
+        if(userName == null){
+            applicantNameDetails = auctionRepository.findUserDetails(userId);
+        }
+
+        if(applicantNameDetails == null){
+            userName = applicantNameDetails.getUsername();
+        }
+
         try {
             SurfaceCollectionAuctionApplication entity =
                 SurfaceCollectionAuctionApplication.builder()
