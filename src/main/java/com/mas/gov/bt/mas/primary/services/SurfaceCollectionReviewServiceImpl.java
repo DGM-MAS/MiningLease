@@ -56,6 +56,12 @@ public class SurfaceCollectionReviewServiceImpl
     private final ApplicantAccountProvisioningService applicantAccountProvisioningService;
     private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
 
+    // Kill switch for the site-scoped TP menu rework — see application.yml. This path
+    // already stamped site_id correctly before this rework; kept toggle-aware for
+    // consistency with the other SC/SL provisioning call sites.
+    @org.springframework.beans.factory.annotation.Value("${masmenu.tp-site-scoping.enabled:true}")
+    private boolean siteScopingEnabled;
+
     private static final String SERVICE_CODE = "SURFACE_COLLECTION_AUCTION";
     /** Matches HouseholdPermitThresholdService.SURFACE_COLLECTION_PERMIT in mas-royalty-service —
      * the service type actually checked by the live household-cap enforcement, so an auction-won
@@ -361,9 +367,10 @@ public class SurfaceCollectionReviewServiceImpl
         repository.save(surfaceCollectionPermitEntity);
 
         SiteMaster provisionedSite = siteProvisioningService.provisionSiteForApprovedLeaseSurfaceAuction(entity);
-        master.setSiteId(provisionedSite.getId());
-
-        applicationMasterRepository.save(master);
+        if (siteScopingEnabled) {
+            master.setSiteId(provisionedSite.getId());
+            applicationMasterRepository.save(master);
+        }
 
         recordApprovedForThreshold(entity, bidWinner, surfaceCollectionAuctionPermit.getPermitNo());
 

@@ -52,6 +52,13 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
     @Autowired
     private StockLiftingRepository stockLiftingRepository;
 
+    // Kill switch for the site-scoped TP menu rework — see application.yml for the
+    // full rationale. false = don't stamp site_id on manual SC/SL entries, matching
+    // the pre-rework behavior (visible under every site). Mining/Quarry Lease manual
+    // entries are unaffected — they always stamped site_id, long before this rework.
+    @org.springframework.beans.factory.annotation.Value("${masmenu.tp-site-scoping.enabled:true}")
+    private boolean siteScopingEnabled;
+
     private static final String IS_MANUAL = "TRUE";
 
     // -------------------------------------------------------
@@ -410,8 +417,10 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         ApplicationMaster master = createApplicationMaster(saved.getApplicationNo(), scApplicantUserId, "SURFACE_COLLECTION_PERMIT", status, now);
 
         SiteMaster provisionedSite = siteProvisioningService.provisionSiteForSurfaceCollection(saved);
-        master.setSiteId(provisionedSite.getId());
-        applicationMasterRepository.save(master);
+        if (siteScopingEnabled) {
+            master.setSiteId(provisionedSite.getId());
+            applicationMasterRepository.save(master);
+        }
         recordHouseholdThresholdEntity("SURFACE_COLLECTION_PERMIT", saved.getApplicationNo(), saved.getApplicantCid(), saved.getPermitNo());
 
         notifyPromoter(req.getPromoterId(), saved.getApplicationNo());
@@ -472,8 +481,10 @@ public class ManualMiningEntryServiceImpl implements ManualMiningEntryService {
         ApplicationMaster master = createApplicationMaster(saved.getApplicationNo(), slApplicantUserId, "STOCK_LIFTING", status, now);
 
         SiteMaster provisionedSite = siteProvisioningService.provisionSiteForStockLifting(saved);
-        master.setSiteId(provisionedSite.getId());
-        applicationMasterRepository.save(master);
+        if (siteScopingEnabled) {
+            master.setSiteId(provisionedSite.getId());
+            applicationMasterRepository.save(master);
+        }
         recordHouseholdThresholdEntity("STOCK_LIFTING", saved.getApplicationNo(), saved.getApplicantCid(), saved.getStockLiftingPermitNo());
 
         notifyPromoter(req.getPromoterId(), saved.getApplicationNo());
