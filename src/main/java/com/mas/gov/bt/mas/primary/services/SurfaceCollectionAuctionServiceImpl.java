@@ -119,7 +119,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
             applicantNameDetails = auctionRepository.findUserDetails(userId);
         }
 
-        if(applicantNameDetails == null){
+        if(applicantNameDetails != null){
             userName = applicantNameDetails.getUsername();
         }
 
