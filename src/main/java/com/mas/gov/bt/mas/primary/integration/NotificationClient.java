@@ -263,6 +263,43 @@ public class NotificationClient {
      * Send application submitted notification to applicant.
      */
     @Async
+    public void sendMiningLeasePFSSubmittedNotification(String email, String applicantName,
+                                                       String applicationNumber) {
+        String subject = "Mining Lease Application PFS Submitted - " + applicationNumber;
+        String body = String.format("""
+                Your application %1$s for Mining Lease has been submitted. PFS Report submitted successfully.
+
+                Application Number: %s
+
+                You can track your application status using this reference number.
+                We will notify you of any updates on your application.
+                """, applicationNumber);
+
+        EmailRequest request = new EmailRequest();
+        request.setTo(email);
+        request.setSubject(subject);
+        request.setBody(body);
+        request.setRecipientName(applicantName);
+
+        try {
+            restTemplate.postForObject(
+                    notificationEmailBuilderUrl,
+                    request,
+                    String.class
+            );
+        }catch (Exception ex) {
+            log.error(
+                    "Failed to send Mining Lease Application Submitted notification to {} for application {}",
+                    email,
+                    applicationNumber,
+                    ex);
+        }
+    }
+
+    /**
+     * Send application submitted notification to applicant.
+     */
+    @Async
     public void sendApplicationSubmittedNotification(String email, String applicantName,
                                                       String applicationNumber) {
         String subject = "Mining Lease Application Submitted - " + applicationNumber;
