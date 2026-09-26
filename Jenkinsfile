@@ -33,7 +33,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    dockerImage = docker.build("${SPRINGBOOT_IMAGE}:${IMAGE_TAG}")
+                    dockerImage = docker.build("${SPRINGBOOT_IMAGE}:${IMAGE_TAG}", "--pull .")
                 }
             }
         }

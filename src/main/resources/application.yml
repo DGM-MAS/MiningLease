@@ -12,6 +12,15 @@ app:
   frontend:
     base-url: http://172.30.3.10
 
+# Kill switch for the site-scoped Transport Permit menu rework — same flag/rationale as
+# mas-royalty-service's own masmenu.tp-site-scoping.enabled. Guards the manual-entry
+# (ManualMiningEntryServiceImpl) and Surface Collection auction (SurfaceCollectionReviewServiceImpl)
+# site-stamping calls in this repo. Flip to false to revert to pre-rework behavior (TPs visible
+# under every site) — no data migration needed, site_id is just left null.
+masmenu:
+  tp-site-scoping:
+    enabled: true
+
 # Set to false to bypass payment and let applications flow through directly (dev/testing only)
 payment:
   enabled: true

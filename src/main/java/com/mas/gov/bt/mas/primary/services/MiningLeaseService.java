@@ -2142,7 +2142,6 @@ public class MiningLeaseService {
                         String message = "Geological Report for application " + miningLeaseApplication.getApplicationNumber() + " has been accepted. Please upload PFS to proceed further.";
                         String serviceId = MENU_ID_PROMOTER;
                         notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN", true, miningLeaseApplication.getApplicationNumber());
-                        smsClient.sendApplicationStatusSms(miningLeaseApplication.getApplicantUserId(), miningLeaseApplication.getApplicationNumber(), "GR Approved");
                     }else {
                         throw new BusinessException(ErrorCodes.DATA_INTEGRITY_VIOLATION, "Applicant user ID is not present.");
                     }
@@ -2384,7 +2383,6 @@ public class MiningLeaseService {
                     String message = "Your application " + miningLeaseApplication.getApplicationNumber() + " has been forwarded to geologist to review.";
                     String serviceId = MENU_ID_PROMOTER;
                     notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN", false, miningLeaseApplication.getApplicationNumber());
-                    smsClient.sendApplicationStatusSms(miningLeaseApplication.getApplicantUserId(), miningLeaseApplication.getApplicationNumber(), "Application Accepted");
 
                     if (geologistId != null) {
                         String geoTitle = "Mining lease application forwarded for review.";
@@ -2471,7 +2469,6 @@ public class MiningLeaseService {
                             "2. Final Mining Feasibility Study (FMFS) Report.\n";
                     String serviceId = MENU_ID_PROMOTER;
                     notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN", true, miningLeaseApplication.getApplicationNumber());
-                    smsClient.sendApplicationStatusSms(miningLeaseApplication.getApplicantUserId(), miningLeaseApplication.getApplicationNumber(), "PA/FC Approved");
 
                 }
                 case "Rejected" -> {
@@ -2662,7 +2659,6 @@ public class MiningLeaseService {
                     String message = "Your mining application has been accepted. You are hereby required to print the approved Prefeasibility Study (PFS) report along with the duly completed MA-1 Form and submit the documents to the Dzongkhag Land Lease Committee for obtaining the necessary sectoral clearances.";
                     String serviceId = MENU_ID_PROMOTER;
                     notificationClient.sendUserNotification(title, message, miningleaseapplication.getApplicantUserId(), serviceId, "CITIZEN", true, miningleaseapplication.getApplicationNumber());
-                    smsClient.sendApplicationStatusSms(miningleaseapplication.getApplicantUserId(), miningleaseapplication.getApplicationNumber(), "MA-1 Issued");
                 }
                 if (miningleaseapplication.getApplicantEmail() != null) {
                     notificationClient.sendStatusUpdateNotification(
@@ -3486,7 +3482,6 @@ public class MiningLeaseService {
                     String message = "Work order for your application has been uploaded by mine engineer. Your application " + miningLeaseApplication.getApplicationNumber() + " for Mining Lease has been approved.";
                     String serviceId = MENU_ID_PROMOTER;
                     notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN", false, miningLeaseApplication.getApplicationNumber());
-                    smsClient.sendApplicationStatusSms(miningLeaseApplication.getApplicantUserId(), miningLeaseApplication.getApplicationNumber(), "Work Order Issued");
                 }
                 if (miningLeaseApplication.getApplicantEmail() != null) {
                     notificationClient.sendWorkOrderNotification(
