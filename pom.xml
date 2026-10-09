@@ -21,9 +21,14 @@
         <java.version>21</java.version>
         <!-- Override Boot 4.0.8's Tomcat 11.0.24, which carries CVE-2026-65182 /
              CVE-2026-65637 / CVE-2026-68525 (CRITICAL) plus 8 more. VAPT round 6. -->
-        <tomcat.version>11.0.25</tomcat.version>
+        <tomcat.version>11.0.26</tomcat.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
         <spring-cloud.version>2025.1.3</spring-cloud.version>
+        <!-- CVE-2026-68497 (jackson-databind): override Boot 4.0.8's managed Jackson 3 BOM -->
+        <jackson-bom.version>3.1.7</jackson-bom.version>
+        <!-- Jackson 2.x BOM (Boot manages 2.21.5, vulnerable) -->
+        <jackson-2-bom.version>2.22.3</jackson-2-bom.version>
+        <lombok.version>1.18.48</lombok.version>
     </properties>
 
     <dependencies>
@@ -96,14 +101,14 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.38</version>
+            <version>1.18.48</version>
             <optional>true</optional>
         </dependency>
 
         <dependency>
             <groupId>org.modelmapper</groupId>
             <artifactId>modelmapper</artifactId>
-            <version>3.2.1</version>
+            <version>3.2.6</version>
         </dependency>
 
         <dependency>
@@ -200,7 +205,7 @@
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
-                            <version>1.18.38</version>
+                            <version>1.18.48</version>
                         </path>
                         <path>
                             <groupId>org.mapstruct</groupId>
