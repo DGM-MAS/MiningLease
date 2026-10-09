@@ -28,4 +28,8 @@ public class GewogLookup {
 
     @Column(name = "gewog_name_bh")
     private String gewogNameBh;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "regional_id", referencedColumnName = "id")
+    private RegionMaster regionalMaster;
 }

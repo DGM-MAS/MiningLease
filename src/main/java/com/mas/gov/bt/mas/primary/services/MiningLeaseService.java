@@ -69,6 +69,7 @@ public class MiningLeaseService {
     //        the DB, but mas-frontend's director-dgm/mlaapplicationlist.ts calls
     //        getdirectorMiningLeaseApplications / mlaApprovedByDirector, i.e. this is the code's
     //        "DIRECTOR" task role (GR/FMFS/MLA review).
+
     private static final String MENU_ID_PROMOTER      = "79";
     private static final String MENU_ID_MPCD          = "80";
     private static final String MENU_ID_GEOLOGIST     = "81";
@@ -206,7 +207,7 @@ public class MiningLeaseService {
                             .findById(request.getDzongkhag())
                             .orElseThrow(() -> new RuntimeException("Invalid Dzongkhag ID"));
 
-                    application.setRegionId(dzongkhag.getRegion().getId());
+
                     application.setDzongkhag(dzongkhag);
                 }
 
@@ -215,6 +216,7 @@ public class MiningLeaseService {
                             .findByGewogId(request.getGewog())
                             .orElseThrow(() -> new RuntimeException("Invalid gewog ID"));
 
+                    application.setRegionId(gewog.getRegionalMaster().getId());
                     application.setGewog(gewog);
                 }
 
@@ -1113,7 +1115,7 @@ public class MiningLeaseService {
 
         if(userDetails.getUserId()!= null) {
             String title = "An new application has been reassigned.";
-            String message = "An application for mining lease has been assigned for review. Application No. "+request.getApplicationNumber()+" Please login in review the application";
+            String message = "An application for mining lease has been assigned for review. Application No. "+request.getApplicationNumber()+" Please review the application.";
             String serviceId = MENU_ID_GEOLOGIST;
             notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true, request.getApplicationNumber());
         }else {
@@ -2404,7 +2406,7 @@ public class MiningLeaseService {
                         }
 
                         String title = "Application status updated.";
-                        String message = "Your application " + miningLeaseApplication.getApplicationNumber() + " has been forwarded to MPCD for review.";
+                        String message = "Your application " + miningLeaseApplication.getApplicationNumber() + " has been forwarded to the MPCD for MA-1 upload.";
                         String serviceId = MENU_ID_PROMOTER;
                         notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN", false, miningLeaseApplication.getApplicationNumber());
 
@@ -2464,11 +2466,17 @@ public class MiningLeaseService {
                     }
 
                     String title = "Application status updated.";
-                    String message = "Application No. " + miningLeaseApplication.getApplicationNumber() + " The submitted PA, FC, and public clearance have been approved. To facilitate further processing, please submit the following:\n" +
-                            "1. Terms of Reference (ToR) for the Environmental Impact Assessment (EIA).\n" +
-                            "2. Final Mining Feasibility Study (FMFS) Report.\n";
-                    String serviceId = MENU_ID_PROMOTER;
-                    notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN", true, miningLeaseApplication.getApplicationNumber());
+                    String message = "Application No. " + miningLeaseApplication.getApplicationNumber() + " The submitted PA, FC, and public clearance have been approved. Please check your email for further instruction.";
+
+                    notificationClient.sendUserNotification(
+                            title,
+                            message,
+                            miningLeaseApplication.getApplicantUserId(),
+                            MENU_ID_PROMOTER,
+                            "CITIZEN",
+                            true,
+                            miningLeaseApplication.getApplicationNumber()
+                    );
 
                 }
                 case "Rejected" -> {
@@ -2520,6 +2528,18 @@ public class MiningLeaseService {
                                 "MPCD Review",
                                 reviewQuarryLeaseApplication.getMpcdRemarks());
                     }
+                    String title = "Application status updated.";
+                    String message = "Application No. " + miningLeaseApplication.getApplicationNumber() + " Please resubmit the PFS details as per the remarks provided.";
+
+                    notificationClient.sendUserNotification(
+                            title,
+                            message,
+                            miningLeaseApplication.getApplicantUserId(),
+                            MENU_ID_PROMOTER,
+                            "CITIZEN",
+                            true,
+                            miningLeaseApplication.getApplicationNumber()
+                    );
                     smsClient.sendApplicationStatusSms(miningLeaseApplication.getApplicantUserId(), miningLeaseApplication.getApplicationNumber(), "Revision Required");
                 }
                 case "Resubmit PA/FC" -> {
@@ -3598,7 +3618,7 @@ public class MiningLeaseService {
 
         List<TaskManagement> geologistTasks = taskManagementRepository .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
                 applicationNumber,
-                "GEOLOGIST",
+                "ASSIGNED",
                 "GEOLOGIST",
                 SERVICE_CODE
         );
