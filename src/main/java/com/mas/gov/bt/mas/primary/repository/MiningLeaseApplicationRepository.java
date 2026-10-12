@@ -173,6 +173,7 @@ public interface MiningLeaseApplicationRepository extends JpaRepository<MiningLe
         ON t.applicationNumber = q.applicationNumber
     WHERE t.assignedToUserId = :userId
     AND q.currentStatus IN (
+    'SUBMITTED',
     'ASSIGNED',
     'GEOLOGIST_REVIEW',
     "ACCEPTED PFS MPCD",
