@@ -143,7 +143,15 @@ public class MiningLeaseService {
 
         log.info("Creating/updating mining lease application for user: {}", userId);
 
+        // A draft may be sparse; a submission may not (PT report 5.9 — empty bodies were
+        // accepted as numbered applications with every field null).
         boolean isDraft = "Draft".equalsIgnoreCase(request.getApplicationType());
+        if (!isDraft && !"Submitted".equalsIgnoreCase(request.getApplicationType())) {
+            throw new IllegalArgumentException("applicationType must be either 'Draft' or 'Submitted'");
+        }
+        if (!isDraft && (!isNotBlank(request.getApplicantType()) || !isNotBlank(request.getApplicantName()))) {
+            throw new IllegalArgumentException("applicantType and applicantName are required to submit an application");
+        }
         LocalDateTime now = LocalDateTime.now();
 
         // ============================================================
