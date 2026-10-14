@@ -105,5 +105,7 @@ public class EnvironmentClearanceRenewalResponseDTO {
 
     private String latestRemarks;
 
+    private Long regionalId;
+
 
 }
