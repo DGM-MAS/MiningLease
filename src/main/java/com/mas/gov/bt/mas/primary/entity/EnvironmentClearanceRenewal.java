@@ -148,4 +148,7 @@ public class EnvironmentClearanceRenewal {
     public void preUpdate() {
         updatedOn = LocalDateTime.now();
     }
+
+    @Column(name = "regional_id")
+    private Long regionalId;
 }

@@ -382,12 +382,11 @@ public class MiningLeaseRenewalService {
         MiningLeaseRenewalApplication miningLeaseRenewalApplication ;
 
         miningLeaseRenewalApplication = findApplicationById(request.getApplicationId());
+
         ApplicationMaster applicationMaster ;
-        if(miningLeaseRenewalApplication != null) {
-            applicationMaster = miningLeaseRenewalApplication.getApplicationMaster();
-        }else {
-            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
-        }
+
+        applicationMaster = miningLeaseRenewalApplication.getApplicationMaster();
+
         if (request.getMiningEngineerId() != null && request.getGeologistId() != null) {
             miningLeaseRenewalApplication.setCurrentStatus("ASSIGNED");
             applicationMaster.setCurrentStatus("ASSIGNED");
@@ -395,6 +394,7 @@ public class MiningLeaseRenewalService {
             miningLeaseRenewalApplication.setCurrentStatus("GEOLOGIST ASSIGNED");
             applicationMaster.setCurrentStatus("GEOLOGIST ASSIGNED");
         }
+
         applicationMasterRepository.save(applicationMaster);
         miningLeaseRenewalApplicationRepository.save(miningLeaseRenewalApplication);
 

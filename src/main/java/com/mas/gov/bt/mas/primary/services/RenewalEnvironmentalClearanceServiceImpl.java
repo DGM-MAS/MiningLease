@@ -73,6 +73,8 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
 
     private final SurfaceCollectionPermitRepository surfaceCollectionPermitRepository;
 
+    private final com.mas.gov.bt.mas.primary.client.WorkflowAssignmentClient workflowAssignmentClient;
+
     @jakarta.annotation.PostConstruct
     private void resolveMenuIds() {
         MENU_ID_MPCD           = menuIdResolver.resolve("/mpcdrenewaleclist", MENU_ID_MPCD);
@@ -161,11 +163,16 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                 }
             }
 
-            UserWorkloadProjection assignedMDEngineer = assignMD(regionId);
+//            UserWorkloadProjection assignedMDEngineer = assignMD(regionId);
+//
+//            if (assignedMDEngineer == null) {
+//                assignedMDEngineer = assignMD(9L);
+//            }
 
-            if (assignedMDEngineer == null) {
-                assignedMDEngineer = assignMD(9L);
-            }
+            UserWorkloadProjection assignedMDEngineer = assignMD(
+                    regionId,
+                    entity.getApplicationNo()
+            );
 
             createTask(master, entity, "MINING ENGINEER", userId, assignedMDEngineer.getUserId());
             entity.setAssignedMDId(assignedMDEngineer.getUserId());
@@ -197,11 +204,16 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
                 );
             }
 
-            UserWorkloadProjection assignedMPCD = assignMPCD(regionId);
+//            UserWorkloadProjection assignedMPCD = assignMPCD(regionId);
+//
+//            if (assignedMPCD == null) {
+//                assignedMPCD = assignMPCD(9L);
+//            }
 
-            if (assignedMPCD == null) {
-                assignedMPCD = assignMPCD(9L);
-            }
+            UserWorkloadProjection assignedMPCD = assignMPCD(
+                    regionId,
+                    entity.getApplicationNo()
+            );
 
 //            log.info(
 //                    "Assigned MPCD: id={}, username={}, email={}",
@@ -229,11 +241,33 @@ public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironm
         entity.setPreviousEcExpiryDate(ecExpiryDate);
         entity.setPreviousEcFileId(ecFileId);
         entity.setPreviousEcNumber(ecNumber);
+        entity.setRegionalId(regionId);
 
         EnvironmentClearanceRenewal saved =
                 renewalEnvironmentalClearanceRepository.save(entity);
 
         return environmentClearanceRenewalMapper.toResponseDTO(saved);
+    }
+
+    @Transactional
+    public UserWorkloadProjection assignMPCD(Long regionId, String applicationNumber) {
+        var resolved = workflowAssignmentClient.resolve(SERVICE_CODE, "ASSIGNED TO MPCD", regionId, applicationNumber);
+        return toProjection(resolved);
+    }
+
+    @Transactional
+    public UserWorkloadProjection assignMD(Long regionId, String applicationNumber) {
+        var resolved = workflowAssignmentClient.resolve(SERVICE_CODE, "ASSIGNED TO MD", regionId, applicationNumber);
+        return toProjection(resolved);
+    }
+
+    private UserWorkloadProjection toProjection(com.mas.gov.bt.mas.primary.dto.workflow.ResolvedAssigneeDto dto) {
+        return new UserWorkloadProjection() {
+            @Override public Long getUserId() { return dto.getUserId(); }
+            @Override public String getEmail() { return dto.getEmail(); }
+            @Override public Long getWorkload() { return dto.getWorkload(); }
+            @Override public String getUsername() { return dto.getUsername(); }
+        };
     }
 
     private ApplicationMaster createApplicationMaster(String applicationNumber, Long userId, String status) {
