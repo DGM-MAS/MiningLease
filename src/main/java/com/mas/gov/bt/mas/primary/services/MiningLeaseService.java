@@ -113,13 +113,13 @@ public class MiningLeaseService {
 
     private final UserRepository userRepository;
 
-    private final HouseholdPermitCapConfigRefRepository capConfigRepository;
+//    private final HouseholdPermitCapConfigRefRepository capConfigRepository;
 
     private final com.mas.gov.bt.mas.primary.client.WorkflowAssignmentClient workflowAssignmentClient;
 
     private final HouseholdPermitThresholdEntryRepository thresholdEntryRepository;
 
-    private static final int DEFAULT_MAX_APPLICATIONS = 2;
+//    private static final int DEFAULT_MAX_APPLICATIONS = 2;
     private static final String THRESHOLD_SERVICE_TYPE = "MINING_LEASE";
 
     private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
@@ -540,44 +540,44 @@ public class MiningLeaseService {
      * element [2] so the admin-configured cap for that type still applies.
      * Returns {groupingType, groupingKey, registrationType}.
      */
-    private String[] resolveGroupingKey(Long userId) {
-        return miningLeaseApplicationRepository.findGroupingInfoByUserId(userId)
-                .map(info -> {
-                    String rt = info.getRegistrationType();
-                    if ("INDIVIDUAL".equals(rt) && isNotBlank(info.getHouseholdNumber())) {
-                        return new String[]{"INDIVIDUAL", info.getHouseholdNumber(), rt};
-                    }
-                    if ("BUSINESS_LICENSE".equals(rt) && isNotBlank(info.getLicenseNo())) {
-                        return new String[]{"BUSINESS_LICENSE", info.getLicenseNo(), rt};
-                    }
-                    if ("REGISTERED_COMPANY".equals(rt) && isNotBlank(info.getCompanyRegistrationNumber())) {
-                        return new String[]{"REGISTERED_COMPANY", info.getCompanyRegistrationNumber(), rt};
-                    }
-                    return new String[]{"CID", info.getCid(), rt};
-                })
-                .orElse(new String[]{"CID", null, "INDIVIDUAL"});
-    }
+//    private String[] resolveGroupingKey(Long userId) {
+//        return miningLeaseApplicationRepository.findGroupingInfoByUserId(userId)
+//                .map(info -> {
+//                    String rt = info.getRegistrationType();
+//                    if ("INDIVIDUAL".equals(rt) && isNotBlank(info.getHouseholdNumber())) {
+//                        return new String[]{"INDIVIDUAL", info.getHouseholdNumber(), rt};
+//                    }
+//                    if ("BUSINESS_LICENSE".equals(rt) && isNotBlank(info.getLicenseNo())) {
+//                        return new String[]{"BUSINESS_LICENSE", info.getLicenseNo(), rt};
+//                    }
+//                    if ("REGISTERED_COMPANY".equals(rt) && isNotBlank(info.getCompanyRegistrationNumber())) {
+//                        return new String[]{"REGISTERED_COMPANY", info.getCompanyRegistrationNumber(), rt};
+//                    }
+//                    return new String[]{"CID", info.getCid(), rt};
+//                })
+//                .orElse(new String[]{"CID", null, "INDIVIDUAL"});
+//    }
 
     private boolean isNotBlank(String value) {
         return value != null && !value.isBlank();
     }
 
-    /** Human-readable term for the cap-limit message, matching the grouping key resolved above. */
-    private String groupingLabel(String groupingType) {
-        return switch (groupingType) {
-            case "INDIVIDUAL" -> "household";
-            case "BUSINESS_LICENSE" -> "business license";
-            case "REGISTERED_COMPANY" -> "registered company";
-            default -> "applicant";
-        };
-    }
+//    /** Human-readable term for the cap-limit message, matching the grouping key resolved above. */
+//    private String groupingLabel(String groupingType) {
+//        return switch (groupingType) {
+//            case "INDIVIDUAL" -> "household";
+//            case "BUSINESS_LICENSE" -> "business license";
+//            case "REGISTERED_COMPANY" -> "registered company";
+//            default -> "applicant";
+//        };
+//    }
 
-    private int getMaxAllowedForService(String serviceType, String registrationType) {
-        String rt = isNotBlank(registrationType) ? registrationType : "INDIVIDUAL";
-        return capConfigRepository.findByServiceTypeAndRegistrationType(serviceType, rt)
-                .map(c -> c.getMaxAllowed() != null ? c.getMaxAllowed() : DEFAULT_MAX_APPLICATIONS)
-                .orElse(DEFAULT_MAX_APPLICATIONS);
-    }
+//    private int getMaxAllowedForService(String serviceType, String registrationType) {
+//        String rt = isNotBlank(registrationType) ? registrationType : "INDIVIDUAL";
+//        return capConfigRepository.findByServiceTypeAndRegistrationType(serviceType, rt)
+//                .map(c -> c.getMaxAllowed() != null ? c.getMaxAllowed() : DEFAULT_MAX_APPLICATIONS)
+//                .orElse(DEFAULT_MAX_APPLICATIONS);
+//    }
 
     /**
      * Mining lease no longer enforces an application cap — always reports
