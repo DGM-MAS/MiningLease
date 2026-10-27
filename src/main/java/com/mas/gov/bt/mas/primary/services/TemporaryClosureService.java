@@ -462,7 +462,7 @@ public class TemporaryClosureService {
         ApplicationMaster applicationMaster ;
 
         applicationMaster = temporaryClosureEntity.getApplicationMaster();
-        if (request.getMIFocalId() != null ) {
+        if (request.getMiFocalId() != null ) {
             temporaryClosureEntity.setCurrentStatus("MI ASSIGNED");
             temporaryClosureEntity.setRemarksRC(request.getRemarksRC());
             temporaryClosureEntity.setRcReviewedAt(LocalDateTime.now());
@@ -471,15 +471,15 @@ public class TemporaryClosureService {
         applicationMasterRepository.save(applicationMaster);
         temporaryClosureRepository.save(temporaryClosureEntity);
 
-        if (request.getMIFocalId() != null) {
+        if (request.getMiFocalId() != null) {
             createTask(
                     applicationMaster,
                     temporaryClosureEntity,
                     "MI",
                     userId,
-                    request.getMIFocalId());
+                    request.getMiFocalId());
 
-            UserWorkloadProjection userMI = temporaryClosureRepository.findUserDetailsMI(request.getMIFocalId());
+            UserWorkloadProjection userMI = temporaryClosureRepository.findUserDetailsMI(request.getMiFocalId());
 
             if (temporaryClosureEntity.getApplicantEmail() != null) {
                 notificationClient.sendStatusUpdateNotification(
