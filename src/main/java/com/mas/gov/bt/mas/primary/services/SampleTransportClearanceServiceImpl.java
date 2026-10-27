@@ -97,13 +97,13 @@ public class SampleTransportClearanceServiceImpl
                     "Dzongkhag"
             );
 
-            regionId = dzongkhagLookup.getRegion().getId();
-
             gewogLookup = lookupHelper.fetchLookup(
                     request.getGewogID(),
                     gewogLookupRepository,
                     "Gewog"
             );
+
+            regionId = gewogLookup.getRegionalMaster().getId();
 
             if (request.getVillageID() != null
                     && !request.getVillageID().isBlank()) {

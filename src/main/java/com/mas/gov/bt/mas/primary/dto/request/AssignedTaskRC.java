@@ -7,7 +7,7 @@ import lombok.Setter;
 @Getter
 public class AssignedTaskRC {
 
-    private Long Id;
-    private Long MIFocalId;
+    private Long id;
+    private Long miFocalId;
     private String remarksRC;
 }
