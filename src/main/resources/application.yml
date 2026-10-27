@@ -206,37 +206,4 @@ springdoc:
 jwt:
   secret: ${JWT_SECRET}
 
----
-# ── Production profile ── activate with SPRING_PROFILES_ACTIVE=prod in Kubernetes
-spring:
-  config:
-    activate:
-      on-profile: prod
-  datasource:
-    url: jdbc:postgresql://172.30.3.10:30432/mas_db?tcpKeepAlive=true&socketTimeout=300&prepareThreshold=0
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    properties:
-      hibernate:
-        show_sql: false
-        format_sql: false
-app:
-  masters:
-    base-url: http://172.30.3.10:30082
-  self:
-    base-url: http://172.30.3.10:30085
-  notification:
-    api-url: http://172.30.3.10:30081/master/api/notifications
-    email-builder-url: http://172.30.3.10:30081/master/api/notifications/send
-  menu-resolution:
-    api-url: http://172.30.3.10:30081/master/api/menu-resolution
-  frontend:
-    base-url: http://172.30.3.10
-
-springdoc:
-  swagger-ui:
-    enabled: false
-  api-docs:
-    enabled: false
-
+# Production overrides live in application-prod.yml (every value from the ConfigMap/Secret).
