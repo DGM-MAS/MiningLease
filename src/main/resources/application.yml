@@ -1,16 +1,18 @@
 app:
   masters:
-    base-url: http://172.30.3.10:30082
-    citizen-register-url: http://172.30.3.10:30081/master/api/auth/citizen/register
+    base-url: ${APP_MASTERS_BASE_URL}
+    citizen-register-url: ${APP_MASTERS_CITIZEN_REGISTER_URL}
   self:
-    base-url: http://172.30.3.10:30085
+    base-url: ${APP_SELF_BASE_URL}
   notification:
-    api-url: http://172.30.3.10:30081/master/api/notifications
-    email-builder-url: http://172.30.3.10:30081/master/api/notifications/send
+    api-url: ${APP_NOTIFICATION_API_URL}
+    email-builder-url: ${APP_NOTIFICATION_EMAIL_BUILDER_URL}
   menu-resolution:
-    api-url: http://172.30.3.10:30081/master/api/menu-resolution
+    api-url: ${APP_MENU_RESOLUTION_API_URL}
   frontend:
-    base-url: http://172.30.3.10
+    base-url: ${APP_FRONTEND_BASE_URL}
+  sms:
+    base-url: ${APP_SMS_BASE_URL}
 
 # Kill switch for the site-scoped Transport Permit menu rework — same flag/rationale as
 # mas-royalty-service's own masmenu.tp-site-scoping.enabled. Guards the manual-entry
@@ -33,9 +35,9 @@ payment:
 
   email:
     enabled: true
-    from-address: mas@systems.gov.bt
+    from-address: ${APP_EMAIL_FROM_ADDRESS}
     from-name: Mines Administrative System
-    support-email: mas@systems.gov.bt
+    support-email: ${APP_EMAIL_SUPPORT_EMAIL}
     retry-attempts: 3
 
 server:
@@ -63,11 +65,9 @@ spring:
     name: mas-backend-mining-lease
 
   datasource:
-#    url: jdbc:postgresql://localhost:5432/postgres
-    url: jdbc:postgresql://172.30.3.10:30432/mas_db?tcpKeepAlive=true&socketTimeout=300&prepareThreshold=0
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:4GbRIVm8KuYXzEJB}
-#    password: root
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
     type: com.zaxxer.hikari.HikariDataSource
     hikari:
@@ -90,20 +90,16 @@ spring:
 #        physical_naming_strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
 
   file:
-    upload-dir: /opt/Storage
+    upload-dir: ${SPRING_FILE_UPLOAD_DIR}
 
   qr:
-    qr-link: https://drugrims.systems.gov.bt/QrDetails
+    qr-link: ${SPRING_QR_QR_LINK}
 
   mail:
-#    host: mail.systems.gov.bt
-#    port: 587
-#    username: mas@systems.gov.bt
-#    password: ${MAIL_PASSWORD:5xk5ZtSAyRcB}
-    host: smtp.gmail.com
-    port: 587
-    username: ngnecentric@gmail.com
-    password: ${MAIL_PASSWORD:vjvneilswatcysuh}
+    host: ${SPRING_MAIL_HOST}
+    port: ${SPRING_MAIL_PORT}
+    username: ${SPRING_MAIL_USERNAME}
+    password: ${SPRING_MAIL_PASSWORD}
     protocol: smtp
     default-encoding: UTF-8
     properties:
@@ -117,52 +113,52 @@ spring:
           timeout: 30000
           writetimeout: 30000
           ssl:
-            trust: smtp.gmail.com
+            trust: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_TRUST}
             protocols: TLSv1.2
 
   cache:
     type: none  # Using in-memory token blacklist
 
 internal:
-  api-key: ${INTERNAL_API_KEY:kjJ/7D4TrEUZ9YTx3wm+fRFqvcYEDEqqcTfvS8J7IQ8=}
+  api-key: ${INTERNAL_API_KEY}
 
 # BIRMS MOENR Service Configuration (Ministry of Energy and Natural Resources)
 birms:
   login:
-    url: https://birmsstagging.drc.gov.bt/api-services/core-module/api/v1/auth/external-users/logMeIn
+    url: ${BIRMS_LOGIN_URL}
   moenr:
-    username: ${BIRMS_MOENR_USERNAME:moenr}
-    password: ${BIRMS_MOENR_PASSWORD:Admin@123}
+    username: ${BIRMS_MOENR_USERNAME}
+    password: ${BIRMS_MOENR_PASSWORD}
     login:
-      url: https://birmsstagging.drc.gov.bt/api-services/core-module/api/v1/auth/external-users/logMeIn
+      url: ${BIRMS_MOENR_LOGIN_URL}
     payment-advice:
-      url: https://birmsstagging.drc.gov.bt/api-services/moenr-service/api/v1/paymentdetails/create
+      url: ${BIRMS_MOENR_PAYMENT_ADVICE_URL}
     payment-detail-advice-no:
-      url: https://birmsstagging.drc.gov.bt/api-services/moenr-service/api/v1/paymentdetails/paymentAdviceNumber
+      url: ${BIRMS_MOENR_PAYMENT_DETAIL_ADVICE_NO_URL}
     payment-detail-reference-no:
-      url: https://birmsstagging.drc.gov.bt/api-services/moenr-service/api/v1/paymentdetails/referenceNumber
+      url: ${BIRMS_MOENR_PAYMENT_DETAIL_REFERENCE_NO_URL}
     cancel-payment-advice:
-      url: https://birmsstagging.drc.gov.bt/api-services/moenr-service/api/v1/paymentdetails/cancel
+      url: ${BIRMS_MOENR_CANCEL_PAYMENT_ADVICE_URL}
     get-receipt-ref-no:
-      url: https://birmsstagging.drc.gov.bt/api-services/moenr-service/api/v1/paymentdetails/receipt-details
+      url: ${BIRMS_MOENR_GET_RECEIPT_REF_NO_URL}
     get-receipt-base64:
-      url: https://birmsstagging.drc.gov.bt/api-services/moenr-service/api/v1/paymentdetails/receipt-details
+      url: ${BIRMS_MOENR_GET_RECEIPT_BASE64_URL}
 
 ecss:
-  base-url: https://ecss.systems.gov.bt/public/ec
-  token: ${ECSS_TOKEN:ecss_2026_secure_X9kLmP78}
+  base-url: ${ECSS_BASE_URL}
+  token: ${ECSS_TOKEN}
 
 data-hub:
   get-access-token:
-    url: https://stg-sso.tech.gov.bt/oauth2/token?grant_type=client_credentials
-    client-id: ${DATAHUB_CLIENT_ID:wz_hmjRfUWx4ZGyUfL1KfQrAReka}
-    client-secret: ${DATAHUB_CLIENT_SECRET:qIAoW01LGvU7XW5tHF_ZuuSNSGUa}
+    url: ${DATA_HUB_GET_ACCESS_TOKEN_URL}
+    client-id: ${DATA_HUB_GET_ACCESS_TOKEN_CLIENT_ID}
+    client-secret: ${DATA_HUB_GET_ACCESS_TOKEN_CLIENT_SECRET}
   citizen-details:
-    url: https://staging-datahub-apim.tech.gov.bt/dcrc_allcitizendetailsapi/1.0.0/allcitizendetails
+    url: ${DATA_HUB_CITIZEN_DETAILS_URL}
   rbp-scs-details:
-    url: https://staging-datahub-apim.tech.gov.bt/rbp_scs_details_api/1.0.0/latestscsdetailsbycid
+    url: ${DATA_HUB_RBP_SCS_DETAILS_URL}
   ibls-business-license:
-    url: https://staging-datahub-apim.tech.gov.bt/moea_businessinformationapi/1.0.0/businesslicensedetails
+    url: ${DATA_HUB_IBLS_BUSINESS_LICENSE_URL}
 
 management:
   # Actuator listens on its own port. The Kubernetes Service for each backend maps a
