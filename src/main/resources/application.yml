@@ -14,11 +14,7 @@ app:
   sms:
     base-url: ${APP_SMS_BASE_URL}
 
-# Kill switch for the site-scoped Transport Permit menu rework — same flag/rationale as
-# mas-royalty-service's own masmenu.tp-site-scoping.enabled. Guards the manual-entry
-# (ManualMiningEntryServiceImpl) and Surface Collection auction (SurfaceCollectionReviewServiceImpl)
-# site-stamping calls in this repo. Flip to false to revert to pre-rework behavior (TPs visible
-# under every site) — no data migration needed, site_id is just left null.
+# Kill switch for the site-scoped Transport Permit menu rework
 masmenu:
   tp-site-scoping:
     enabled: true
@@ -43,17 +39,10 @@ payment:
 server:
   port: 8085
   address: 0.0.0.0
-#  address: 127.0.0.1  # Uncomment to accept connections only from this host (gateway on same machine); in Kubernetes use NetworkPolicy instead
   tomcat:
     relaxed-query-chars: "|,{,},[,],^,@,$,&,+,="
 
 spring:
-  cloud:
-    inetutils:
-      preferred-networks:
-        - 10.10
-        - 172
-        - 192.168
   jackson:
     time-zone: Asia/Thimphu
   data:
@@ -70,24 +59,18 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
     type: com.zaxxer.hikari.HikariDataSource
-    hikari:
-      maximum-pool-size: 20
-      minimum-idle: 5
-      idle-timeout: 600000
-      max-lifetime: 600000
-      keepalive-time: 60000
-      connection-timeout: 30000
+    # HikariCP tuning → env vars in mas-common-config
+    # (Spring Boot 4 + Hikari 6 seal-check: NO spring.datasource.hikari.* here)
 
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     properties:
       hibernate:
         show_sql: false
         format_sql: false
         default_schema: mas_db
-#        physical_naming_strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
 
   file:
     upload-dir: ${SPRING_FILE_UPLOAD_DIR}
@@ -122,7 +105,7 @@ spring:
 internal:
   api-key: ${INTERNAL_API_KEY}
 
-# BIRMS MOENR Service Configuration (Ministry of Energy and Natural Resources)
+# BIRMS MOENR Service Configuration
 birms:
   login:
     url: ${BIRMS_LOGIN_URL}
@@ -161,10 +144,6 @@ data-hub:
     url: ${DATA_HUB_IBLS_BUSINESS_LICENSE_URL}
 
 management:
-  # Actuator listens on its own port. The Kubernetes Service for each backend maps a
-  # single app port, so nothing outside the pod can reach /actuator once it moves here —
-  # this is what closed ZAP's "Spring Actuator Information Leak" on promotor-reporting.
-  # No Deployment defines a liveness/readiness probe, so nothing depends on the old path.
   server:
     port: 9085
   endpoints:
@@ -178,13 +157,13 @@ management:
     mail:
       enabled: false
 
-# Swagger/OpenAPI Configuration
+# Swagger disabled in prod (also disabled by application-prod.yml — belt and braces)
 springdoc:
   api-docs:
-    enabled: true
+    enabled: false
     path: /v3/api-docs
   swagger-ui:
-    enabled: true
+    enabled: false
     path: /swagger-ui.html
     doc-expansion: none
     default-models-expand-depth: -1
@@ -201,5 +180,3 @@ springdoc:
 # JWT Configuration (HS512 symmetric key) - must match auth server
 jwt:
   secret: ${JWT_SECRET}
-
-# Production overrides live in application-prod.yml (every value from the ConfigMap/Secret).
