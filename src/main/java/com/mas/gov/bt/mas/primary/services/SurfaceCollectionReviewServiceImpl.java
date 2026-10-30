@@ -1,0 +1,582 @@
+package com.mas.gov.bt.mas.primary.services;
+
+import com.mas.gov.bt.mas.primary.dto.IssuePermitRequest;
+import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
+import com.mas.gov.bt.mas.primary.dto.request.ReassignRequestDTO;
+import com.mas.gov.bt.mas.primary.dto.request.ResubmitRequestDTO;
+import com.mas.gov.bt.mas.primary.dto.request.SurfaceCollectionAuctionListResponseDTO;
+import com.mas.gov.bt.mas.primary.dto.response.BidWinnerResponseDTO;
+import com.mas.gov.bt.mas.primary.dto.response.PermitResponseDTO;
+import com.mas.gov.bt.mas.primary.dto.response.ReviewResponseDTO;
+import com.mas.gov.bt.mas.primary.dto.response.SurfaceCollectionAuctionResponseDTO;
+import com.mas.gov.bt.mas.primary.entity.*;
+import com.mas.gov.bt.mas.primary.exception.BusinessException;
+import com.mas.gov.bt.mas.primary.integration.MenuIdResolver;
+import com.mas.gov.bt.mas.primary.integration.NotificationClient;
+import com.mas.gov.bt.mas.primary.repository.*;
+import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.Date;
+import java.util.List;
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class SurfaceCollectionReviewServiceImpl
+        implements SurfaceCollectionReviewService {
+
+    private final SurfaceCollectionBankGuaranteeRepository bgRepository;
+    private final SurfaceCollectionPermitReviewRepository reviewRepository;
+    private final SurfaceCollectionPermitAuctionRepository permitRepository;
+    @Autowired
+    private SurfaceCollectionPermitRepository repository;
+    private final SurfaceCollectionAuctionRepository auctionRepository;
+    private final ApplicationMasterRepository applicationMasterRepository;
+    private final TaskManagementRepository taskManagementRepository;
+    private final NotificationClient notificationClient;
+    private final MenuIdResolver menuIdResolver;
+
+    private final SiteProvisioningService siteProvisioningService;
+
+    private final SurfaceCollectionBidWinnerRepository bidWinnerRepository;
+    private final ApplicantAccountProvisioningService applicantAccountProvisioningService;
+    private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
+
+    // Kill switch for the site-scoped TP menu rework — see application.yml. This path
+    // already stamped site_id correctly before this rework; kept toggle-aware for
+    // consistency with the other SC/SL provisioning call sites.
+    @org.springframework.beans.factory.annotation.Value("${masmenu.tp-site-scoping.enabled:true}")
+    private boolean siteScopingEnabled;
+
+    private static final String SERVICE_CODE = "SURFACE_COLLECTION_AUCTION";
+    /** Matches HouseholdPermitThresholdService.SURFACE_COLLECTION_PERMIT in mas-royalty-service —
+     * the service type actually checked by the live household-cap enforcement, so an auction-won
+     * permit counts against the same cap a regular Surface Collection application would. */
+    private static final String HOUSEHOLD_CAP_SERVICE_TYPE = "SURFACE_COLLECTION_PERMIT";
+
+    // Real sidebar menu ids (permissions.id) per recipient role — used to target
+    // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
+    // Same SURFACE_COLLECTION_AUCTION menu tree as SurfaceCollectionAuctionServiceImpl.java.
+    // Resolved against the live permissions table at startup (see MenuIdResolver); the string
+    // literal below is only a fallback if masters is unreachable.
+    private String MENU_ID_PROMOTER; // "Promoter Application List" (/auctionsurfacecollectionlist)
+
+    // ME-facing review page for this same BG. Despite the "MINING_DIRECTOR" role literal
+    // used by SurfaceCollectionAuctionServiceImpl/SurfaceCollectionBankGuaranteeServiceImpl
+    // for this menu id, mas-frontend actually serves it from
+    // demo/AuctionofSurfaceCollection/miningEnginner/mdauctionsurfacecollectionlist — i.e.
+    // this IS the Mining Engineer's own review queue, confirmed against app-routing.module.ts.
+    private String MENU_ID_MINING_ENGINEER; // "ME Auction Application List" (/mdauctionsurfacecollectionlist)
+
+    private static final int DEFAULT_TAT_DAYS = 2;
+
+    @jakarta.annotation.PostConstruct
+    private void resolveMenuIds() {
+        MENU_ID_PROMOTER = menuIdResolver.resolve("/auctionsurfacecollectionlist", "73");
+        MENU_ID_MINING_ENGINEER = menuIdResolver.resolve("/mdauctionsurfacecollectionlist", "74");
+    }
+
+
+    @Override
+    public ReviewResponseDTO assignToME(Long bgId) {
+
+        SurfaceCollectionBankGuarantee bg = bgRepository.findById(bgId)
+                .orElseThrow(() -> new RuntimeException("BG not found"));
+
+        Long assignedMe = getLeastBusyME();
+
+        String applicationNo = bg.getAuctionApplication() != null
+                ? bg.getAuctionApplication().getApplicationNo()
+                : null;
+
+        SurfaceCollectionPermitReview review =
+                SurfaceCollectionPermitReview.builder()
+                        .bgId(bgId)
+                        .applicationNo(applicationNo)
+                        .reviewStatus("ASSIGNED")
+                        .assignedMeId(assignedMe)
+                        .assignedOn(LocalDateTime.now())
+                        .build();
+
+        reviewRepository.save(review);
+
+        if (assignedMe != null) {
+            String title = "Surface Collection permit application assigned for review";
+            String message = "A Surface Collection permit application " + applicationNo
+                    + " has been assigned to you for review.";
+            notificationClient.sendUserNotification(title, message, assignedMe, MENU_ID_MINING_ENGINEER, "STAFF", true, applicationNo);
+        }
+
+        return map(review);
+    }
+
+    @Override
+    public ReviewResponseDTO reassign(
+            Long reviewId,
+            ReassignRequestDTO dto
+    ) {
+
+        SurfaceCollectionPermitReview review = getReview(reviewId);
+
+        Long previousAssignee = review.getAssignedMeId();
+        Long newAssignee = dto.getNewMeId();
+
+        review.setReassignedTo(newAssignee);
+        review.setReassignedOn(LocalDateTime.now());
+        review.setAssignedMeId(newAssignee);
+
+        reviewRepository.save(review);
+
+        String applicationNo = review.getApplicationNo();
+
+        if (previousAssignee != null && !previousAssignee.equals(newAssignee)) {
+            notificationClient.sendUserNotification(
+                    "Surface Collection permit review reassigned away from you",
+                    "The Surface Collection permit application " + applicationNo
+                            + " has been reassigned to another reviewer.",
+                    previousAssignee, MENU_ID_MINING_ENGINEER, "STAFF", false, applicationNo);
+        }
+        if (newAssignee != null) {
+            notificationClient.sendUserNotification(
+                    "Surface Collection permit application assigned for review",
+                    "A Surface Collection permit application " + applicationNo
+                            + " has been assigned to you for review.",
+                    newAssignee, MENU_ID_MINING_ENGINEER, "STAFF", true, applicationNo);
+        }
+
+        return map(review);
+    }
+
+    @Override
+    public ReviewResponseDTO requestResubmission(
+            Long reviewId,
+            ResubmitRequestDTO dto,
+            Long userId) {
+
+        Optional<SurfaceCollectionAuctionApplication> surfaceCollectionAuctionApplication =
+                auctionRepository.findById(reviewId);
+
+        SurfaceCollectionAuctionApplication surfaceCollectionAuctionApplication1 = null;
+
+        if (surfaceCollectionAuctionApplication.isEmpty()) {
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "No Auction application found with the given ID.");
+        } else {
+            surfaceCollectionAuctionApplication1 = surfaceCollectionAuctionApplication.get();
+        }
+
+        surfaceCollectionAuctionApplication1.setAuctionStatus("BG RESUBMIT");
+        surfaceCollectionAuctionApplication1.setMdRemarks(dto.getRemarks());
+        surfaceCollectionAuctionApplication1.setMd_reviewed_on(LocalDateTime.now());
+
+        auctionRepository.save(surfaceCollectionAuctionApplication1);
+
+        Optional<SurfaceCollectionBankGuarantee> surfaceCollectionBankGuarantee =
+                bgRepository.findByAuctionApplicationId(surfaceCollectionAuctionApplication1.getId());
+
+        if (surfaceCollectionBankGuarantee.isPresent()) {
+            SurfaceCollectionBankGuarantee surfaceCollectionBankGuarantee1 = surfaceCollectionBankGuarantee.get();
+
+            surfaceCollectionBankGuarantee1.setBgFileId(null);
+            surfaceCollectionBankGuarantee1.setStatus("BG RESUBMIT");
+            surfaceCollectionBankGuarantee1.setReviewedBy(userId);
+            surfaceCollectionBankGuarantee1.setReviewedOn(LocalDateTime.now());
+            surfaceCollectionBankGuarantee1.setRemarks(dto.getRemarks());
+
+            bgRepository.save(surfaceCollectionBankGuarantee1);
+        }else {
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "No Bank Guarantee details found with the given ID.");
+        }
+
+        ApplicationMaster applicationMaster = surfaceCollectionAuctionApplication1.getApplicationMaster();
+
+        applicationMaster.setCurrentStatus("BG RESUBMIT");
+        applicationMasterRepository.save(applicationMaster);
+
+        Long promoterId = surfaceCollectionAuctionApplication1.getBidWinner().getPromoterId();
+        createTask(applicationMaster , surfaceCollectionAuctionApplication1,"PROMOTER", promoterId, surfaceCollectionAuctionApplication1.getAssignedMdUserId() );
+
+        UserWorkloadProjection userPromoterDetails =
+                auctionRepository.findUserDetails(promoterId);
+
+        SurfaceCollectionPermitReview review = new SurfaceCollectionPermitReview();
+
+        review.setReviewedOn(LocalDateTime.now());
+        review.setRemarks(dto.getRemarks());
+        review.setApplicationNo(surfaceCollectionAuctionApplication1.getApplicationNo());
+        review.setReviewStatus("BG RESUBMIT");
+
+        try {
+            reviewRepository.save(review);
+        }catch (BusinessException e){
+            throw new BusinessException(ErrorCodes.DATA_INTEGRITY_VIOLATION, "Data VIOLATION. While saving reviews for this application.", e.getCause());
+        }
+        // Notification and Email
+        if (userPromoterDetails.getEmail() != null) {
+            notificationClient.sendSurfaceCollectionAuctionMailToPromoterBGResubmit(
+                    userPromoterDetails.getEmail(),
+                    userPromoterDetails.getUsername(),
+                    surfaceCollectionAuctionApplication1.getApplicationNo());
+        }else {
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "No Email address found for promoter.");
+        }
+
+        if(userPromoterDetails.getUserId()!= null) {
+            String title = "Bank guarantor details has been reviewed.";
+            String message = "Bank guarantor details has been reviewed for surface collection auction. Application No. "+ surfaceCollectionAuctionApplication1.getApplicationNo();
+            String serviceId = MENU_ID_PROMOTER;
+            notificationClient.sendUserNotification(title, message, userPromoterDetails.getUserId(), serviceId, "CITIZEN", true, surfaceCollectionAuctionApplication1.getApplicationNo());
+        }else {
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Promoter Email Address not found.");
+        }
+
+        return map(review);
+    }
+
+    @Transactional
+    private void createTask(ApplicationMaster master, SurfaceCollectionAuctionApplication application, String role, Long userId, Long directorId) {
+        LocalDateTime now = LocalDateTime.now();
+
+        TaskManagement task = new TaskManagement();
+        task.setApplicationNumber(application.getApplicationNo());
+        task.setServiceCode(SERVICE_CODE);
+        task.setAssignedToRole(role);
+        task.setAssignedByUserId(userId);
+        task.setAssignedToUserId(directorId);
+        task.setAssignedAt(now);
+        task.setTaskStatus(master.getCurrentStatus());
+
+        task.setDeadlineDate(now.plusDays(DEFAULT_TAT_DAYS));
+        task.setCreatedBy(userId);
+
+        taskManagementRepository.save(task);
+        log.info("Created task for role {}", role);
+    }
+
+    @Override
+    @Transactional
+    public SurfaceCollectionAuctionResponseDTO issuePermit(
+            Long reviewId,
+            Long mdUserId,
+            @Valid IssuePermitRequest issuePermitFileId
+    ) {
+
+        SurfaceCollectionAuctionApplication entity = getAuction(reviewId);
+
+        LocalDate permitValidFrom = LocalDate.now();
+        LocalDate permitValidTo = issuePermitFileId.getPermitValidTo();
+        if (!permitValidTo.isAfter(permitValidFrom)) {
+            throw new BusinessException(ErrorCodes.INVALID_INPUT_DATA, "Permit validity (valid to) must be after the issue date.");
+        }
+
+        ApplicationMaster master = entity.getApplicationMaster();
+        SurfaceCollectionBidWinner bidWinner = entity.getBidWinner();
+
+        entity.setApprovedDate(LocalDate.now());
+        entity.setPermitGenerated(true);
+        entity.setIssuePermitFileId(issuePermitFileId.getIssuePermitFileId());
+
+        entity.setAuctionStatus("PERMIT_ISSUED");
+
+        auctionRepository.save(entity);
+
+        master.setCurrentStatus("PERMIT_ISSUED");
+
+        SurfaceCollectionBankGuarantee surfaceCollectionBankGuarantee = new SurfaceCollectionBankGuarantee();
+
+        Optional<SurfaceCollectionBankGuarantee> surfaceCollectionBankGuarantee1 = bgRepository.findByAuctionApplicationId(reviewId);
+        if (surfaceCollectionBankGuarantee1.isPresent()) {
+            surfaceCollectionBankGuarantee = surfaceCollectionBankGuarantee1.get();
+        }
+        surfaceCollectionBankGuarantee.setStatus("PERMIT_ISSUED");
+
+        bgRepository.save(surfaceCollectionBankGuarantee);
+
+        SurfaceCollectionAuctionPermit surfaceCollectionAuctionPermit = new SurfaceCollectionAuctionPermit();
+        surfaceCollectionAuctionPermit.setIssuedBy(mdUserId);
+        surfaceCollectionAuctionPermit.setIssuedOn(LocalDateTime.now());
+        surfaceCollectionAuctionPermit.setAuctionApplication(entity);
+        surfaceCollectionAuctionPermit.setValidFrom(permitValidFrom);
+        surfaceCollectionAuctionPermit.setPermitNo(generatePermitNo());
+        surfaceCollectionAuctionPermit.setIssuePermitFileId(issuePermitFileId.getIssuePermitFileId());
+        surfaceCollectionAuctionPermit.setValidTo(permitValidTo);
+        surfaceCollectionAuctionPermit.setPermitStatus("PERMIT_ISSUED");
+        permitRepository.save(surfaceCollectionAuctionPermit);
+
+        // Resolve (or auto-register) the winning bidder's own citizen account so the
+        // permit, the site, and the tracked application get attributed to the actual
+        // winner rather than the MD/officer who processed the issuance. Runs
+        // synchronously (REQUIRES_NEW, commits independently) since downstream steps
+        // in this method need the id right away.
+        Long promoterId = null;
+        if (bidWinner != null) {
+            promoterId = applicantAccountProvisioningService.provisionForApplicant(
+                    null, bidWinner.getCidNumber(), bidWinner.getBidWinnerName(),
+                    bidWinner.getContactNumber(), bidWinner.getEmailAddress(),
+                    bidWinner.getLicenseNumber(), null,
+                    bidWinner.getCompanyRegistrationNumber(), bidWinner.getBidWinnerName(), bidWinner.getCompanyType());
+            if (promoterId != null) {
+                bidWinner.setPromoterId(promoterId);
+                bidWinnerRepository.save(bidWinner);
+            }
+        }
+        if (promoterId != null) {
+            master.setApplicantUserId(promoterId);
+        }
+
+        // Surface Collection Permit is stored here
+        SurfaceCollectionPermitEntity surfaceCollectionPermitEntity = new SurfaceCollectionPermitEntity();
+        surfaceCollectionPermitEntity.setApprovedOn(LocalDate.now());
+        surfaceCollectionPermitEntity.setNameOfSurfaceCollection(entity.getSiteName());
+        surfaceCollectionPermitEntity.setOrigin("AUCTION");
+        surfaceCollectionPermitEntity.setPermitNo(surfaceCollectionAuctionPermit.getPermitNo());
+        surfaceCollectionPermitEntity.setPermitFileId(issuePermitFileId.getIssuePermitFileId());
+        surfaceCollectionPermitEntity.setPermitValidityFrom(Date.from(permitValidFrom.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+        surfaceCollectionPermitEntity.setPermitValidityTo(Date.from(permitValidTo.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+
+        surfaceCollectionPermitEntity.setApplicationNo(entity.getApplicationNo());
+        surfaceCollectionPermitEntity.setCreatedBy(promoterId);
+        if (bidWinner != null) {
+            surfaceCollectionPermitEntity.setApplicantCid(bidWinner.getCidNumber());
+            surfaceCollectionPermitEntity.setApplicantName(bidWinner.getBidWinnerName());
+            surfaceCollectionPermitEntity.setMobileNo(bidWinner.getContactNumber());
+            surfaceCollectionPermitEntity.setEmail(bidWinner.getEmailAddress());
+            surfaceCollectionPermitEntity.setDzongkhag(bidWinner.getDzongkhagId() != null ? bidWinner.getDzongkhagId().getDzongkhagName() : null);
+            surfaceCollectionPermitEntity.setGewog(bidWinner.getGewogId() != null ? bidWinner.getGewogId().getGewogName() : null);
+            surfaceCollectionPermitEntity.setPlaceVillage(bidWinner.getVillageId() != null ? bidWinner.getVillageId().getVillageName() : null);
+            surfaceCollectionPermitEntity.setRegionId(bidWinner.getRegionId() != null ? bidWinner.getRegionId().getId() : null);
+        }
+        surfaceCollectionPermitEntity.setEcFileId(entity.getFileECid());
+        surfaceCollectionPermitEntity.setEcNo(entity.getEcNumber());
+        surfaceCollectionPermitEntity.setEcValidUpto(entity.getEcValidUpto());
+        surfaceCollectionPermitEntity.setECStatus(entity.getEcStatus());
+
+        repository.save(surfaceCollectionPermitEntity);
+
+        SiteMaster provisionedSite = siteProvisioningService.provisionSiteForApprovedLeaseSurfaceAuction(entity);
+        if (siteScopingEnabled) {
+            master.setSiteId(provisionedSite.getId());
+            applicationMasterRepository.save(master);
+        }
+
+        recordApprovedForThreshold(entity, bidWinner, surfaceCollectionAuctionPermit.getPermitNo());
+
+        // This was the one citizen-visible milestone in the whole auction flow with no
+        // in-app notification at all (email-only elsewhere in this class) — issuePermit
+        // never called sendUserNotification, so the sidebar dot never lit up for it.
+        Long notifyUserId = promoterId != null ? promoterId : master.getApplicantUserId();
+        if (notifyUserId != null) {
+            String title = "Surface Collection Permit Issued";
+            String message = "Your Surface Collection Permit for application " + entity.getApplicationNo()
+                    + " has been issued. Permit No: " + surfaceCollectionAuctionPermit.getPermitNo() + ".";
+            notificationClient.sendUserNotification(title, message, notifyUserId, MENU_ID_PROMOTER, "CITIZEN", false, entity.getApplicationNo());
+        }
+
+        return mapToResponse(entity);
+    }
+
+    private SurfaceCollectionAuctionApplication getAuction(Long id) {
+        return auctionRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Auction not found"));
+    }
+
+    @Override
+    public long countMyApplicationsMD(Long userId) {
+        List<String> archivedStatuses = List.of("SUBMITTED", "EC_APPROVED", "AUCTION_COMPLETED", "BG SUBMITTED", "BG RESUBMIT", "BG RESUBMITTED");
+        return auctionRepository.countByAssignedMdUserIdAndAuctionStatusIn(userId, archivedStatuses);
+    }
+
+    @Override
+    public long countMyArchiveMD(Long userId) {
+        List<String> archivedStatuses = List.of("PERMIT_ISSUED");
+        return auctionRepository.countByAssignedMdUserIdAndAuctionStatusIn(userId, archivedStatuses);
+    }
+
+    @Override
+    public Page<SurfaceCollectionAuctionListResponseDTO> getMyApplicationsMD(String search, Pageable pageable, Long userId) {
+        Page<SurfaceCollectionAuctionApplication> page;
+
+        List<String> archivedStatuses = List.of("SUBMITTED", "EC_APPROVED", "AUCTION_COMPLETED", "BG SUBMITTED", "BG RESUBMIT", "BG RESUBMITTED");
+
+        if (search == null || search.isBlank()) {
+
+            page = auctionRepository
+                    .findByAssignedMdUserIdAndAuctionStatusIn(userId,archivedStatuses,pageable);
+
+        } else {
+
+            page = auctionRepository
+                    .findByAssignedMdUserIdAndApplicationNoContainingIgnoreCaseOrLocationContainingIgnoreCaseAndAuctionStatusIn(
+                            userId,
+                            search,
+                            search,
+                            archivedStatuses,
+                            pageable
+                    );
+        }
+
+        return page.map(this::mapListResponse);
+    }
+
+    @Override
+    public Page<SurfaceCollectionAuctionListResponseDTO> getMyArchiveMD(String search, Pageable pageable, Long userId) {
+        Page<SurfaceCollectionAuctionApplication> page;
+
+        List<String> archivedStatuses = List.of("PERMIT_ISSUED");
+
+        if (search == null || search.isBlank()) {
+
+            page = auctionRepository
+                    .findByAssignedMdUserIdAndAuctionStatusIn(userId,archivedStatuses,pageable);
+
+        } else {
+
+            page = auctionRepository
+                    .findByAssignedMdUserIdAndApplicationNoContainingIgnoreCaseOrLocationContainingIgnoreCaseAndAuctionStatusIn(
+                            userId,
+                            search,
+                            search,
+                            archivedStatuses,
+                            pageable
+                    );
+        }
+
+        return page.map(this::mapListResponse);
+    }
+
+    private SurfaceCollectionAuctionListResponseDTO mapListResponse(
+            SurfaceCollectionAuctionApplication entity
+    ) {
+
+        return SurfaceCollectionAuctionListResponseDTO.builder()
+                .id(entity.getId())
+                .applicationNo(entity.getApplicationNo())
+                .location(entity.getLocation())
+                .area(entity.getArea())
+                .material(entity.getMaterial())
+                .ecFileId(entity.getFileECid())
+                .ecNumber(entity.getEcNumber())
+                .ecValidUpto(entity.getEcValidUpto())
+                .ecStatus(entity.getEcStatus())
+                .fcStatus(entity.getFcStatus())
+                .submittedBy(entity.getSubmittedBy())
+                .auctionStatus(entity.getAuctionStatus())
+                .issuePermitFileId(entity.getIssuePermitFileId())
+                .bgRequested(entity.getBgRequested())
+                .permitGenerated(entity.getPermitGenerated())
+                .createdOn(entity.getCreatedOn())
+                .build();
+    }
+
+    private SurfaceCollectionPermitReview getReview(Long id) {
+        return reviewRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Review not found"));
+    }
+
+    private Long getLeastBusyME() {
+        return 1L;
+    }
+
+    private synchronized String generatePermitNo() {
+        String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        return "SCP-" + date + String.format("%05d", monthlySequence());
+    }
+
+    private long monthlySequence() {
+        YearMonth currentMonth = YearMonth.now();
+        LocalDateTime monthStart = currentMonth.atDay(1).atStartOfDay();
+        LocalDateTime monthEnd = currentMonth.atEndOfMonth().atTime(23, 59, 59);
+        return repository.countByMonth(monthStart, monthEnd) + 1;
+    }
+
+    private ReviewResponseDTO map(SurfaceCollectionPermitReview review) {
+        return ReviewResponseDTO.builder()
+                .auctionId(review.getId())
+                .applicationNo(review.getApplicationNo())
+                .reviewStatus(review.getReviewStatus())
+                .remarks(review.getRemarks())
+                .build();
+    }
+
+    private PermitResponseDTO mapPermit(SurfaceCollectionAuctionPermit permit) {
+        return PermitResponseDTO.builder()
+                .permitId(permit.getId())
+                .permitNo(permit.getPermitNo())
+                .permitStatus(permit.getPermitStatus())
+                .issuedOn(permit.getIssuedOn())
+                .build();
+    }
+
+    private SurfaceCollectionAuctionResponseDTO mapToResponse(
+            SurfaceCollectionAuctionApplication entity
+    ) {
+        return SurfaceCollectionAuctionResponseDTO.builder()
+                .id(entity.getId())
+                .applicationNo(entity.getApplicationNo())
+                .location(entity.getLocation())
+                .area(entity.getArea())
+                .material(entity.getMaterial())
+                .ecFileId(entity.getFileECid())
+                .ecNumber(entity.getEcNumber())
+                .ecValidUpto(entity.getEcValidUpto())
+                .ecStatus(entity.getEcStatus())
+                .fcStatus(entity.getFcStatus())
+                .auctionStatus(entity.getAuctionStatus())
+                .submittedForEc(entity.getSubmittedForEc())
+                .submittedForFc(entity.getSubmittedForFc())
+                .bgRequested(entity.getBgRequested())
+                .permitGenerated(entity.getPermitGenerated())
+                .bidWinner(mapToResponseBidWinner(entity.getBidWinner()))
+                .createdOn(entity.getCreatedOn())
+                .build();
+    }
+
+    private BidWinnerResponseDTO mapToResponseBidWinner(SurfaceCollectionBidWinner bidWinner) {
+        if  (bidWinner == null) {
+            return BidWinnerResponseDTO.builder().build();
+        }
+        return BidWinnerResponseDTO.builder()
+                .id(bidWinner.getId())
+                .bidWinnerName(bidWinner.getBidWinnerName())
+                .emailAddress(bidWinner.getEmailAddress())
+                .contactNumber(bidWinner.getContactNumber())
+                .licenseNumber(bidWinner.getLicenseNumber())
+                .companyType(bidWinner.getCompanyType())
+                .companyRegistrationNumber(bidWinner.getCompanyRegistrationNumber())
+                .dzongkhagId(bidWinner.getDzongkhagId().getDzongkhagName())
+                .gewogId(bidWinner.getGewogId().getGewogName())
+                .villageId(bidWinner.getVillageId().getVillageName())
+                .regionId(bidWinner.getRegionId().getRegionName())
+                .cidNumber(bidWinner.getCidNumber())
+                .build();
+    }
+
+    /**
+     * Records an ACTIVE entry in the same household-cap table the real (non-auction)
+     * Surface Collection flow uses, so an auction-won permit counts against a
+     * household's cap exactly like a regular SC application would.
+     */
+    private void recordApprovedForThreshold(SurfaceCollectionAuctionApplication app, SurfaceCollectionBidWinner bidWinner, String permitNo) {
+        if (bidWinner == null || bidWinner.getCidNumber() == null || bidWinner.getCidNumber().isBlank()) return;
+        HouseholdPermitThresholdEntity entry = new HouseholdPermitThresholdEntity();
+        entry.setApplicantCid(bidWinner.getCidNumber());
+        entry.setServiceType(HOUSEHOLD_CAP_SERVICE_TYPE);
+        entry.setApplicationNo(app.getApplicationNo());
+        entry.setPermitNo(permitNo);
+        entry.setStatus("ACTIVE");
+        householdPermitThresholdRepository.save(entry);
+    }
+}

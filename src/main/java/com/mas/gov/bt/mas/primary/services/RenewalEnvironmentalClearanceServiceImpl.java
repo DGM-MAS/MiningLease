@@ -1,0 +1,1912 @@
+package com.mas.gov.bt.mas.primary.services;
+
+import com.mas.gov.bt.mas.primary.client.MastersPaymentClient;
+import com.mas.gov.bt.mas.primary.entity.*;
+import com.mas.gov.bt.mas.primary.repository.*;
+import com.mas.gov.bt.mas.primary.utility.CustomRuntimeException;
+
+import com.mas.gov.bt.mas.primary.dto.CitizenApplicantProjection;
+import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
+import com.mas.gov.bt.mas.primary.dto.payment.PaymentInitiationRequest;
+import com.mas.gov.bt.mas.primary.dto.payment.PaymentInitiationResponse;
+import com.mas.gov.bt.mas.primary.dto.request.*;
+import com.mas.gov.bt.mas.primary.dto.response.EnvironmentClearanceRenewalResponseDTO;
+import com.mas.gov.bt.mas.primary.exception.BusinessException;
+import com.mas.gov.bt.mas.primary.integration.MenuIdResolver;
+import com.mas.gov.bt.mas.primary.integration.NotificationClient;
+import com.mas.gov.bt.mas.primary.mapper.EnvironmentClearanceRenewalMapper;
+import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
+import com.mas.gov.bt.mas.primary.utility.SuccessResponse;
+import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.Year;
+import java.time.ZoneId;
+import java.util.Date;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+@Service
+@Slf4j
+@RequiredArgsConstructor
+public class RenewalEnvironmentalClearanceServiceImpl implements RenewalEnvironmentalClearanceService {
+
+    private static final String SERVICE_CODE = "RENEWAL_ENV_CLEARANCE";
+
+    // Real sidebar menu ids (permissions.id) per recipient role for this service — used to target
+    // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
+    // NOT the same thing as SERVICE_CODE above, which is an unrelated t_application_master.service_code value.
+    private String MENU_ID_MPCD            = "94"; // "MPCD" — RENEWAL_ENV_CLEARANCE (/mpcdrenewaleclist)
+    private String MENU_ID_MINING_ENGINEER  = "95"; // "MINING ENGINEER" (/mdrenewalecapprovedlist)
+    private String MENU_ID_APPLICANT        = "92"; // "Promoter Application List" (citizen-facing /renewalapplicationlist)
+    private String MENU_ID_RC              = "93"; // "RC Application List" (/rc-renewaleclist)
+    private String MENU_ID_MI              = "96"; // "Mining Inspector List" (/mirenewallist)
+
+    // payment_master lookup keys for the EC renewal fee — matches the existing
+    // (currently disabled, pending a real BIRMS wire code) payment_master row.
+    private static final String PAYMENT_SERVICE_CODE = "SC_RENEWAL_EC";
+    private static final String EC_FEE_TYPE = "EC_FEE";
+
+    private final EnvironmentClearanceRenewalMapper environmentClearanceRenewalMapper;
+
+    private final RenewalEnvironmentalClearanceRepository renewalEnvironmentalClearanceRepository;
+
+    private final TaskManagementRepository taskManagementRepository;
+
+    private final ApplicationMasterRepository applicationMasterRepository;
+
+    private final NotificationClient notificationClient;
+
+    private final MenuIdResolver menuIdResolver;
+
+    private final MiningLeaseApplicationRepository miningLeaseApplicationRepository;
+
+    private final QuarryLeaseApplicationRepository queryLeaseApplicationRepository;
+
+    private final SurfaceCollectionPermitRepository surfaceCollectionPermitRepository;
+
+    private final com.mas.gov.bt.mas.primary.client.WorkflowAssignmentClient workflowAssignmentClient;
+
+    @jakarta.annotation.PostConstruct
+    private void resolveMenuIds() {
+        MENU_ID_MPCD           = menuIdResolver.resolve("/mpcdrenewaleclist", MENU_ID_MPCD);
+        MENU_ID_MINING_ENGINEER = menuIdResolver.resolve("/mdrenewalecapprovedlist", MENU_ID_MINING_ENGINEER);
+        MENU_ID_APPLICANT      = menuIdResolver.resolve("/renewalapplicationlist", MENU_ID_APPLICANT);
+        MENU_ID_RC             = menuIdResolver.resolve("/rc-renewaleclist", MENU_ID_RC);
+        MENU_ID_MI             = menuIdResolver.resolve("/mirenewallist", MENU_ID_MI);
+    }
+
+    private final PaymentMasterRepository paymentMasterRepository;
+
+    private final MastersPaymentClient mastersPaymentClient;
+
+    @Value("${app.self.base-url}")
+    private String selfBaseUrl;
+
+    @Value("${payment.enabled:true}")
+    private boolean paymentEnabled;
+
+    @Override
+    public EnvironmentClearanceRenewalResponseDTO saveDraft(
+            EnvironmentClearanceRenewalRequestDTO request,
+            Long userId)
+    {
+        EnvironmentClearanceRenewal entity =
+                environmentClearanceRenewalMapper.toEntity(request);
+
+        entity.setStatus("DRAFT");
+        entity.setCreatedBy(userId);
+
+        EnvironmentClearanceRenewal saved =
+                renewalEnvironmentalClearanceRepository.save(entity);
+
+        return environmentClearanceRenewalMapper.toResponseDTO(saved);
+    }
+
+    @Override
+    @Transactional
+    public EnvironmentClearanceRenewalResponseDTO submitApplication(EnvironmentClearanceRenewalRequestDTO request, Long userId) {
+        validateSubmission(request);
+
+        EnvironmentClearanceRenewal entity =
+                environmentClearanceRenewalMapper.toEntity(request);
+
+        Long regionId = 0L;
+        String ecNumber = "";
+
+        Date ecExpiryDate = null;
+
+        String ecFileId = "";
+
+        entity.setApplicationNo(generateApplicationNumber());
+        entity.setCreatedBy(userId);
+        entity.setSubmittedOn(LocalDateTime.now());
+
+        routeApplication(entity);
+
+        ApplicationMaster master =
+                createApplicationMaster(entity.getApplicationNo(), userId, entity.getStatus() );
+
+        entity.setApplicationMaster(master);
+
+        if (entity.getServiceType().equals("MINING LEASE") || entity.getServiceType().equals("QUARRY LEASE")) {
+
+            if (entity.getServiceType().equals("MINING LEASE") ){
+                Optional<MiningLeaseApplication> application =
+                        miningLeaseApplicationRepository.findByApplicationNumber(request.getSiteApplicationNo());
+
+                if (application.isPresent()) {
+                    regionId = application.get().getRegionId();
+                    ecNumber = application.get().getEcNumber();
+                    ecExpiryDate = application.get().getEcExpiryDate();
+                    ecFileId = application.get().getEcFileId();
+                }
+            }
+
+            if (entity.getServiceType().equals("QUARRY LEASE") ){
+                Optional<QuarryLeaseApplication> application =
+                        queryLeaseApplicationRepository.findByApplicationNumber(request.getSiteApplicationNo());
+
+                if (application.isPresent()) {
+                    regionId = application.get().getRegionId();
+                    ecNumber = application.get().getEcNumber();
+                    ecExpiryDate = application.get().getECExpiryDate();
+                    ecFileId = application.get().getEcFileId();
+                }
+            }
+
+//            UserWorkloadProjection assignedMDEngineer = assignMD(regionId);
+//
+//            if (assignedMDEngineer == null) {
+//                assignedMDEngineer = assignMD(9L);
+//            }
+
+            UserWorkloadProjection assignedMDEngineer = assignMD(
+                    regionId,
+                    entity.getApplicationNo()
+            );
+
+            createTask(master, entity, "MINING ENGINEER", userId, assignedMDEngineer.getUserId());
+            entity.setAssignedMDId(assignedMDEngineer.getUserId());
+
+            notificationClient.sendEnvironmentalClearanceAssignmentNotification(
+                    assignedMDEngineer.getEmail(),
+                    assignedMDEngineer.getUsername(),
+                    entity.getApplicationNo(),
+                    "REVIEW APPLICATION");
+
+            String title = "Renewal environmental clearance application has been assigned.";
+            String message = "An application for environmental clearance lease has been assigned for review. Application No. "+ entity.getApplicationNo()+" Please login in review the Geological report.";
+            String serviceId = MENU_ID_MINING_ENGINEER;
+            notificationClient.sendUserNotification(title, message, assignedMDEngineer.getUserId(), serviceId, "STAFF", true, entity.getApplicationNo());
+
+        }else {
+
+            Optional<SurfaceCollectionPermitEntity> surfaceCollectionPermitEntity = surfaceCollectionPermitRepository.findByApplicationNo(request.getSiteApplicationNo());
+
+            if (surfaceCollectionPermitEntity.isPresent()) {
+                regionId = surfaceCollectionPermitEntity.get().getRegionId();
+                ecNumber = surfaceCollectionPermitEntity.get().getEcNo();
+                ecFileId = surfaceCollectionPermitEntity.get().getEcFileId();
+
+                LocalDate ecValidUpto = surfaceCollectionPermitEntity.get().getEcValidUpto();
+
+                ecExpiryDate = Date.from(
+                        ecValidUpto.atStartOfDay(ZoneId.systemDefault()).toInstant()
+                );
+            }
+
+//            UserWorkloadProjection assignedMPCD = assignMPCD(regionId);
+//
+//            if (assignedMPCD == null) {
+//                assignedMPCD = assignMPCD(9L);
+//            }
+
+            UserWorkloadProjection assignedMPCD = assignMPCD(
+                    regionId,
+                    entity.getApplicationNo()
+            );
+
+//            log.info(
+//                    "Assigned MPCD: id={}, username={}, email={}",
+//                    assignedMPCD.getUserId(),
+//                    assignedMPCD.getUsername(),
+//                    assignedMPCD.getEmail()
+//            );
+
+            createTask(master, entity, "MPCD", userId, assignedMPCD.getUserId());
+            entity.setAssignedMPCDId(assignedMPCD.getUserId());
+
+            notificationClient.sendEnvironmentalClearanceAssignmentNotification(
+                    assignedMPCD.getEmail(),
+                    assignedMPCD.getUsername(),
+                    entity.getApplicationNo(),
+                    "REVIEW APPLICATION");
+
+            String title = "Renewal environmental clearance application has been assigned.";
+            String message = "An application for environmental clearance lease has been assigned for review. Application No. "+ entity.getApplicationNo()+" Please login in review the Geological report.";
+            String serviceId = MENU_ID_MPCD;
+            notificationClient.sendUserNotification(title, message, assignedMPCD.getUserId(), serviceId, "STAFF", true, entity.getApplicationNo());
+
+        }
+
+        entity.setPreviousEcExpiryDate(ecExpiryDate);
+        entity.setPreviousEcFileId(ecFileId);
+        entity.setPreviousEcNumber(ecNumber);
+        entity.setRegionalId(regionId);
+
+        EnvironmentClearanceRenewal saved =
+                renewalEnvironmentalClearanceRepository.save(entity);
+
+        return environmentClearanceRenewalMapper.toResponseDTO(saved);
+    }
+
+    @Transactional
+    public UserWorkloadProjection assignMPCD(Long regionId, String applicationNumber) {
+        var resolved = workflowAssignmentClient.resolve(SERVICE_CODE, "ASSIGNED TO MPCD", regionId, applicationNumber);
+        return toProjection(resolved);
+    }
+
+    @Transactional
+    public UserWorkloadProjection assignMD(Long regionId, String applicationNumber) {
+        var resolved = workflowAssignmentClient.resolve(SERVICE_CODE, "ASSIGNED TO MD", regionId, applicationNumber);
+        return toProjection(resolved);
+    }
+
+    private UserWorkloadProjection toProjection(com.mas.gov.bt.mas.primary.dto.workflow.ResolvedAssigneeDto dto) {
+        return new UserWorkloadProjection() {
+            @Override public Long getUserId() { return dto.getUserId(); }
+            @Override public String getEmail() { return dto.getEmail(); }
+            @Override public Long getWorkload() { return dto.getWorkload(); }
+            @Override public String getUsername() { return dto.getUsername(); }
+        };
+    }
+
+    private ApplicationMaster createApplicationMaster(String applicationNumber, Long userId, String status) {
+        ApplicationMaster master = new ApplicationMaster();
+        master.setApplicationNumber(applicationNumber);
+        master.setServiceCode(SERVICE_CODE);
+        master.setApplicantUserId(userId);
+        master.setCurrentStatus(status);
+        master.setSubmittedOn(LocalDateTime.now());
+        return applicationMasterRepository.save(master);
+    }
+
+    private void validateSubmission(
+            EnvironmentClearanceRenewalRequestDTO request
+    ) {
+
+        if (request.getServiceType() == null) {
+            throw new IllegalArgumentException(
+                    "Service type is required"
+            );
+        }
+
+        boolean isLeaseType = request.getServiceType().equals("MINING LEASE")
+                || request.getServiceType().equals("QUARRY LEASE");
+
+        // Location/Area/Previous EC only apply to Surface Collection renewals —
+        // the applicant form never collects them for Mining/Quarry Lease renewals.
+        if (!isLeaseType) {
+
+            if (request.getLocation() == null ||
+                    request.getLocation().isBlank()) {
+                throw new IllegalArgumentException(
+                        "Location is required"
+                );
+            }
+
+            if (request.getArea() == null ||
+                    request.getArea().isBlank()) {
+                throw new IllegalArgumentException(
+                        "Area is required"
+                );
+            }
+
+            if (request.getPreviousEcFileId() == null) {
+                throw new IllegalArgumentException(
+                        "Previous EC file is required"
+                );
+            }
+        }
+
+        if (request.getSelfMonitoringReportFileId() == null) {
+            throw new IllegalArgumentException(
+                    "Self monitoring report is required"
+            );
+        }
+    }
+
+    private void routeApplication(
+            EnvironmentClearanceRenewal entity
+    ) {
+
+        if (Objects.equals(entity.getServiceType(), "MINING LEASE") || Objects.equals(entity.getServiceType(), "QUARRY LEASE")) {
+
+            entity.setStatus(
+                    "ASSIGNED TO MD"
+            );
+
+        } else {
+
+            entity.setStatus(
+                    "ASSIGNED TO MPCD"
+            );
+        }
+    }
+
+    private synchronized String generateApplicationNumber() {
+
+        int year = Year.now().getValue();
+
+        String prefix = String.format("ECR-%d-", year);
+
+        // Query t_application_master — it is always written first,
+        // so it is the authoritative source of which numbers are taken.
+        // Querying the service table would miss numbers from failed
+        // transactions where ApplicationMaster committed but the entity did not.
+        Integer maxSequence =
+                applicationMasterRepository
+                        .findMaxSequenceByApplicationNumberPrefix(prefix);
+
+        long nextSequence =
+                (maxSequence == null ? 0 : maxSequence) + 1;
+
+        return String.format(
+                "ECR-%d-%06d",
+                year,
+                nextSequence
+        );
+    }
+
+    private UserWorkloadProjection assignMD(Long regionId) {
+
+        UserWorkloadProjection md =
+                renewalEnvironmentalClearanceRepository.findMDEnvironmentalClearance(regionId);
+
+        return md;
+    }
+
+    private UserWorkloadProjection assignMPCD(Long regionId) {
+
+        UserWorkloadProjection mpcd =
+                renewalEnvironmentalClearanceRepository.findMPCDEnvironmentalClearance(regionId);
+
+        return mpcd;
+    }
+
+    private void createTask(ApplicationMaster master, EnvironmentClearanceRenewal application, String role, Long userId, Long directorId) {
+        LocalDateTime now = LocalDateTime.now();
+
+        TaskManagement task = new TaskManagement();
+        task.setApplicationNumber(application.getApplicationNo());
+        task.setServiceCode(SERVICE_CODE);
+        task.setAssignedToRole(role);
+        task.setAssignedByUserId(userId);
+        task.setAssignedToUserId(directorId);
+        task.setAssignedAt(now);
+        task.setTaskStatus(master.getCurrentStatus());
+
+        task.setCreatedBy(userId);
+
+        taskManagementRepository.save(task);
+        log.info("Created task for role {}", role);
+    }
+
+    @Override
+    public EnvironmentClearanceRenewalResponseDTO reviewApplicationMPCD(
+            ReviewEnvironmentClearanceMPCDRequest request,
+            Long userId
+    ) {
+
+        EnvironmentClearanceRenewal entity =
+                renewalEnvironmentalClearanceRepository
+                        .findById(request.getRenewalId())
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Application not found"
+                                ));
+
+        Long regionId = resolveRegionId(entity);
+
+        ApplicationMaster applicationMaster = entity.getApplicationMaster();
+
+        validateMPCDAssignment(entity, userId);
+
+        if (request.getMpcdSiteReportFileId() != null) {
+            entity.setMpcdSiteReportFileId(
+                    request.getMpcdSiteReportFileId()
+            );
+            entity.setMpcdReportSubmittedOn(
+                    LocalDateTime.now()
+            );
+        }
+
+        if (request.getAdditionalRemarks() != null) {
+            entity.setRemarkMPCD(
+                    request.getAdditionalRemarks()
+            );
+
+            entity.setLatestRemarks(request.getAdditionalRemarks());
+        }
+
+        if (Boolean.TRUE.equals(request.getSubmitIOM())) {
+
+            validateIOMSubmission(request);
+
+            entity.setIomFileId(request.getIomFileId());
+            entity.setSignedEcFileId(request.getSignedEcFileId());
+            entity.setEcFeeAmount(request.getEcFeeAmount());
+            entity.setEcExpiryDate(request.getEcExpiryDate());
+            entity.setEcNumber(request.getEcNumber());
+            entity.setIomSubmittedOn(LocalDateTime.now());
+
+            // Only actually route through a payment step if the EC fee is enabled —
+            // otherwise this behaves exactly like "no payment required at all" and
+            // goes straight to MD assignment, matching current/legacy behavior.
+            PaymentMaster ecFeeRow = paymentMasterRepository
+                    .resolveApplicable(PAYMENT_SERVICE_CODE, EC_FEE_TYPE, "PAYMENT_PENDING")
+                    .orElse(null);
+            boolean ecFeeEnabled = ecFeeRow != null && Boolean.TRUE.equals(ecFeeRow.getIsEnabled());
+
+            if (ecFeeEnabled && paymentEnabled) {
+
+                entity.setStatus("PAYMENT_PENDING");
+
+                applicationMaster.setCurrentStatus(entity.getStatus());
+                applicationMasterRepository.save(applicationMaster);
+
+                EnvironmentClearanceRenewal saved =
+                        renewalEnvironmentalClearanceRepository.save(entity);
+
+                notificationClient.sendUserNotification(
+                        "Renewal environmental clearance fee payment required.",
+                        "Your environmental clearance renewal application " + entity.getApplicationNo()
+                                + " has been reviewed. Please pay the EC fee to proceed.",
+                        entity.getCreatedBy(),
+                        MENU_ID_APPLICANT, "CITIZEN", true, entity.getApplicationNo());
+
+                return environmentClearanceRenewalMapper.toResponseDTO(saved);
+            }
+
+            EnvironmentClearanceRenewal saved =
+                    assignMDAfterIOM(entity, applicationMaster, regionId, userId);
+
+            return environmentClearanceRenewalMapper.toResponseDTO(saved);
+
+        } else if (Boolean.TRUE.equals(request.getApproveApplication())) {
+
+            entity.setStatus("APPROVED_BY_MPCD");
+            entity.setMpcdApprovedOn(LocalDateTime.now());
+
+        } else {
+
+            entity.setStatus("UNDER_MPCD_REVIEW");
+        }
+
+        applicationMaster.setCurrentStatus(entity.getStatus());
+        applicationMasterRepository.save(applicationMaster);
+
+        EnvironmentClearanceRenewal saved =
+                renewalEnvironmentalClearanceRepository
+                        .save(entity);
+
+        return environmentClearanceRenewalMapper
+                .toResponseDTO(saved);
+    }
+
+    private void validateIOMSubmission(
+            ReviewEnvironmentClearanceMPCDRequest request
+    ) {
+
+        if (request.getIomFileId() == null) {
+            throw new BusinessException(
+                    "IOM file is required"
+            );
+        }
+    }
+
+    private Long resolveRegionId(EnvironmentClearanceRenewal entity) {
+
+        Long regionId = 0L;
+
+        if (entity.getServiceType().equals("MINING LEASE") || entity.getServiceType().equals("QUARRY LEASE")) {
+
+            if (entity.getServiceType().equals("MINING LEASE")) {
+                Optional<MiningLeaseApplication> application =
+                        miningLeaseApplicationRepository.findByApplicationNumber(entity.getSiteApplicationNo());
+
+                if (application.isPresent()) {
+                    regionId = application.get().getRegionId();
+                }
+            }
+
+            if (entity.getServiceType().equals("QUARRY LEASE")) {
+                Optional<QuarryLeaseApplication> application =
+                        queryLeaseApplicationRepository.findByApplicationNumber(entity.getSiteApplicationNo());
+
+                if (application.isPresent()) {
+                    regionId = application.get().getRegionId();
+                }
+            }
+        } else {
+            Optional<SurfaceCollectionPermitEntity> surfaceCollectionPermitEntity =
+                    surfaceCollectionPermitRepository.findByApplicationNo(
+                            entity.getSiteApplicationNo()
+                    );
+
+            if (surfaceCollectionPermitEntity.isPresent()) {
+                regionId = surfaceCollectionPermitEntity.get().getRegionId();
+            }
+        }
+
+        return regionId;
+    }
+
+    /**
+     * Assigns the IOM to a Mining Engineer/MD and notifies both sides. Used both when no
+     * EC-fee payment gate applies (IOM submission goes straight through) and when a payment
+     * gate applies (called from {@link #onEcPaymentConfirmed} once the fee is paid).
+     */
+    private EnvironmentClearanceRenewal assignMDAfterIOM(
+            EnvironmentClearanceRenewal entity,
+            ApplicationMaster applicationMaster,
+            Long regionId,
+            Long assignerUserId
+    ) {
+
+        entity.setStatus("IOM_SUBMITTED");
+
+        UserWorkloadProjection assignedMD = assignMD(regionId);
+
+        if (assignedMD == null) {
+            assignedMD = assignMD(9L);
+        }
+        entity.setAssignedMDId(assignedMD.getUserId());
+
+        applicationMaster.setCurrentStatus(entity.getStatus());
+        applicationMasterRepository.save(applicationMaster);
+
+        EnvironmentClearanceRenewal saved =
+                renewalEnvironmentalClearanceRepository.save(entity);
+
+        createTask(applicationMaster, saved, "MINING ENGINEER", assignerUserId, assignedMD.getUserId());
+
+        notificationClient.sendEnvironmentalClearanceAssignmentNotification(
+                assignedMD.getEmail(),
+                assignedMD.getUsername(),
+                entity.getApplicationNo(),
+                "REVIEW IOM");
+
+        notificationClient.sendUserNotification(
+                "Renewal environmental clearance IOM has been assigned.",
+                "An IOM for environmental clearance renewal has been forwarded for your review. Application No. " + entity.getApplicationNo(),
+                assignedMD.getUserId(),
+                MENU_ID_MINING_ENGINEER, "STAFF", true, entity.getApplicationNo());
+
+        return saved;
+    }
+
+    @Override
+    @Transactional
+    public EnvironmentClearanceRenewalResponseDTO payEcFee(Long renewalId, Long userId) {
+
+        EnvironmentClearanceRenewal entity =
+                renewalEnvironmentalClearanceRepository
+                        .findById(renewalId)
+                        .orElseThrow(() -> new RuntimeException("Application not found"));
+
+        if (!entity.getCreatedBy().equals(userId)) {
+            throw new CustomRuntimeException("You are not authorized to pay for this application");
+        }
+
+        if (!"PAYMENT_PENDING".equals(entity.getStatus())) {
+            throw new CustomRuntimeException("EC fee can only be paid while the application is awaiting payment");
+        }
+
+        PaymentMaster ecFeeRow = paymentMasterRepository
+                .resolveApplicable(PAYMENT_SERVICE_CODE, EC_FEE_TYPE, "PAYMENT_PENDING")
+                .orElse(null);
+        boolean ecFeeEnabled = ecFeeRow != null && Boolean.TRUE.equals(ecFeeRow.getIsEnabled());
+
+        if (!ecFeeEnabled || !paymentEnabled) {
+            onEcPaymentConfirmed(entity.getApplicationNo());
+            EnvironmentClearanceRenewal refreshed =
+                    renewalEnvironmentalClearanceRepository.findById(renewalId).orElseThrow();
+            return environmentClearanceRenewalMapper.toResponseDTO(refreshed);
+        }
+
+        CitizenApplicantProjection applicant =
+                renewalEnvironmentalClearanceRepository.findApplicantDetails(entity.getCreatedBy());
+
+        PaymentInitiationRequest.PaymentItemRequest item = new PaymentInitiationRequest.PaymentItemRequest();
+        item.setFeeType(EC_FEE_TYPE);
+        item.setServiceCode(PAYMENT_SERVICE_CODE);
+        item.setDescription("Environmental Clearance Renewal Fee");
+        item.setQuantity(1);
+        // amount intentionally left unset — resolved server-side from payment_master.amount
+
+        PaymentInitiationRequest req = new PaymentInitiationRequest();
+        req.setApplicationId(entity.getApplicationNo());
+        req.setApplicationType(SERVICE_CODE);
+        req.setTaxPayerName(applicant != null ? applicant.getFullName() : null);
+        req.setTaxPayerDocumentNo(applicant != null ? applicant.getUsername() : null);
+        req.setTaxPayerNo(applicant != null ? applicant.getUsername() : null);
+        req.setPlatform("MAS");
+        req.setOnPaidStatus("IOM_SUBMITTED_TO_MD");
+        req.setCallbackUrl(selfBaseUrl + "/api/renewal-environmental-clearance/ec-payment-callback");
+        req.setPaymentItems(List.of(item));
+
+        PaymentInitiationResponse paymentResp = mastersPaymentClient.initiate(req);
+
+        EnvironmentClearanceRenewalResponseDTO response =
+                environmentClearanceRenewalMapper.toResponseDTO(entity);
+        response.setRedirectUrl(paymentResp.getRedirectUrl());
+
+        log.info("EC renewal fee payment initiated for application {}", entity.getApplicationNo());
+
+        return response;
+    }
+
+    /**
+     * Called by the masters payment service once the EC renewal fee payment is confirmed as
+     * PAID. No JWT required — internal service call from mas-backend-masters.
+     */
+    @Override
+    @Transactional
+    public void onEcPaymentConfirmed(String applicationNo) {
+
+        EnvironmentClearanceRenewal entity =
+                renewalEnvironmentalClearanceRepository
+                        .findByApplicationNo(applicationNo)
+                        .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Application not found: " + applicationNo));
+
+        if (!"PAYMENT_PENDING".equals(entity.getStatus())) {
+            log.warn("EC payment callback received for application {} not in PAYMENT_PENDING (status={}), ignoring",
+                    applicationNo, entity.getStatus());
+            return;
+        }
+
+        entity.setPaymentCompletedOn(LocalDateTime.now());
+
+        ApplicationMaster applicationMaster = entity.getApplicationMaster();
+        Long regionId = resolveRegionId(entity);
+
+        assignMDAfterIOM(entity, applicationMaster, regionId, entity.getAssignedMPCDId());
+
+        log.info("EC renewal fee payment confirmed — application {} forwarded to MD", applicationNo);
+    }
+
+    private void validateMPCDAssignment(
+            EnvironmentClearanceRenewal entity,
+            Long userId
+    ) {
+
+        if (entity.getAssignedMPCDId() == null) {
+            throw new CustomRuntimeException(
+                    "Application is not assigned"
+            );
+        }
+
+        if (!entity.getAssignedMPCDId().equals(userId)) {
+            throw new CustomRuntimeException(
+                    "You are not assigned to this application"
+            );
+        }
+    }
+
+    private void validateRCAssignment(
+            EnvironmentClearanceRenewal entity,
+            Long userId
+    ) {
+
+        if (entity.getAssignedRCId() == null) {
+            throw new CustomRuntimeException(
+                    "Application is not assigned"
+            );
+        }
+
+        if (!entity.getAssignedRCId().equals(userId)) {
+            throw new CustomRuntimeException(
+                    "You are not assigned to this application"
+            );
+        }
+    }
+
+    private void validateMIAssignment(
+            EnvironmentClearanceRenewal entity,
+            Long userId
+    ) {
+
+        if (entity.getAssignedMIId() == null) {
+            throw new CustomRuntimeException(
+                    "Application is not assigned"
+            );
+        }
+
+        if (!entity.getAssignedMIId().equals(userId)) {
+            throw new CustomRuntimeException(
+                    "You are not assigned to this application"
+            );
+        }
+    }
+
+    private void validateMDAssignment(
+            EnvironmentClearanceRenewal entity,
+            Long userId
+    ) {
+
+        if (entity.getAssignedMDId() == null) {
+            throw new CustomRuntimeException(
+                    "Application is not assigned"
+            );
+        }
+
+        if (!entity.getAssignedMDId().equals(userId)) {
+            throw new CustomRuntimeException(
+                    "You are not assigned to this application"
+            );
+        }
+    }
+
+    @Override
+    public SuccessResponse<List<EnvironmentClearanceRenewalResponseDTO>>
+    getAssignedToMPCD(
+            Long userId,
+            Pageable pageable,
+            String search
+    ) {
+
+        List<String> ApplicationStatus = List.of(
+                "EC_RENEWED");
+
+        Page<EnvironmentClearanceRenewal> page;
+
+        if (search == null || search.isBlank()) {
+
+            page = renewalEnvironmentalClearanceRepository
+                    .findByAssignedMPCDIdAndStatusNotIn(
+                            userId,
+                            ApplicationStatus,
+                            pageable
+                    );
+
+        } else {
+
+            page = renewalEnvironmentalClearanceRepository
+                    .findByAssignedMPCDIdAndApplicationNoContainingIgnoreCaseAndStatusNotIn(
+                            userId,
+                            search,
+                            ApplicationStatus,
+                            pageable
+                    );
+        }
+
+        List<EnvironmentClearanceRenewalResponseDTO> response =
+                page.getContent()
+                        .stream()
+                        .map(environmentClearanceRenewalMapper::toResponseDTO)
+                        .toList();
+
+        return new SuccessResponse<>(
+                "Assigned applications retrieved successfully",
+                response
+        );
+    }
+
+    @Override
+    public void reassignTaskMPCD(
+            ReassignTaskRequest request,
+            Long userId
+    ) {
+
+        List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(),"MPCD","ASSIGNED TO MPCD", SERVICE_CODE);
+        if (task.isEmpty()) {
+            throw new BusinessException("No Task Found");
+        }
+
+        for(TaskManagement taskManagement : task) {
+            taskManagement.setAssignedToUserId(request.getNewAssigneeUserId());
+            taskManagement.setAssignedByUserId(userId);
+            taskManagement.setAssignedAt(LocalDateTime.now());
+            taskManagement.setReassignmentCount(taskManagement.getReassignmentCount() + 1);
+            taskManagement.setActionRemarks(request.getRemarks());
+        }
+
+        taskManagementRepository.saveAll(task);
+
+        EnvironmentClearanceRenewal entity =
+                renewalEnvironmentalClearanceRepository
+                        .findByApplicationNo(
+                                request.getApplicationNumber()
+                        )
+                        .orElseThrow(() ->
+                                new BusinessException(
+                                        "Application not found"
+                                ));
+
+        entity.setAssignedMPCDId(
+                request.getNewAssigneeUserId()
+        );
+
+        if(request.getRemarks() != null) {
+            entity.setLatestRemarks(request.getRemarks());
+        }
+
+        renewalEnvironmentalClearanceRepository.save(entity);
+
+        TaskManagement firstTask = task.getFirst();
+
+        UserWorkloadProjection userDetails = renewalEnvironmentalClearanceRepository.findUserDetails(request.getNewAssigneeUserId());
+
+        notificationClient.sendTaskRenewalEnvironmentalClearanceReassignmentNotification(
+                userDetails.getEmail(), userDetails.getUsername(),
+                firstTask.getApplicationNumber(),
+                firstTask.getAssignedToRole(),
+                request.getRemarks());
+
+        if(userDetails.getUserId()!= null) {
+            String title = "An new application has been reassigned.";
+            String message = "An application for environmental clearance renewal has been assigned for review. Application No. "+ request.getApplicationNumber()+" Please login in review the application";
+            String serviceId = MENU_ID_MPCD;
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true, request.getApplicationNumber());
+        }else {
+            throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+        }
+
+        log.info("MPCD task {} reassigned to user {}", firstTask.getId(), request.getNewAssigneeUserId());
+    }
+
+
+    /** Tab-count badges for the applicant's own nav-tabs: processing/archived. */
+    public java.util.Map<String, Long> getApplicantCounts(Long userId) {
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("processing", renewalEnvironmentalClearanceRepository.countByApplicantUserIdAndStatusNotIn(userId, List.of("EC_RENEWED")));
+        counts.put("archived", renewalEnvironmentalClearanceRepository.countByCreatedByAndStatusIn(userId, List.of("APPROVED", "REJECTED", "EC_RENEWED")));
+        return counts;
+    }
+
+    /** Tab-count badge for the "archived" tab shared by RC/MI/MD dashboards (agency-user branch) and the base admin view. */
+    public java.util.Map<String, Long> getArchivedCount() {
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("archived", renewalEnvironmentalClearanceRepository.countByStatusIn(List.of("APPROVED", "REJECTED", "EC_RENEWED")));
+        return counts;
+    }
+
+    /** Tab-count badges for the MPCD dashboard's nav-tabs: assigned/archived. */
+    public java.util.Map<String, Long> getMpcdCounts(Long userId) {
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("assigned", renewalEnvironmentalClearanceRepository.countByAssignedMPCDIdAndStatusNotIn(userId, List.of("EC_RENEWED")));
+        counts.put("archived", renewalEnvironmentalClearanceRepository.countByAssignedMPCDIdAndStatusIn(userId, List.of("APPROVED", "REJECTED")));
+        return counts;
+    }
+
+    /** Tab-count badge for the RC dashboard's "assigned" tab (archived comes from the shared getArchivedCount()). */
+    public java.util.Map<String, Long> getRcCounts(Long userId) {
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("assigned", renewalEnvironmentalClearanceRepository.countByAssignedRCIdAndStatusNotIn(userId, List.of("EC_RENEWED")));
+        return counts;
+    }
+
+    /** Tab-count badge for the MI dashboard's "assigned" tab (archived comes from the shared getArchivedCount()). */
+    public java.util.Map<String, Long> getMiCounts(Long userId) {
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("assigned", renewalEnvironmentalClearanceRepository.countByAssignedMIIdAndStatusNotIn(userId, List.of("EC_RENEWED")));
+        return counts;
+    }
+
+    /** Tab-count badge for the MD dashboard's "assigned" tab (archived comes from the shared getArchivedCount()). */
+    public java.util.Map<String, Long> getMdCounts(Long userId) {
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("assigned", renewalEnvironmentalClearanceRepository.countByAssignedMDIdAndStatusNotIn(userId, List.of("EC_RENEWED")));
+        return counts;
+    }
+
+    @Override
+    public Page<EnvironmentClearanceRenewalResponseDTO> getMyApplications(Long userId, Pageable pageable, String search) {
+        List<String> ApplicationStatus = List.of(
+                "EC_RENEWED");
+        Page<EnvironmentClearanceRenewal> applications;
+
+        if (search == null || search.isBlank()) {
+            applications = renewalEnvironmentalClearanceRepository.findByApplicantUserIdAndStatusNotIn(
+                    userId,
+                    ApplicationStatus,
+                    pageable);
+        }
+        else {
+
+            applications = renewalEnvironmentalClearanceRepository.findByAssignedToUserAndSearch(
+                    userId,
+                    ApplicationStatus,
+                    search.trim(),
+                    pageable
+            );
+        }
+        return applications.map(environmentClearanceRenewalMapper::toResponseDTO);
+    }
+
+    @Override
+    public EnvironmentClearanceRenewalResponseDTO getApplicationById(Long id, Long userId) {
+        EnvironmentClearanceRenewal entity =
+                renewalEnvironmentalClearanceRepository
+                        .findById(id)
+                        .orElseThrow(() ->
+                                new RuntimeException("Application not found"));
+
+        boolean isCreator   = userId.equals(entity.getCreatedBy());
+        boolean isAssignedMPCD = userId.equals(entity.getAssignedMPCDId());
+        boolean isAssignedRC   = userId.equals(entity.getAssignedRCId());
+        boolean isAssignedMI   = userId.equals(entity.getAssignedMIId());
+        boolean isAssignedMD   = userId.equals(entity.getAssignedMDId());
+
+        if (!isCreator && !isAssignedMPCD && !isAssignedRC && !isAssignedMI && !isAssignedMD) {
+            throw new CustomRuntimeException("You are not authorized to access this application");
+        }
+
+        EnvironmentClearanceRenewalResponseDTO dto = environmentClearanceRenewalMapper.toResponseDTO(entity);
+
+        // The RC/MI/MPCD site assessment reports and the IOM are the reviewers' internal
+        // working documents — never returned to the applicant/promoter, at any stage.
+        if (isCreator) {
+            dto.setRcSiteReportFileId(null);
+            dto.setMiSiteReportFileId(null);
+            dto.setMpcdSiteReportFileId(null);
+            dto.setIomFileId(null);
+        }
+
+        return dto;
+    }
+
+    /**
+     * Full application detail looked up by its public application number — used by the
+     * Track Applications "View Details" deep link, which must work regardless of who's
+     * currently assigned or what stage the application is in, unlike getApplicationById
+     * above (which restricts to the creator/currently assigned MPCD/RC/MI/MD). Agency
+     * (staff) callers are left unrestricted here for that reason; a CITIZEN caller may
+     * only ever look up their own application, and gets the same internal-field stripping
+     * getApplicationById already applies for the creator.
+     */
+    @Override
+    public EnvironmentClearanceRenewalResponseDTO getApplicationByApplicationNo(String applicationNo, Long userId, boolean isAgencyUser) {
+        EnvironmentClearanceRenewal entity =
+                renewalEnvironmentalClearanceRepository
+                        .findByApplicationNo(applicationNo)
+                        .orElseThrow(() ->
+                                new RuntimeException("Application not found"));
+
+        boolean isCreator = userId.equals(entity.getCreatedBy());
+        if (!isAgencyUser && !isCreator) {
+            throw new CustomRuntimeException("You are not authorized to access this application");
+        }
+
+        EnvironmentClearanceRenewalResponseDTO dto = environmentClearanceRenewalMapper.toResponseDTO(entity);
+        if (isCreator) {
+            dto.setRcSiteReportFileId(null);
+            dto.setMiSiteReportFileId(null);
+            dto.setMpcdSiteReportFileId(null);
+            dto.setIomFileId(null);
+        }
+        return dto;
+    }
+
+    @Override
+    public Page<EnvironmentClearanceRenewalResponseDTO> getArchivedApplications(Pageable pageable, String search, Long userId) {
+        Page<EnvironmentClearanceRenewal> page;
+
+        if (search == null || search.isBlank()) {
+
+            page = renewalEnvironmentalClearanceRepository
+                    .findByStatusIn(
+                            List.of("APPROVED", "REJECTED", "EC_RENEWED"),
+                            pageable
+                    );
+
+        } else {
+
+            page = renewalEnvironmentalClearanceRepository
+                    .findByStatusInAndApplicationNoContainingIgnoreCase(
+                            List.of("APPROVED", "REJECTED", "EC_RENEWED"),
+                            search,
+                            pageable
+                    );
+        }
+
+        return page.map(
+                environmentClearanceRenewalMapper::toResponseDTO
+        );
+    }
+
+    @Override
+    public Page<EnvironmentClearanceRenewalResponseDTO> getMyArchivedApplications(Long userId, Pageable pageable, String search) {
+        Page<EnvironmentClearanceRenewal> page;
+
+        if (search == null || search.isBlank()) {
+
+            page = renewalEnvironmentalClearanceRepository
+                    .findByCreatedByAndStatusIn(
+                            userId,
+                            List.of("APPROVED", "REJECTED", "EC_RENEWED"),
+                            pageable
+                    );
+
+        } else {
+
+            page = renewalEnvironmentalClearanceRepository
+                    .findByCreatedByAndStatusInAndApplicationNoContainingIgnoreCase(
+                            userId,
+                            List.of("APPROVED", "REJECTED", "EC_RENEWED"),
+                            search,
+                            pageable
+                    );
+        }
+
+        return page.map(
+                environmentClearanceRenewalMapper::toResponseDTO
+        );
+    }
+
+    @Override
+    public EnvironmentClearanceRenewalResponseDTO updateDraft(
+            Long id,
+            EnvironmentClearanceRenewalRequestDTO request,
+            Long userId
+    ) {
+
+        EnvironmentClearanceRenewal entity =
+                getOwnedApplication(id, userId);
+
+        validateDraftStatus(entity);
+
+        entity.setServiceType(request.getServiceType());
+        entity.setLocation(request.getLocation());
+        entity.setArea(request.getArea());
+        entity.setPreviousEcFileId(
+                String.valueOf(request.getPreviousEcFileId())
+        );
+        entity.setSelfMonitoringReportFileId(
+                request.getSelfMonitoringReportFileId()
+        );
+
+        EnvironmentClearanceRenewal saved =
+                renewalEnvironmentalClearanceRepository
+                        .save(entity);
+
+        return environmentClearanceRenewalMapper
+                .toResponseDTO(saved);
+    }
+
+    @Override
+    public void deleteDraft(
+            Long id,
+            Long userId
+    ) {
+
+        EnvironmentClearanceRenewal entity =
+                getOwnedApplication(id, userId);
+
+        validateDraftStatus(entity);
+
+        renewalEnvironmentalClearanceRepository
+                .delete(entity);
+    }
+
+    @Override
+    public EnvironmentClearanceRenewalResponseDTO resubmitApplication(
+            Long id,
+            EnvironmentClearanceRenewalRequestDTO request,
+            Long userId
+    ) {
+
+        EnvironmentClearanceRenewal entity =
+                getOwnedApplication(id, userId);
+
+        validateResubmissionStatus(entity);
+
+        entity.setLocation(request.getLocation());
+        entity.setArea(request.getArea());
+        entity.setPreviousEcFileId(
+                String.valueOf(request.getPreviousEcFileId())
+        );
+        entity.setSelfMonitoringReportFileId(
+                request.getSelfMonitoringReportFileId()
+        );
+
+        String pendingRevisionStage = entity.getPendingRevisionStage();
+        String resubmitTitle = "Environmental Clearance Renewal Resubmitted";
+        String resubmitMessage = "Applicant has resubmitted environmental clearance renewal application "
+                + entity.getApplicationNo() + ". Please review.";
+
+        if ("RC".equals(pendingRevisionStage)) {
+
+            entity.setStatus("ASSIGNED_TO_RC");
+            entity.getApplicationMaster()
+                    .setCurrentStatus("ASSIGNED_TO_RC");
+            if (entity.getAssignedRCId() != null) {
+                notificationClient.sendUserNotification(resubmitTitle, resubmitMessage, entity.getAssignedRCId(), MENU_ID_RC, "STAFF", true, entity.getApplicationNo());
+            }
+
+        } else if ("MI".equals(pendingRevisionStage)) {
+
+            entity.setStatus("ASSIGNED_TO_MI");
+            entity.getApplicationMaster()
+                    .setCurrentStatus("ASSIGNED_TO_MI");
+            if (entity.getAssignedMIId() != null) {
+                notificationClient.sendUserNotification(resubmitTitle, resubmitMessage, entity.getAssignedMIId(), MENU_ID_MI, "STAFF", true, entity.getApplicationNo());
+            }
+
+        } else if ("MD".equals(pendingRevisionStage)) {
+
+            entity.setStatus("UNDER_MD_REVIEW");
+            entity.getApplicationMaster()
+                    .setCurrentStatus("UNDER_MD_REVIEW");
+            if (entity.getAssignedMDId() != null) {
+                notificationClient.sendUserNotification(resubmitTitle, resubmitMessage, entity.getAssignedMDId(), MENU_ID_MINING_ENGINEER, "STAFF", true, entity.getApplicationNo());
+            }
+
+        } else {
+
+            routeApplication(entity);
+            entity.getApplicationMaster()
+                    .setCurrentStatus(entity.getStatus());
+            if (entity.getAssignedMPCDId() != null) {
+                notificationClient.sendUserNotification(resubmitTitle, resubmitMessage, entity.getAssignedMPCDId(), MENU_ID_MPCD, "STAFF", true, entity.getApplicationNo());
+            }
+        }
+
+        entity.setPendingRevisionStage(null);
+
+        EnvironmentClearanceRenewal saved =
+                renewalEnvironmentalClearanceRepository
+                        .save(entity);
+
+        return environmentClearanceRenewalMapper
+                .toResponseDTO(saved);
+    }
+
+    @Override
+    public Page<EnvironmentClearanceRenewalResponseDTO>
+    getArchivedApplicationsMPCD(
+            Long userId,
+            Pageable pageable,
+            String search
+    ) {
+
+        List<String> archivedStatuses = List.of(
+                "APPROVED",
+                "REJECTED"
+        );
+
+        Page<EnvironmentClearanceRenewal> page;
+
+        if (search == null || search.isBlank()) {
+
+            page = renewalEnvironmentalClearanceRepository
+                    .findByAssignedMPCDIdAndStatusIn(
+                            userId,
+                            archivedStatuses,
+                            pageable
+                    );
+
+        } else {
+
+            page = renewalEnvironmentalClearanceRepository
+                    .findByAssignedMPCDIdAndApplicationNoContainingIgnoreCaseAndStatusIn(
+                            userId,
+                            search.trim(),
+                            archivedStatuses,
+                            pageable
+                    );
+        }
+
+        return page.map(
+                environmentClearanceRenewalMapper::toResponseDTO
+        );
+    }
+
+    @Override
+    public EnvironmentClearanceRenewalResponseDTO requestResubmission(
+            RequestResubmissionDTO request,
+            Long userId
+    ) {
+
+        EnvironmentClearanceRenewal entity =
+                renewalEnvironmentalClearanceRepository
+                        .findById(request.getRenewalId())
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Application not found"
+                                ));
+
+        validateMPCDAssignment(entity, userId);
+
+        entity.setRemarkMPCD(request.getRemarks());
+
+        entity.setLatestRemarks(request.getRemarks());
+
+        entity.setStatus("RESUBMISSION_REQUIRED");
+        entity.setPendingRevisionStage("MPCD");
+
+        entity.getApplicationMaster()
+                .setCurrentStatus("RESUBMISSION_REQUIRED");
+
+        if (entity.getCreatedBy() != null) {
+            String title = "Environmental Clearance Renewal Resubmission Required";
+            String message = "Your environmental clearance renewal application " + entity.getApplicationNo()
+                    + " requires resubmission. Remarks: " + request.getRemarks();
+            notificationClient.sendUserNotification(title, message, entity.getCreatedBy(), MENU_ID_APPLICANT, "CITIZEN", true, entity.getApplicationNo());
+        }
+
+        EnvironmentClearanceRenewal saved =
+                renewalEnvironmentalClearanceRepository
+                        .save(entity);
+
+        return environmentClearanceRenewalMapper
+                .toResponseDTO(saved);
+    }
+
+    @Override
+    public EnvironmentClearanceRenewalResponseDTO requestResubmissionRC(
+            RequestResubmissionDTO request,
+            Long userId
+    ) {
+
+        EnvironmentClearanceRenewal entity =
+                renewalEnvironmentalClearanceRepository
+                        .findById(request.getRenewalId())
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Application not found"
+                                ));
+
+        validateRCAssignment(entity, userId);
+
+        entity.setRemarkRC(request.getRemarks());
+
+        entity.setLatestRemarks(request.getRemarks());
+
+        entity.setStatus("RESUBMISSION_REQUIRED");
+        entity.setPendingRevisionStage("RC");
+
+        entity.getApplicationMaster()
+                .setCurrentStatus("RESUBMISSION_REQUIRED");
+
+        if (entity.getCreatedBy() != null) {
+            String title = "Environmental Clearance Renewal Resubmission Required";
+            String message = "Your environmental clearance renewal application " + entity.getApplicationNo()
+                    + " requires resubmission. Remarks: " + request.getRemarks();
+            notificationClient.sendUserNotification(title, message, entity.getCreatedBy(), MENU_ID_APPLICANT, "CITIZEN", true, entity.getApplicationNo());
+        }
+
+        EnvironmentClearanceRenewal saved =
+                renewalEnvironmentalClearanceRepository
+                        .save(entity);
+
+        return environmentClearanceRenewalMapper
+                .toResponseDTO(saved);
+    }
+
+    @Override
+    public EnvironmentClearanceRenewalResponseDTO requestResubmissionMI(
+            RequestResubmissionDTO request,
+            Long userId
+    ) {
+
+        EnvironmentClearanceRenewal entity =
+                renewalEnvironmentalClearanceRepository
+                        .findById(request.getRenewalId())
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Application not found"
+                                ));
+
+        validateMIAssignment(entity, userId);
+
+        entity.setLatestRemarks(request.getRemarks());
+
+        entity.setRemarkMI(request.getRemarks());
+        entity.setStatus("RESUBMISSION_REQUIRED");
+        entity.setPendingRevisionStage("MI");
+
+        entity.getApplicationMaster()
+                .setCurrentStatus("RESUBMISSION_REQUIRED");
+
+        if (entity.getCreatedBy() != null) {
+            String title = "Environmental Clearance Renewal Resubmission Required";
+            String message = "Your environmental clearance renewal application " + entity.getApplicationNo()
+                    + " requires resubmission. Remarks: " + request.getRemarks();
+            notificationClient.sendUserNotification(title, message, entity.getCreatedBy(), MENU_ID_APPLICANT, "CITIZEN", true, entity.getApplicationNo());
+        }
+
+        EnvironmentClearanceRenewal saved =
+                renewalEnvironmentalClearanceRepository
+                        .save(entity);
+
+        return environmentClearanceRenewalMapper
+                .toResponseDTO(saved);
+    }
+
+    @Override
+    public EnvironmentClearanceRenewalResponseDTO requestResubmissionMD(
+            RequestResubmissionDTO request,
+            Long userId
+    ) {
+
+        EnvironmentClearanceRenewal entity =
+                renewalEnvironmentalClearanceRepository
+                        .findById(request.getRenewalId())
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Application not found"
+                                ));
+
+        validateMDAssignment(entity, userId);
+
+        entity.setRemarkMD(request.getRemarks());
+
+        entity.setLatestRemarks(request.getRemarks());
+
+        entity.setStatus("RESUBMISSION_REQUIRED");
+        entity.setPendingRevisionStage("MD");
+
+        entity.getApplicationMaster()
+                .setCurrentStatus("RESUBMISSION_REQUIRED");
+
+        if(Objects.equals(entity.getServiceType(), "MINING_LEASE")
+                || Objects.equals(entity.getServiceType(), "QUARRY_LEASE")){
+
+            if (entity.getCreatedBy() != null) {
+                String title = "Environmental Clearance Renewal Resubmission Required";
+                String message = "Your environmental clearance renewal application " + entity.getApplicationNo()
+                        + " requires resubmission. Remarks: " + request.getRemarks();
+                notificationClient.sendUserNotification(title, message, entity.getCreatedBy(), MENU_ID_APPLICANT, "CITIZEN", true, entity.getApplicationNo());
+            }
+        }else{
+            if (entity.getAssignedMPCDId() != null) {
+                String title = "Environmental Clearance Renewal Resubmission Required";
+                String message = "Your environmental clearance renewal application " + entity.getApplicationNo()
+                        + " requires resubmission. Remarks: " + request.getRemarks();
+                notificationClient.sendUserNotification(title, message, entity.getAssignedMPCDId(), MENU_ID_MPCD, "AGENCY", true, entity.getApplicationNo());
+            }
+        }
+
+        EnvironmentClearanceRenewal saved =
+                renewalEnvironmentalClearanceRepository
+                        .save(entity);
+
+        return environmentClearanceRenewalMapper
+                .toResponseDTO(saved);
+    }
+
+    @Override
+    public EnvironmentClearanceRenewalResponseDTO rejectApplicationMPCD(
+            RejectApplicationDTO request,
+            Long userId
+    ) {
+
+        EnvironmentClearanceRenewal entity =
+                renewalEnvironmentalClearanceRepository
+                        .findById(request.getRenewalId())
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Application not found"
+                                ));
+
+        validateMPCDAssignment(entity, userId);
+
+        entity.setRemarkMPCD(
+                request.getRejectionRemarks()
+        );
+
+        entity.setLatestRemarks(request.getRejectionRemarks());
+
+        entity.setStatus("REJECTED");
+
+        entity.getApplicationMaster()
+                .setCurrentStatus("REJECTED");
+        // Terminal state — mark completion so the citizen tracking dashboard archives it
+        entity.getApplicationMaster()
+                .setCompletedOn(LocalDateTime.now());
+
+        if (entity.getCreatedBy() != null) {
+            String title = "Environmental Clearance Renewal Rejected";
+            String message = "Your environmental clearance renewal application " + entity.getApplicationNo()
+                    + " has been rejected. Reason: " + request.getRejectionRemarks();
+            notificationClient.sendUserNotification(title, message, entity.getCreatedBy(), MENU_ID_APPLICANT, "CITIZEN", false, entity.getApplicationNo());
+        }
+
+        EnvironmentClearanceRenewal saved =
+                renewalEnvironmentalClearanceRepository
+                        .save(entity);
+
+        return environmentClearanceRenewalMapper
+                .toResponseDTO(saved);
+    }
+
+    @Override
+    public EnvironmentClearanceRenewalResponseDTO assignRC(
+            AssignRCRequestDTO request,
+            Long userId
+    ) {
+
+        EnvironmentClearanceRenewal entity =
+                renewalEnvironmentalClearanceRepository
+                        .findById(request.getRenewalId())
+                        .orElseThrow(() ->
+                                new RuntimeException("Application not found"));
+
+        validateMPCDAssignment(entity, userId);
+
+        entity.setAssignedRCId(request.getRcUserId());
+        entity.setRemarkRC(request.getRemarks());
+
+        entity.setLatestRemarks(request.getRemarks());
+
+        entity.setLatestRemarks(request.getRemarks());
+        entity.setStatus("ASSIGNED_TO_RC");
+
+        entity.getApplicationMaster()
+                .setCurrentStatus("ASSIGNED_TO_RC");
+
+        createTask(
+                entity.getApplicationMaster(),
+                entity,
+                "RC",
+                userId,
+                request.getRcUserId()
+        );
+
+        if (request.getRcUserId() != null) {
+            String title = "Environmental Clearance Renewal Assigned for Site Review";
+            String message = "An environmental clearance renewal application has been assigned to you for site review. Application No. " + entity.getApplicationNo();
+            notificationClient.sendUserNotification(title, message, request.getRcUserId(), MENU_ID_RC, "STAFF", true, entity.getApplicationNo());
+        }
+
+        EnvironmentClearanceRenewal saved =
+                renewalEnvironmentalClearanceRepository.save(entity);
+
+        return environmentClearanceRenewalMapper.toResponseDTO(saved);
+    }
+
+    @Override
+    public SuccessResponse<List<EnvironmentClearanceRenewalResponseDTO>>
+    getAssignedToRC(
+            Long userId,
+            Pageable pageable,
+            String search
+    ) {
+
+        Page<EnvironmentClearanceRenewal> page;
+
+        List<String> applicationStatuses = List.of(
+                "EC_RENEWED"
+        );
+
+        if (search == null || search.isBlank()) {
+
+            page = renewalEnvironmentalClearanceRepository
+                    .findByAssignedRCIdAndStatusNotIn(
+                            userId,
+                            applicationStatuses,
+                            pageable
+                    );
+
+        } else {
+
+            page = renewalEnvironmentalClearanceRepository
+                    .findByAssignedRCIdAndApplicationNoContainingIgnoreCaseAndStatusNotIn(
+                            userId,
+                            search.trim(),
+                            applicationStatuses,
+                            pageable
+                    );
+        }
+
+        Page<EnvironmentClearanceRenewalResponseDTO> responsePage =
+                page.map(
+                        environmentClearanceRenewalMapper::toResponseDTO
+                );
+
+        return SuccessResponse.fromPage(
+                "Assigned RC applications retrieved successfully",
+                responsePage
+        );
+    }
+
+    @Override
+    public EnvironmentClearanceRenewalResponseDTO submitRCReport(
+            SubmitRCReportDTO request,
+            Long userId
+    ) {
+
+        EnvironmentClearanceRenewal entity =
+                renewalEnvironmentalClearanceRepository
+                        .findById(request.getRenewalId())
+                        .orElseThrow(() ->
+                                new RuntimeException("Application not found"));
+
+        validateRCAssignment(entity, userId);
+
+        entity.setRcSiteReportFileId(
+                request.getRcSiteReportFileId()
+        );
+
+        entity.setRemarkRC(
+                request.getRemarks()
+        );
+
+        entity.setLatestRemarks(request.getRemarks());
+
+        entity.setRcReportSubmittedOn(
+                LocalDateTime.now()
+        );
+
+        entity.setStatus("RC_REPORT_SUBMITTED");
+
+        entity.getApplicationMaster()
+                .setCurrentStatus("RC_REPORT_SUBMITTED");
+
+        if (entity.getAssignedMPCDId() != null) {
+            String title = "RC Site Report Submitted";
+            String message = "RC has submitted the site report for environmental clearance renewal application "
+                    + entity.getApplicationNo() + ". Please review and proceed.";
+            notificationClient.sendUserNotification(title, message, entity.getAssignedMPCDId(), MENU_ID_MPCD, "STAFF", true, entity.getApplicationNo());
+        }
+
+        EnvironmentClearanceRenewal saved =
+                renewalEnvironmentalClearanceRepository.save(entity);
+
+        return environmentClearanceRenewalMapper.toResponseDTO(saved);
+    }
+
+    @Override
+    public EnvironmentClearanceRenewalResponseDTO assignMI(
+            AssignMIRequestDTO request,
+            Long userId
+    ) {
+
+        EnvironmentClearanceRenewal entity =
+                renewalEnvironmentalClearanceRepository
+                        .findById(request.getRenewalId())
+                        .orElseThrow(() ->
+                                new RuntimeException("Application not found"));
+
+        validateRCAssignment(entity, userId);
+
+        entity.setAssignedMIId(request.getMiUserId());
+        entity.setRemarkMI(request.getRemarks());
+
+        entity.setLatestRemarks(request.getRemarks());
+
+        entity.setStatus("ASSIGNED_TO_MI");
+
+        entity.getApplicationMaster()
+                .setCurrentStatus("ASSIGNED_TO_MI");
+
+        createTask(
+                entity.getApplicationMaster(),
+                entity,
+                "MI",
+                userId,
+                request.getMiUserId()
+        );
+
+        if (request.getMiUserId() != null) {
+            String title = "Environmental Clearance Renewal Assigned for Site Verification";
+            String message = "An environmental clearance renewal application has been assigned to you for site verification. Application No. " + entity.getApplicationNo();
+            notificationClient.sendUserNotification(title, message, request.getMiUserId(), MENU_ID_MI, "STAFF", true, entity.getApplicationNo());
+        }
+
+        EnvironmentClearanceRenewal saved =
+                renewalEnvironmentalClearanceRepository.save(entity);
+
+        return environmentClearanceRenewalMapper.toResponseDTO(saved);
+    }
+
+    @Override
+    public SuccessResponse<List<EnvironmentClearanceRenewalResponseDTO>>
+    getAssignedToMI(
+            Long userId,
+            Pageable pageable,
+            String search
+    ) {
+
+        Page<EnvironmentClearanceRenewal> page;
+
+        List<String> applicationStatuses = List.of(
+                "EC_RENEWED"
+        );
+
+        if (search == null || search.isBlank()) {
+
+            page = renewalEnvironmentalClearanceRepository
+                    .findByAssignedMIIdAndStatusNotIn(
+                            userId,
+                            applicationStatuses,
+                            pageable
+                    );
+
+        } else {
+
+            page = renewalEnvironmentalClearanceRepository
+                    .findByAssignedMIIdAndApplicationNoContainingIgnoreCaseAndStatusNotIn(
+                            userId,
+                            search.trim(),
+                            applicationStatuses,
+                            pageable
+                    );
+        }
+
+        Page<EnvironmentClearanceRenewalResponseDTO> responsePage =
+                page.map(
+                        environmentClearanceRenewalMapper::toResponseDTO
+                );
+
+        return SuccessResponse.fromPage(
+                "Assigned MI applications retrieved successfully",
+                responsePage
+        );
+    }
+
+    @Override
+    public EnvironmentClearanceRenewalResponseDTO submitMIReport(
+            SubmitMIReportDTO request,
+            Long userId
+    ) {
+
+        EnvironmentClearanceRenewal entity =
+                renewalEnvironmentalClearanceRepository
+                        .findById(request.getRenewalId())
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Application not found"
+                                ));
+
+        validateMIAssignment(entity, userId);
+
+        entity.setMiSiteReportFileId(
+                request.getMiSiteReportFileId()
+        );
+
+        entity.setLatestRemarks(request.getRemarks());
+
+        entity.setRemarkMI(
+                request.getRemarks()
+        );
+
+        entity.setMiReportSubmittedOn(
+                LocalDateTime.now()
+        );
+
+        entity.setStatus("MI_REPORT_SUBMITTED");
+
+        entity.getApplicationMaster()
+                .setCurrentStatus("MI_REPORT_SUBMITTED");
+
+        if (entity.getAssignedRCId() != null) {
+            String title = "MI Site Verification Report Submitted";
+            String message = "MI has submitted the site verification report for environmental clearance renewal application "
+                    + entity.getApplicationNo() + ". Please review and proceed.";
+            notificationClient.sendUserNotification(title, message, entity.getAssignedRCId(), MENU_ID_RC, "STAFF", true, entity.getApplicationNo());
+        }
+
+        EnvironmentClearanceRenewal saved =
+                renewalEnvironmentalClearanceRepository
+                        .save(entity);
+
+        return environmentClearanceRenewalMapper
+                .toResponseDTO(saved);
+    }
+
+    @Override
+    public SuccessResponse<List<EnvironmentClearanceRenewalResponseDTO>>
+    getAssignedToMD(Long userId, Pageable pageable, String search) {
+
+        Page<EnvironmentClearanceRenewal> page;
+
+        List<String> statuses = List.of(
+                "EC_RENEWED"
+        );
+
+        if (search == null || search.isBlank()) {
+
+            page = renewalEnvironmentalClearanceRepository
+                    .findByAssignedMDIdAndStatusNotIn(userId, statuses, pageable);
+
+        } else {
+
+            page = renewalEnvironmentalClearanceRepository
+                    .findByAssignedMDIdAndApplicationNoContainingIgnoreCaseAndStatusNotIn(
+                            userId,
+                            search.trim(),
+                            statuses,
+                            pageable
+                    );
+        }
+
+        Page<EnvironmentClearanceRenewalResponseDTO> response =
+                page.map(environmentClearanceRenewalMapper::toResponseDTO);
+
+        return SuccessResponse.fromPage(
+                "MD applications retrieved successfully",
+                response
+        );
+    }
+
+    @Override
+    public EnvironmentClearanceRenewalResponseDTO approveEC(
+            ApproveECRequestDTO request,
+            Long userId
+    ) {
+
+        EnvironmentClearanceRenewal entity =
+                renewalEnvironmentalClearanceRepository
+                        .findById(request.getRenewalId())
+                        .orElseThrow(() -> new RuntimeException("Application not found"));
+
+        validateMDAssignment(entity, userId);
+
+        entity.setEcCertificateFileId(request.getEcCertificateFileId());
+        entity.setEcGeneratedOn(LocalDateTime.now());
+        entity.setMdApprovedOn(LocalDateTime.now());
+
+        if (request.getEcNumber() != null) {
+            entity.setEcNumber(request.getEcNumber());
+        }
+        if (request.getEcFileId() != null) {
+            entity.setEcFileId(request.getEcFileId());
+        }
+        if (request.getEcExpiryDate() != null) {
+            entity.setEcExpiryDate(
+                    Date.from(request.getEcExpiryDate().atStartOfDay(ZoneId.systemDefault()).toInstant())
+            );
+        }
+
+        if (Boolean.TRUE.equals(request.getForwardToDECC())) {
+            entity.setStatus("FORWARDED_TO_DECC");
+        } else {
+            entity.setStatus("EC_RENEWED");
+            // Terminal state — mark completion so the citizen tracking dashboard archives it
+            entity.getApplicationMaster()
+                    .setCompletedOn(LocalDateTime.now());
+        }
+
+        if (entity.getServiceType().equals("MINING LEASE") || entity.getServiceType().equals("QUARRY LEASE")) {
+
+            if (entity.getServiceType().equals("MINING LEASE")) {
+                Optional<MiningLeaseApplication> application =
+                        miningLeaseApplicationRepository.findByApplicationNumber(entity.getSiteApplicationNo());
+
+                if (application.isPresent()) {
+                   MiningLeaseApplication miningLeaseApplication = application.get();
+
+                   miningLeaseApplication.setECStatus("ACTIVE");
+                   miningLeaseApplication.setEcNumber(entity.getEcNumber());
+                   miningLeaseApplication.setEcExpiryDate(entity.getEcExpiryDate());
+                   miningLeaseApplication.setEcFileId(entity.getEcFileId());
+
+                   miningLeaseApplicationRepository.save(miningLeaseApplication);
+
+
+                }
+            }
+
+            if (entity.getServiceType().equals("QUARRY LEASE")) {
+                Optional<QuarryLeaseApplication> application =
+                        queryLeaseApplicationRepository.findByApplicationNumber(entity.getSiteApplicationNo());
+
+                if (application.isPresent()) {
+                    QuarryLeaseApplication quarryLeaseApplication = application.get();
+
+                    quarryLeaseApplication.setECStatus("ACTIVE");
+                    quarryLeaseApplication.setECExpiryDate(entity.getEcExpiryDate());
+                    quarryLeaseApplication.setEcNumber(entity.getEcNumber());
+                    quarryLeaseApplication.setEcFileId(entity.getEcFileId());
+
+                    queryLeaseApplicationRepository.save(quarryLeaseApplication);
+
+                }
+            }
+        }else{
+
+            Optional<SurfaceCollectionPermitEntity> surfaceCollectionPermitEntity = surfaceCollectionPermitRepository.findByApplicationNo(entity.getSiteApplicationNo());
+
+            if (surfaceCollectionPermitEntity.isPresent()) {
+                SurfaceCollectionPermitEntity surfaceCollectionPermit = surfaceCollectionPermitEntity.get();
+
+                LocalDate ecExpiryDate = entity.getEcExpiryDate() == null
+                        ? null
+                        : entity.getEcExpiryDate()
+                        .toInstant()
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDate();
+
+                surfaceCollectionPermit.setECStatus("ACTIVE");
+                surfaceCollectionPermit.setEcFileId(entity.getEcFileId());
+                surfaceCollectionPermit.setEcNo(entity.getEcNumber());
+                surfaceCollectionPermit.setEcValidUpto(ecExpiryDate);
+                surfaceCollectionPermitRepository.save(surfaceCollectionPermit);
+
+            }
+        }
+
+        entity.getApplicationMaster()
+                .setCurrentStatus(entity.getStatus());
+
+        if (entity.getCreatedBy() != null) {
+            String title;
+            String message;
+            if ("FORWARDED_TO_DECC".equals(entity.getStatus())) {
+                title = "Environmental Clearance Forwarded to DECC";
+                message = "Your environmental clearance renewal application " + entity.getApplicationNo()
+                        + " has been approved and forwarded to DECC.";
+            } else {
+                title = "Environmental Clearance Renewed";
+                message = "Your environmental clearance renewal application " + entity.getApplicationNo()
+                        + " has been approved. EC Number: " + entity.getEcNumber() + ".";
+            }
+            notificationClient.sendUserNotification(title, message, entity.getCreatedBy(), MENU_ID_APPLICANT, "CITIZEN", false, entity.getApplicationNo());
+        }
+
+        EnvironmentClearanceRenewal saved =
+                renewalEnvironmentalClearanceRepository.save(entity);
+
+        return environmentClearanceRenewalMapper.toResponseDTO(saved);
+    }
+
+    private EnvironmentClearanceRenewal getOwnedApplication(
+            Long id,
+            Long userId
+    ) {
+
+        return renewalEnvironmentalClearanceRepository
+                .findByIdAndCreatedBy(id, userId)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Application not found"
+                        ));
+    }
+
+    private void validateOwnership(
+            EnvironmentClearanceRenewal entity,
+            Long userId
+    ) {
+
+        if (!entity.getCreatedBy().equals(userId)) {
+            throw new CustomRuntimeException(
+                    "You are not authorized to access this application"
+            );
+        }
+    }
+
+    private void validateDraftStatus(
+            EnvironmentClearanceRenewal entity
+    ) {
+
+        if (!"DRAFT".equals(entity.getStatus())) {
+            throw new CustomRuntimeException(
+                    "Only draft application can be modified"
+            );
+        }
+    }
+
+    private void validateResubmissionStatus(
+            EnvironmentClearanceRenewal entity
+    ) {
+
+        if (!"RESUBMISSION_REQUIRED".equals(
+                entity.getStatus())) {
+            throw new CustomRuntimeException(
+                    "Application is not in resubmission state"
+            );
+        }
+    }
+}

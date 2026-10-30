@@ -1,0 +1,1071 @@
+package com.mas.gov.bt.mas.primary.services;
+
+import com.mas.gov.bt.mas.primary.utility.CustomRuntimeException;
+
+import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
+import com.mas.gov.bt.mas.primary.dto.request.*;
+import com.mas.gov.bt.mas.primary.dto.response.TemporaryClosureNotificationResponse;
+import com.mas.gov.bt.mas.primary.entity.*;
+import com.mas.gov.bt.mas.primary.exception.BusinessException;
+import com.mas.gov.bt.mas.primary.exception.ResourceNotFoundException;
+import com.mas.gov.bt.mas.primary.integration.MenuIdResolver;
+import com.mas.gov.bt.mas.primary.integration.NotificationClient;
+import com.mas.gov.bt.mas.primary.mapper.TemporaryClosureMapper;
+import com.mas.gov.bt.mas.primary.repository.*;
+import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
+import com.mas.gov.bt.mas.primary.utility.SuccessResponse;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+@Service
+@Slf4j
+@RequiredArgsConstructor
+public class TemporaryClosureService {
+
+    private static final String SERVICE_CODE = "TEMPORARY CLOSURE SERVICE";
+    private static final String SERVICE_ID = "108";
+    private static final int DEFAULT_TAT_DAYS = 2;
+    private static final String SURFACE_COLLECTION_CATEGORY   = "SURFACE_COLLECTION_PERMIT";
+    private static final String STOCK_LIFTING_CATEGORY   = "STOCK_LIFTING";
+
+    // Real sidebar menu ids (permissions.id) per recipient role — used to target
+    // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
+    // NOT the same thing as SERVICE_ID above, which is an unrelated t_application_master.service_id
+    // value (108 is actually the parent "Temporary Closure" folder /temporaryClosure, not a leaf).
+    // Confirmed via DB: children of permissions.id=108 are
+    //   109 = "Temporary Closure Application" (/temporaryclosurelist) — PROMOTOR/citizen
+    //   110 = "RC Closure Application List"   (/rcapproverejectlist)  — RC
+    //   111 = "MI Closure Application List"   (/miverifiactionlist)   — MI
+    private String MENU_ID_APPLICANT = "109";
+    private String MENU_ID_RC = "110";
+    private String MENU_ID_MI = "111";
+
+    private final TemporaryClosureRepository temporaryClosureRepository;
+    private final TaskManagementRepository taskManagementRepository;
+    private final ApplicationMasterRepository  applicationMasterRepository;
+    private final NotificationClient notificationClient;
+    private final MenuIdResolver menuIdResolver;
+    private  final TemporaryClosureMapper TemporaryClosureMapper;
+    private final MiningLeaseApplicationRepository miningLeaseApplicationRepository;
+    private final QuarryLeaseApplicationRepository queryLeaseApplicationRepository;
+    private final ApplicationRevisionHistoryRepository revisionHistoryRepository;
+
+    private final SurfaceCollectionPermitRepository surfaceCollectionPermitRepository;
+
+    private final StockLiftingRepository stockLiftingRepository;
+
+    private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
+
+    private final DzongkhagLookupRepository dzongkhagLookupRepository;
+
+    @jakarta.annotation.PostConstruct
+    private void resolveMenuIds() {
+        MENU_ID_APPLICANT = menuIdResolver.resolve("/temporaryclosurelist", MENU_ID_APPLICANT);
+        MENU_ID_RC = menuIdResolver.resolve("/rcapproverejectlist", MENU_ID_RC);
+        MENU_ID_MI = menuIdResolver.resolve("/miverifiactionlist", MENU_ID_MI);
+    }
+
+    private final SiteProvisioningService siteProvisioningService;
+
+    @Transactional
+    public TemporaryClosureNotificationResponse submitApplication(@Valid TemporaryClosureNotificationRequest request, Long userId, String email, String applicantType) {
+        Optional<MiningLeaseApplication> miningLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationId());
+        Optional<QuarryLeaseApplication> quarryLeaseApplication = queryLeaseApplicationRepository.findByApplicationNumber(request.getApplicationId());
+        Optional<SurfaceCollectionPermitEntity> surfaceCollectionAuctionApplication = surfaceCollectionPermitRepository.findByApplicationNo(request.getApplicationId());
+        Optional<StockLiftingApplication> stockLiftingApplication = stockLiftingRepository.findByApplicationNo(request.getApplicationId());
+
+        MiningLeaseApplication miningLeaseApplication1 = null;
+        QuarryLeaseApplication quarryLeaseApplication1 = null;
+        SurfaceCollectionPermitEntity surfaceCollectionPermitEntity = null;
+        StockLiftingApplication stockLiftingApplicationEntity = null;
+
+        String applicationType = null;
+        String siteName = null;
+
+
+        if (miningLeaseApplication.isPresent()) {
+            miningLeaseApplication1 = miningLeaseApplication.get();
+            miningLeaseApplication1.setCurrentStatus("UNDER-REVIEW-CLOSURE");
+            applicationType = "MINING_LEASE";
+            siteName = miningLeaseApplication1.getNameOfMine();
+            miningLeaseApplicationRepository.save(miningLeaseApplication1);
+
+        }
+        if (quarryLeaseApplication.isPresent()) {
+            quarryLeaseApplication1 = quarryLeaseApplication.get();
+            quarryLeaseApplication1.setCurrentStatus("UNDER-REVIEW-CLOSURE");
+            applicationType = "QUARRY_LEASE";
+            siteName = quarryLeaseApplication1.getNameOfQuarry();
+            queryLeaseApplicationRepository.save(quarryLeaseApplication1);
+        }
+        if (surfaceCollectionAuctionApplication.isPresent()) {
+            surfaceCollectionPermitEntity = surfaceCollectionAuctionApplication.get();
+            surfaceCollectionPermitEntity.setStatus("UNDER-REVIEW-CLOSURE");
+            applicationType  = "SURFACE_COLLECTION_PERMIT";
+            siteName = surfaceCollectionPermitEntity.getNameOfSurfaceCollection();
+            surfaceCollectionPermitRepository.save(surfaceCollectionPermitEntity);
+        }
+        if (stockLiftingApplication.isPresent()) {
+            stockLiftingApplicationEntity = stockLiftingApplication.get();
+            stockLiftingApplicationEntity.setStatus("UNDER-REVIEW-CLOSURE");
+            applicationType  = "STOCK_LIFTING";
+            siteName = stockLiftingApplicationEntity.getNameOfStockLifting();
+            stockLiftingRepository.save(stockLiftingApplicationEntity);
+        }
+
+        if (miningLeaseApplication1 == null && quarryLeaseApplication1 == null && surfaceCollectionPermitEntity == null && stockLiftingApplicationEntity == null){
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Application Detail not found for the given Id.");
+        }
+
+        TemporaryClosureEntity temporaryClosureEntity = new TemporaryClosureEntity();
+        temporaryClosureEntity.setSubmittedAt(LocalDateTime.now());
+        temporaryClosureEntity.setCurrentStatus("SUBMITTED");
+        temporaryClosureEntity.setApplicantUserId(userId);
+        temporaryClosureEntity.setApplicationType(applicationType);
+        temporaryClosureEntity.setNameOfSite(siteName);
+
+        assert miningLeaseApplication1 != null;
+
+        switch (applicationType.toUpperCase()) {
+
+            case "MINING_LEASE" -> {
+                temporaryClosureEntity.setApplicantName(
+                        miningLeaseApplication1.getApplicantName());
+                temporaryClosureEntity.setApplicantCid(
+                        miningLeaseApplication1.getApplicantCid());
+                temporaryClosureEntity.setApplicantContact(
+                        miningLeaseApplication1.getApplicantContact());
+                temporaryClosureEntity.setApplicationId(
+                        miningLeaseApplication1.getApplicationNumber());
+            }
+
+            case "QUARRY_LEASE" -> {
+                assert quarryLeaseApplication1 != null;
+                temporaryClosureEntity.setApplicantName(
+                        quarryLeaseApplication1.getApplicantName());
+                temporaryClosureEntity.setApplicantCid(
+                        quarryLeaseApplication1.getApplicantCid());
+                temporaryClosureEntity.setApplicantContact(
+                        quarryLeaseApplication1.getApplicantContact());
+                temporaryClosureEntity.setApplicationId(
+                        quarryLeaseApplication1.getApplicationNumber());
+            }
+
+            case "SURFACE_COLLECTION_PERMIT" -> {
+                assert surfaceCollectionPermitEntity != null;
+                temporaryClosureEntity.setApplicantName(
+                        surfaceCollectionPermitEntity.getApplicantName());
+                temporaryClosureEntity.setApplicantCid(
+                        surfaceCollectionPermitEntity.getApplicantCid());
+                temporaryClosureEntity.setApplicantContact(
+                        surfaceCollectionPermitEntity.getMobileNo());
+                temporaryClosureEntity.setApplicationId(
+                        surfaceCollectionPermitEntity.getApplicationNo());
+            }
+
+            case "STOCK_LIFTING" -> {
+                assert stockLiftingApplicationEntity != null;
+                temporaryClosureEntity.setApplicantName(
+                        stockLiftingApplicationEntity.getApplicantName());
+                temporaryClosureEntity.setApplicantCid(
+                        stockLiftingApplicationEntity.getApplicantCid());
+                temporaryClosureEntity.setApplicantContact(
+                        stockLiftingApplicationEntity.getApplicantContact());
+                temporaryClosureEntity.setApplicationId(
+                        stockLiftingApplicationEntity.getApplicationNo());
+            }
+
+            default -> throw new BusinessException(
+                    ErrorCodes.INVALID_INPUT_DATA,
+                    "Unsupported application type: " + applicationType
+            );
+        }
+
+        temporaryClosureEntity.setApplicantEmail(email);
+        temporaryClosureEntity.setApplicantType(applicantType);
+
+        // Closure files, reason and duration of closure
+        temporaryClosureEntity.setApplicantFileId(request.getFileId());
+        temporaryClosureEntity.setReasonForClosure(request.getReasonForClosure());
+        temporaryClosureEntity.setNumberOfMonthsForClosure(request.getNumberOfMonthsForClosure());
+        temporaryClosureEntity.setRemarksApplicant(request.getRemarksApplicant());
+        temporaryClosureRepository.save(temporaryClosureEntity);
+
+        // =====================================================
+        // 2. ASSIGN RC
+        // =====================================================
+        Long regionId;
+
+        switch (applicationType.trim().toUpperCase()) {
+
+            case "MINING_LEASE" -> {
+                regionId = miningLeaseApplication1 != null
+                        ? miningLeaseApplication1.getRegionId()
+                        : null;
+            }
+
+            case "QUARRY_LEASE" -> {
+                regionId = quarryLeaseApplication1 != null
+                        ? quarryLeaseApplication1.getRegionId()
+                        : null;
+            }
+
+            case "SURFACE_COLLECTION_PERMIT" -> {
+                regionId = surfaceCollectionPermitEntity != null
+                        ? surfaceCollectionPermitEntity.getRegionId()
+                        : null;
+            }
+
+            case "STOCK_LIFTING" -> {
+                assert stockLiftingApplicationEntity != null;
+                Optional<DzongkhagLookup> dzongkhagLookup = dzongkhagLookupRepository.findById(stockLiftingApplicationEntity.getDzongkhagId());
+                DzongkhagLookup dzongkhagLookupStockLifting = dzongkhagLookup.orElse(null);
+                assert dzongkhagLookupStockLifting != null;
+                regionId = dzongkhagLookupStockLifting.getRegion().getId();
+            }
+
+            default -> throw new BusinessException(
+                    ErrorCodes.INVALID_INPUT_DATA,
+                    "Unsupported application type: " + applicationType
+            );
+        }
+
+        if (regionId == null) {
+            throw new BusinessException(
+                    ErrorCodes.RECORD_NOT_FOUND,
+                    "Region could not be determined for application type: " + applicationType
+            );
+        }
+
+        UserWorkloadProjection assignedRC = assignRC(regionId);
+
+        if (assignedRC == null) {
+            assignedRC = assignRC(9L);
+        }
+
+        // =====================================================
+        // 3. Application master and create task for director
+        // =====================================================
+        // This t_application_master row belongs to the ORIGINAL mining/quarry
+        // lease (that's how site-tagging, sidebar gating, and "my applications"
+        // identify it) — a temporary closure is a status overlay on that same
+        // lease, not a new service, so only currentStatus/completedAt may move.
+        // serviceCode/applicationNumber/serviceId/applicantUserId must stay
+        // exactly as the lease itself set them, or every downstream reader that
+        // keys off serviceCode permanently loses track of this lease
+        //
+        //
+        // =====================================================
+        // 3. APPLICATION MASTER AND CREATE TASK FOR DIRECTOR
+        // =====================================================
+
+        ApplicationMaster master;
+
+        switch (applicationType.trim().toUpperCase()) {
+
+            case "MINING_LEASE" -> {
+                master = miningLeaseApplication1.getApplicationMaster();
+            }
+
+            case "QUARRY_LEASE" -> {
+                master = quarryLeaseApplication1.getApplicationMaster();
+            }
+
+            case "SURFACE_COLLECTION_PERMIT" -> {
+                master = applicationMasterRepository
+                        .findByApplicationNumberAndServiceCode(
+                                temporaryClosureEntity.getApplicationId(),
+                                SURFACE_COLLECTION_CATEGORY
+                        )
+                        .orElseThrow(() -> new BusinessException(
+                                ErrorCodes.RECORD_NOT_FOUND,
+                                "Application master not found for Surface Collection application: "
+                                        + temporaryClosureEntity.getApplicationId()
+                        ));
+            }
+
+            case "STOCK_LIFTING" -> {
+                master = applicationMasterRepository
+                        .findByApplicationNumberAndServiceCode(
+                                temporaryClosureEntity.getApplicationId(),
+                                STOCK_LIFTING_CATEGORY
+                        )
+                        .orElseThrow(() -> new BusinessException(
+                                ErrorCodes.RECORD_NOT_FOUND,
+                                "Application master not found for Stock Lifting application: "
+                                        + temporaryClosureEntity.getApplicationId()
+                        ));
+            }
+
+            default -> throw new BusinessException(
+                    ErrorCodes.INVALID_INPUT_DATA,
+                    "Unsupported application type: " + applicationType
+            );
+        }
+
+        master.setCurrentStatus("SUBMITTED");
+        applicationMasterRepository.save(master);
+
+        temporaryClosureEntity.setApplicationMaster(master);
+
+        createTask(
+                master,
+                temporaryClosureEntity,
+                "RC",
+                userId,
+                assignedRC.getUserId()
+        );
+
+        if (assignedRC.getEmail() != null) {
+            notificationClient.sendMiningLeaseMailToDirectorAssigned(
+                    assignedRC.getEmail(),
+                    assignedRC.getUsername(),
+                    temporaryClosureEntity.getApplicationId());
+        }
+
+        if(assignedRC.getUserId()!= null) {
+            String title = "Temporary closure application has been assigned.";
+            String message = "An application for temporary has been assigned for review. Application No. "+ temporaryClosureEntity.getApplicationId()+" Please login to review the temporary closure application.";
+            String serviceId = MENU_ID_RC;
+            notificationClient.sendUserNotification(title, message, assignedRC.getUserId(), serviceId, "STAFF", true, temporaryClosureEntity.getApplicationId());
+        }else {
+            throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+        }
+
+        return TemporaryClosureMapper.toResponse(temporaryClosureEntity);
+    }
+
+    @Transactional
+    public UserWorkloadProjection assignRC(Long regionId) {
+
+        UserWorkloadProjection rc =
+                temporaryClosureRepository.findRCTemporaryClosure(regionId);
+
+        return rc;
+    }
+
+
+    @Transactional
+    private void createTask(ApplicationMaster master, TemporaryClosureEntity application, String role, Long userId, Long directorId) {
+        LocalDateTime now = LocalDateTime.now();
+
+        TaskManagement task = new TaskManagement();
+        task.setApplicationNumber(application.getApplicationId());
+        task.setServiceCode(SERVICE_CODE);
+        task.setAssignedToRole(role);
+        task.setAssignedByUserId(userId);
+        task.setAssignedToUserId(directorId);
+        task.setAssignedAt(now);
+        task.setTaskStatus(master.getCurrentStatus());
+
+        task.setDeadlineDate(now.plusDays(DEFAULT_TAT_DAYS));
+        task.setCreatedBy(userId);
+
+        taskManagementRepository.save(task);
+        log.info("Created task for role {}", role);
+    }
+
+    /**
+     * Get all applications (for Agency users).
+     */
+    @Transactional(readOnly = true)
+    public Page<TemporaryClosureNotificationResponse> getAllApplications(Long currentUserId, Pageable pageable) {
+
+        Page<TemporaryClosureEntity> applications =
+                temporaryClosureRepository.findApplicationsAssignedToUser(currentUserId, pageable);
+        return applications.map(TemporaryClosureMapper::toListResponse);
+    }
+
+    /**
+     * Get applications for an applicant.
+     */
+    @Transactional(readOnly = true)
+    public long countMyApplications(Long userId) {
+        List<String> ApplicationStatus = List.of(
+                "SUBMITTED",
+                "RC ASSIGNED",
+                "RECTIFICATION BY RC",
+                "RESUBMITTED");
+        return temporaryClosureRepository.countByApplicantUserIdAndStatusIn(userId, ApplicationStatus);
+    }
+
+    public Page<TemporaryClosureNotificationResponse> getMyApplications(Long userId, Pageable pageable, String search) {
+        List<String> ApplicationStatus = List.of(
+                "SUBMITTED",
+                "RC ASSIGNED",
+                "RECTIFICATION BY RC",
+                "RESUBMITTED");
+        Page<TemporaryClosureEntity> applications;
+
+        if (search == null || search.isBlank()) {
+            applications = temporaryClosureRepository.findByApplicantUserIdAndStatusIn(
+                    userId,
+                    ApplicationStatus,
+                    pageable);
+        }
+        else {
+
+            applications = temporaryClosureRepository.findByAssignedToUserAndSearch(
+                    userId,
+                    search.trim(),
+                    pageable
+            );
+        }
+        return applications.map(TemporaryClosureMapper::toListResponse);
+    }
+
+    public long countAssignedToRC(Long userId) {
+        return temporaryClosureRepository.countAssignedToUserRC(userId);
+    }
+
+    public SuccessResponse<List<TemporaryClosureNotificationResponse>> getAssignedToRC(Long userId, Pageable pageable, String search) {
+        Page<TemporaryClosureEntity> page;
+
+        if (search == null || search.isBlank()) {
+
+            page = temporaryClosureRepository
+                    .findAssignedToUserRC(userId, pageable);
+
+        } else {
+
+            page = temporaryClosureRepository
+                    .findAssignedToUserAndSearchRC(
+                            userId,
+                            search.trim(),
+                            pageable
+                    );
+        }
+
+        Page<TemporaryClosureNotificationResponse> responsePage =
+                page.map(TemporaryClosureMapper::toResponse);
+
+        return SuccessResponse.fromPage(
+                "Assigned applications fetched successfully",
+                responsePage
+        );
+    }
+
+    @Transactional
+    public TemporaryClosureNotificationResponse assignApplicationDirector(@Valid AssignedTaskRC request, Long userId) {
+        TemporaryClosureEntity temporaryClosureEntity;
+
+        temporaryClosureEntity = findApplicationById(request.getId());
+        ApplicationMaster applicationMaster ;
+
+        applicationMaster = temporaryClosureEntity.getApplicationMaster();
+        if (request.getMiFocalId() != null ) {
+            temporaryClosureEntity.setCurrentStatus("MI ASSIGNED");
+            temporaryClosureEntity.setRemarksRC(request.getRemarksRC());
+            temporaryClosureEntity.setRcReviewedAt(LocalDateTime.now());
+            applicationMaster.setCurrentStatus("MI ASSIGNED");
+        }
+        applicationMasterRepository.save(applicationMaster);
+        temporaryClosureRepository.save(temporaryClosureEntity);
+
+        if (request.getMiFocalId() != null) {
+            createTask(
+                    applicationMaster,
+                    temporaryClosureEntity,
+                    "MI",
+                    userId,
+                    request.getMiFocalId());
+
+            UserWorkloadProjection userMI = temporaryClosureRepository.findUserDetailsMI(request.getMiFocalId());
+
+            if (temporaryClosureEntity.getApplicantEmail() != null) {
+                notificationClient.sendStatusUpdateNotification(
+                        temporaryClosureEntity.getApplicantEmail(),
+                        temporaryClosureEntity.getApplicantName(),
+                        temporaryClosureEntity.getApplicationId(),
+                        temporaryClosureEntity.getCurrentStatus(),
+                        "MI ASSIGNED");
+            }
+
+            if (userMI != null) {
+                notificationClient.sendAssignmentNotification(
+                        userMI.getEmail(),
+                        userMI.getUsername(),
+                        temporaryClosureEntity.getApplicationId(),
+                        "MI ASSIGNED");
+
+                String title = "A new temporary closure application has been assigned.";
+                String message = "A new temporary closure application has been assigned.";
+                String serviceId = MENU_ID_MI;
+                notificationClient.sendUserNotification(title, message, userMI.getUserId(), serviceId, "STAFF", true, temporaryClosureEntity.getApplicationId());
+            }
+        }
+        return TemporaryClosureMapper.toResponse(temporaryClosureEntity);
+    }
+
+    private TemporaryClosureEntity findApplicationById(Long id) {
+        return temporaryClosureRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Application not found with ID: " + id));
+    }
+
+    @Transactional
+    public TemporaryClosureNotificationResponse reviewApplicationRC(@Valid ReviewTemporaryClosureRCRequest request, Long userId) {
+        log.info("Reviewing temporary closure application by RC user: {}", userId);
+
+        TemporaryClosureEntity app = findApplicationById(request.getId());
+        ApplicationMaster master = app.getApplicationMaster();
+        if (request.getStatus() != null) {
+            switch (request.getStatus()) {
+                case "Approved" -> {
+
+                    LocalDateTime now = LocalDateTime.now();
+
+                    app.setCurrentStatus("TEMPORARY CLOSURE APPROVED");
+                    app.setRemarksRC(request.getRemarks());
+                    app.setLatestRemarks(request.getRemarks());
+                    app.setFileUploadIdRC(request.getFileUploadIdRC());
+                    app.setRcReviewedAt(now);
+                    app.setApprovedAt(now);
+
+                    temporaryClosureRepository.save(app);
+
+                    /*
+                     * Determine service types.
+                     *
+                     * Surface Collection:
+                     *
+                     * ApplicationMaster / Household = SURFACE_COLLECTION_PERMIT
+                     * Site provisioning             = SURFACE_COLLECTION
+                     */
+                    ServiceTypeMapping serviceTypes =
+                            getServiceTypeMapping(app.getApplicationType());
+
+                    String householdServiceType = serviceTypes.householdServiceType();
+                    String siteServiceType = serviceTypes.siteServiceType();
+
+                    /*
+                     * Application Master
+                     */
+                    if (master != null) {
+                        master.setCurrentStatus("TEMPORARY CLOSURE APPROVED");
+                        master.setApprovedAt(now);
+                        master.setCompletedAt(now);
+
+                        applicationMasterRepository.save(master);
+                    }
+
+                    /*
+                     * Update original application status
+                     */
+                    switch (app.getApplicationType().trim().toUpperCase()) {
+
+                        case "MINING_LEASE" -> {
+
+                            MiningLeaseApplication application =
+                                    miningLeaseApplicationRepository
+                                            .findByApplicationNumber(app.getApplicationId())
+                                            .orElseThrow(() -> new BusinessException(
+                                                    ErrorCodes.RECORD_NOT_FOUND,
+                                                    "Mining lease application not found: "
+                                                            + app.getApplicationId()
+                                            ));
+
+                            application.setCurrentStatus("TEMPORARY CLOSURE APPROVED");
+                            application.setUpdatedAt(now);
+                            application.setUpdatedBy(userId);
+
+                            miningLeaseApplicationRepository.save(application);
+                        }
+
+                        case "QUARRY_LEASE" -> {
+
+                            QuarryLeaseApplication application =
+                                    queryLeaseApplicationRepository
+                                            .findByApplicationNumber(app.getApplicationId())
+                                            .orElseThrow(() -> new BusinessException(
+                                                    ErrorCodes.RECORD_NOT_FOUND,
+                                                    "Quarry lease application not found: "
+                                                            + app.getApplicationId()
+                                            ));
+
+                            application.setCurrentStatus("TEMPORARY CLOSURE APPROVED");
+
+                            queryLeaseApplicationRepository.save(application);
+                        }
+
+                        case "SURFACE_COLLECTION_PERMIT" -> {
+
+                            SurfaceCollectionPermitEntity application =
+                                    surfaceCollectionPermitRepository
+                                            .findByApplicationNo(app.getApplicationId())
+                                            .orElseThrow(() -> new BusinessException(
+                                                    ErrorCodes.RECORD_NOT_FOUND,
+                                                    "Surface collection application not found: "
+                                                            + app.getApplicationId()
+                                            ));
+
+                            application.setStatus("TEMPORARY CLOSURE APPROVED");
+
+                            surfaceCollectionPermitRepository.save(application);
+                        }
+
+                        case "STOCK_LIFTING" -> {
+
+                            StockLiftingApplication application =
+                                    stockLiftingRepository
+                                            .findByStockLiftingPermitNo(app.getApplicationId())
+                                            .orElseThrow(() -> new BusinessException(
+                                                    ErrorCodes.RECORD_NOT_FOUND,
+                                                    "Stock lifting application not found: "
+                                                            + app.getApplicationId()
+                                            ));
+
+                            application.setStatus("TEMPORARY CLOSURE APPROVED");
+
+                            stockLiftingRepository.save(application);
+                        }
+
+                        default -> throw new BusinessException(
+                                ErrorCodes.INVALID_INPUT_DATA,
+                                "Unsupported application type: "
+                                        + app.getApplicationType()
+                        );
+                    }
+
+                    /*
+                     * Disable site
+                     *
+                     * IMPORTANT:
+                     * Uses siteServiceType, not householdServiceType.
+                     *
+                     * Surface Collection:
+                     *     SURFACE_COLLECTION
+                     */
+                    siteProvisioningService.setSiteActive(
+                            siteServiceType,
+                            app.getApplicationId(),
+                            false
+                    );
+
+                    /*
+                     * Update household permit threshold
+                     *
+                     * IMPORTANT:
+                     * Uses householdServiceType.
+                     *
+                     * Surface Collection:
+                     *     SURFACE_COLLECTION_PERMIT
+                     */
+                    HouseholdPermitThresholdEntity householdPermitThresholdEntity =
+                            householdPermitThresholdRepository
+                                    .findByApplicationNoAndServiceType(
+                                            app.getApplicationId(),
+                                            householdServiceType
+                                    )
+                                    .orElseThrow(() -> new BusinessException(
+                                            ErrorCodes.RECORD_NOT_FOUND,
+                                            "The application number is not present in household permit table."
+                                    ));
+
+                    householdPermitThresholdEntity.setStatus(
+                            "TEMPORARY CLOSURE APPROVED"
+                    );
+
+                    householdPermitThresholdRepository.save(
+                            householdPermitThresholdEntity
+                    );
+
+                    /*
+                     * Notifications
+                     */
+                    if (app.getApplicantEmail() != null) {
+
+                        notificationClient.sendApprovalNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationId()
+                        );
+                    }
+
+                    if (app.getApplicantUserId() != null) {
+
+                        String title = "Temporary Closure Approved";
+
+                        String message =
+                                "Your temporary closure application "
+                                        + app.getApplicationId()
+                                        + " has been approved.";
+
+                        notificationClient.sendUserNotification(
+                                title,
+                                message,
+                                app.getApplicantUserId(),
+                                MENU_ID_APPLICANT,
+                                "CITIZEN",
+                                false,
+                                app.getApplicationId()
+                        );
+                    }
+                }
+                case "Rectification" -> {
+                    app.setCurrentStatus("RECTIFICATION BY RC");
+                    app.setRemarksRC(request.getRemarks());
+                    app.setLatestRemarks(request.getRemarks());
+                    app.setRcReviewedAt(LocalDateTime.now());
+                    app.setApplicantFileId(null);
+
+                    createRevisionRecord(app, "RC REVIEWED", app.getCurrentStatus(), userId, request.getRemarks() );
+
+                    if (master != null) {
+                        master.setCurrentStatus("RECTIFICATION BY RC");
+                        applicationMasterRepository.save(master);
+                    }
+
+                    if (app.getApplicantEmail() != null) {
+                        assert master != null;
+                        notificationClient.sendRevisionRequestNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationId(),
+                                master.getCurrentStatus(),
+                                request.getRemarks()
+                                );
+                    }
+                    if (app.getApplicantUserId() != null) {
+                        String title = "Temporary Closure Rectification Needed";
+                        String message = "Your temporary closure application " + app.getApplicationId()
+                                + " requires rectification. Please review and resubmit.";
+                        notificationClient.sendUserNotification(title, message, app.getApplicantUserId(), MENU_ID_APPLICANT, "CITIZEN", true, app.getApplicationId());
+                    }
+                    assert master != null;
+                    createTask(master, app, "APPLICANT", userId, app.getApplicantUserId());
+                }
+                default -> throw new IllegalArgumentException("Application status not recognized");
+            }
+            temporaryClosureRepository.save(app);
+        }
+        return TemporaryClosureMapper.toResponse(app);
+    }
+
+    private record ServiceTypeMapping(
+            String householdServiceType,
+            String siteServiceType
+    ) {}
+
+    private ServiceTypeMapping getServiceTypeMapping(String applicationType) {
+
+        return switch (applicationType.trim().toUpperCase()) {
+
+            case "MINING_LEASE" ->
+                    new ServiceTypeMapping(
+                            "MINING_LEASE",
+                            "MINING_LEASE"
+                    );
+
+            case "QUARRY_LEASE" ->
+                    new ServiceTypeMapping(
+                            "QUARRY_LEASE",
+                            "QUARRY_LEASE"
+                    );
+
+            case "SURFACE_COLLECTION_PERMIT" ->
+                    new ServiceTypeMapping(
+                            "SURFACE_COLLECTION_PERMIT",
+                            "SURFACE_COLLECTION"
+                    );
+
+            case "STOCK_LIFTING" ->
+                    new ServiceTypeMapping(
+                            "STOCK_LIFTING",
+                            "STOCK_LIFTING"
+                    );
+
+            default -> throw new BusinessException(
+                    ErrorCodes.INVALID_INPUT_DATA,
+                    "Unsupported application type: " + applicationType
+            );
+        };
+    }
+
+    @Transactional
+    public TemporaryClosureNotificationResponse reviewApplicationMI(@Valid ReviewTemporaryClosureMIRequest request, Long userId) {
+        log.info("Reviewing temporary closure application by mining inspector user: {}", userId);
+
+        TemporaryClosureEntity app = findApplicationById(request.getId());
+        ApplicationMaster master = app.getApplicationMaster();
+
+        if (request.getStatus() != null) {
+            if (request.getStatus().equals("Review")) {
+                LocalDateTime now = LocalDateTime.now();
+                app.setCurrentStatus("MI REVIEWED");
+                app.setRemarksMI(request.getRemarks());
+                app.setLatestRemarks(request.getRemarks());
+                app.setFileIdMI(request.getFileId());
+                app.setMiReviewedAt(now);
+                app.setApprovedAt(now);
+
+                List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(app.getApplicationId(), "MI ASSIGNED", "MI", SERVICE_CODE);
+                Long RCUserId = null;
+                if (taskManagement != null) {
+                    TaskManagement taskManagement1 = taskManagement.getFirst();
+                    RCUserId = taskManagement1.getAssignedToUserId();
+                }
+
+                if (master != null) {
+                    master.setCurrentStatus("MI REVIEWED");
+                    applicationMasterRepository.save(master);
+                }
+                assert master != null;
+                createTask(master, app, "RC", userId, RCUserId);
+
+                if (RCUserId != null) {
+                    String title = "Temporary Closure Reviewed by MI";
+                    String message = "MI has reviewed temporary closure application " + app.getApplicationId()
+                            + ". Please proceed with your review.";
+                    notificationClient.sendUserNotification(title, message, RCUserId, MENU_ID_RC, "STAFF", true, app.getApplicationId());
+                }
+            } else {
+                throw new IllegalArgumentException("Application status not recognized");
+            }
+            temporaryClosureRepository.save(app);
+        }
+        return TemporaryClosureMapper.toResponse(app);
+    }
+
+    public long countAssignedToMI(Long userId) {
+        return temporaryClosureRepository.countAssignedToUserMI(userId);
+    }
+
+    public SuccessResponse<List<TemporaryClosureNotificationResponse>> getAssignedToMI(Long userId, Pageable pageable, String search) {
+        Page<TemporaryClosureEntity> page;
+
+        if (search == null || search.isBlank()) {
+
+            page = temporaryClosureRepository
+                    .findAssignedToUserMI(userId, pageable);
+
+        } else {
+
+            page = temporaryClosureRepository
+                    .findAssignedToUserAndSearchMI(
+                            userId,
+                            search.trim(),
+                            pageable
+                    );
+        }
+
+        Page<TemporaryClosureNotificationResponse> responsePage =
+                page.map(TemporaryClosureMapper::toResponse);
+
+        return SuccessResponse.fromPage(
+                "Assigned applications fetched successfully",
+                responsePage
+        );
+    }
+
+    @Transactional
+    public TemporaryClosureNotificationResponse submitRectification(@Valid TemporaryClosureNotificationRequest request, Long userId) {
+        TemporaryClosureEntity temporaryClosureEntity = temporaryClosureRepository.findByApplicationId(request.getApplicationId());
+        temporaryClosureEntity.setReasonForClosure(request.getReasonForClosure());
+        temporaryClosureEntity.setApplicantFileId(request.getFileId());
+        temporaryClosureEntity.setNumberOfMonthsForClosure(request.getNumberOfMonthsForClosure());
+        temporaryClosureEntity.setRemarksApplicant(request.getRemarksApplicant());
+        temporaryClosureEntity.setCurrentStatus("RESUBMITTED");
+
+        temporaryClosureRepository.save(temporaryClosureEntity);
+
+        ApplicationMaster applicationMaster = temporaryClosureEntity.getApplicationMaster();
+        applicationMaster.setCurrentStatus("RESUBMITTED");
+        applicationMasterRepository.save(applicationMaster);
+
+        List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationId(),"MI ASSIGNED", "MI", SERVICE_CODE);
+        new TaskManagement();
+        TaskManagement taskManagement1;
+        Long MIUserId = null;
+        if (taskManagement != null) {
+            taskManagement1 = taskManagement.getFirst();
+            MIUserId = taskManagement1.getAssignedToUserId();
+
+            createTask(applicationMaster,temporaryClosureEntity, "RESUBMITTED", userId, MIUserId);
+        }
+        UserWorkloadProjection assignedMIDetails = temporaryClosureRepository.findUserDetailsMI(MIUserId);
+        if(assignedMIDetails.getUserId() != null) {
+            String title = "Mining lease application has been assigned for MLA review.";
+            String message = "Mining lease application has been  assigned for MLA review.";
+            String serviceId = MENU_ID_MI;
+            notificationClient.sendUserNotification(title, message, assignedMIDetails.getUserId(), serviceId, "STAFF", true, temporaryClosureEntity.getApplicationId());
+        }
+
+        return  TemporaryClosureMapper.toResponse(temporaryClosureRepository.save(temporaryClosureEntity));
+
+    }
+
+    @Transactional
+    public void reassignTaskRC(@Valid ReassignTaskRequest request, Long userId) {
+        List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(),"SUBMITTED","RC", SERVICE_CODE);
+
+        if (task == null) {
+            throw new CustomRuntimeException("No tasks found");
+        }
+
+        for (TaskManagement taskManagement : task) {
+            taskManagement.setAssignedToUserId(request.getNewAssigneeUserId());
+            taskManagement.setAssignedByUserId(userId);
+            taskManagement.setAssignedAt(LocalDateTime.now());
+            taskManagement.setReassignmentCount(taskManagement.getReassignmentCount() + 1);
+            taskManagement.setActionRemarks(request.getRemarks());
+        }
+        taskManagementRepository.saveAll(task);
+
+        TaskManagement firstTask = task.getFirst();
+
+        UserWorkloadProjection userDetails = miningLeaseApplicationRepository.findUserDetails(request.getNewAssigneeUserId());
+        notificationClient.sendTaskReassignmentNotification(
+                userDetails.getEmail(), userDetails.getUsername(),
+                firstTask.getApplicationNumber(),
+                firstTask.getAssignedToRole(),
+                request.getRemarks());
+
+        if(userDetails.getUserId()!= null) {
+            String title = "An new application has been reassigned.";
+            String message = "An application for temporary closure has been assigned for review. Application No. "+ request.getApplicationNumber()+" Please login in review the application";
+            String serviceId = MENU_ID_RC;
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true, request.getApplicationNumber());
+        }else {
+            throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+        }
+
+        log.info("RC task {} reassigned to user {}", firstTask.getId(), request.getNewAssigneeUserId());
+
+    }
+
+    @Transactional(readOnly = true)
+    public TemporaryClosureNotificationResponse getApplicationByNumber(String applicationNo) {
+        TemporaryClosureEntity application = temporaryClosureRepository.findByApplicationId(applicationNo);
+
+        if(application == null) {
+            throw new CustomRuntimeException(ErrorCodes.RECORD_NOT_FOUND);
+        }
+
+        return TemporaryClosureMapper.toResponse(application);
+    }
+
+    public SuccessResponse<List<TemporaryClosureNotificationResponse>> getAllApplicationAdmin(Pageable pageable, String search) {
+        Page<TemporaryClosureEntity> page;
+
+        if (search == null || search.isBlank()) {
+            page = temporaryClosureRepository.findAll(pageable);
+        } else {
+            page = temporaryClosureRepository.findAllBySearch(search.trim(), pageable);
+        }
+
+        return SuccessResponse.fromPage("Applications fetched successfully", page.map(TemporaryClosureMapper::toResponse));
+    }
+
+    @Transactional
+    public void reassignTaskMI(@Valid ReassignTaskRequest request, Long userId) {
+        List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(),"MI ASSIGNED","MI", SERVICE_CODE);
+
+        if (task == null) {
+            throw new CustomRuntimeException("No tasks found");
+        }
+
+        for (TaskManagement taskManagement : task) {
+            taskManagement.setAssignedToUserId(request.getNewAssigneeUserId());
+            taskManagement.setAssignedByUserId(userId);
+            taskManagement.setAssignedAt(LocalDateTime.now());
+            taskManagement.setReassignmentCount(taskManagement.getReassignmentCount() + 1);
+            taskManagement.setActionRemarks(request.getRemarks());
+        }
+        taskManagementRepository.saveAll(task);
+
+        TaskManagement firstTask = task.getFirst();
+
+        UserWorkloadProjection userDetails = miningLeaseApplicationRepository.findUserDetails(request.getNewAssigneeUserId());
+        notificationClient.sendTaskReassignmentNotification(
+                userDetails.getEmail(), userDetails.getUsername(),
+                firstTask.getApplicationNumber(),
+                firstTask.getAssignedToRole(),
+                request.getRemarks());
+
+        if(userDetails.getUserId()!= null) {
+            String title = "An new application has been reassigned.";
+            String message = "An application for temporary closure has been assigned for review. Application No. "+ request.getApplicationNumber()+" Please login in review the application";
+            String serviceId = MENU_ID_MI;
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true, request.getApplicationNumber());
+        }else {
+            throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+        }
+
+        log.info("MI task {} reassigned to user {}", firstTask.getId(), request.getNewAssigneeUserId());
+    }
+
+
+    @Transactional
+    private void createRevisionRecord(TemporaryClosureEntity miningLeaseApplication, String geologistReview, String geologistRemarks, Long userId, String remarks) {
+        long revisionCount = revisionHistoryRepository.countByApplicationIdAndRevisionStage(miningLeaseApplication.getId(), geologistReview);
+
+        ApplicationRevisionHistory revision = ApplicationRevisionHistory.builder()
+                .applicationId(miningLeaseApplication.getId())
+                .applicationNumber(miningLeaseApplication.getApplicationId())
+                .revisionStage(geologistReview)
+                .revisionNumber((int) revisionCount + 1)
+                .remarks(remarks)
+                .requestedBy(userId)
+                .requestedAt(LocalDateTime.now())
+                .status(geologistRemarks)
+                .createdBy(userId)
+                .build();
+
+        revisionHistoryRepository.save(revision);
+        log.info("Created revision record #{} for application {} at stage {}", revision.getRevisionNumber(), miningLeaseApplication.getApplicationId(), geologistReview);
+    }
+
+    public long countArchivedApplications(Long userId) {
+        List<String> archivedStatuses = List.of("TEMPORARY CLOSURE APPROVED");
+        return temporaryClosureRepository.countArchivedAssignedToUser(userId, archivedStatuses);
+    }
+
+    public long countMyArchivedApplications(Long userId) {
+        List<String> archivedStatuses = List.of("TEMPORARY CLOSURE APPROVED");
+        return temporaryClosureRepository.countByApplicantUserIdAndStatusIn(userId, archivedStatuses);
+    }
+
+    public Page<TemporaryClosureNotificationResponse> getArchivedApplications(Pageable pageable, String search, Long userId) {
+        List<String> archivedStatuses = List.of("TEMPORARY CLOSURE APPROVED");
+        Page<TemporaryClosureEntity> applications;
+
+        if (search == null || search.isBlank()) {
+            applications = temporaryClosureRepository.findArchivedAssignedToUser(
+                    userId,
+                    archivedStatuses,
+                    pageable);
+        }
+        else {
+
+            applications = temporaryClosureRepository.findArchivedAssignedToUserAndSearch(
+                    userId,
+                    archivedStatuses,
+                    search.trim(),
+                    pageable
+            );
+        }
+        return applications.map(TemporaryClosureMapper::toListResponse);
+    }
+
+    public Page<TemporaryClosureNotificationResponse> getMyArchivedApplications(Long userId, Pageable pageable, String search) {
+        List<String> archivedStatuses = List.of("TEMPORARY CLOSURE APPROVED");
+        Page<TemporaryClosureEntity> applications ;
+
+        if (search == null || search.isBlank()) {
+            applications =  temporaryClosureRepository.findByApplicantUserIdAndStatusIn(userId, archivedStatuses, pageable);
+        } else {
+            applications = temporaryClosureRepository.findByApplicantUserIdAndSearch(userId, archivedStatuses, search.trim(), pageable);
+        }
+
+        return applications.map(TemporaryClosureMapper::toListResponse);
+    }
+}

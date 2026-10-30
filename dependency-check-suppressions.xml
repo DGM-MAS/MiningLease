@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+
+    <!--
+      Pass this file to the scan on the command line with the suppression option, naming
+      this file. (NOTE: the option's two leading hyphens are deliberately not written out
+      here - a double hyphen is illegal inside an XML comment and makes this whole file
+      unparseable, which silently disables every suppression in it.)
+      (or, for the Maven plugin, <suppressionFiles> in its configuration).
+
+      Only entries that are demonstrably wrong for this codebase belong here. Anything that is
+      real but accepted goes in Vulnerbility/False Positive and Risk Acceptance Report.xlsx
+      instead, so it stays visible in the scan output and gets re-reviewed each round.
+
+      REMOVED 2026-09-09: the spring-core 6.2.x block (10 CVEs) and the spring-cloud-commons/
+      context 4.x block (CVE-2026-59284). Every MAS backend is now on Spring Boot 4.0.8 /
+      Spring Framework 7.0.9 / Spring Cloud 2025.1.3 (spring-core 7.0.x, spring-cloud-commons
+      5.0.3), which carries the OSS fix for all of them - the jars those rules matched no
+      longer exist, so the findings are resolved at source rather than suppressed.
+    -->
+
+    <suppress>
+        <notes><![CDATA[
+            FALSE POSITIVE. Dependency-Check matches io.projectreactor.netty:reactor-netty-core to
+            cpe:2.3:a:netty:netty by version number alone (1.2.18 / 1.3.x), and then attaches the
+            entire Netty advisory history to it -- 60+ CVEs per service, including CVE-2019-20444/
+            20445 and the netty-codec-http request-smuggling family. The report itself marks the
+            match as low confidence. reactor-netty is a separate Spring project artifact and is not
+            the software those advisories describe.
+
+            EXTENDED 2026-09-10 (VAPT round 6): the same false match now also lands on
+            spring-boot-netty-4.0.8.jar -- Spring Boot 4's own Netty web-server module, whose
+            manifest package is also "netty" -- adding a second identical 65-CVE block on
+            mas-api-gateway. Same reasoning; filePath widened to cover both jars. The real
+            io.netty:* jars (netty-transport 4.2.17 etc.) are still NOT suppressed.
+
+            Scoped to the reactor-netty-core jar by file path on purpose: the real io.netty:* jars
+            it pulls in are NOT suppressed and must keep reporting. Those are managed by the Spring
+            Boot BOM.
+
+            SCOPE NARROWED 2026-08-31: only mas-api-gateway still ships reactor-netty. NDI never
+            used its webflux starter at all (removed), and Quarrying-Lease now runs WebClient on
+            JdkClientHttpConnector with spring-boot-starter-reactor-netty excluded, so the jar is
+            gone from both. The gateway cannot follow them: Spring Cloud Gateway's WebSocketClient
+            bean comes from NettyConfiguration, and without it the context fails to start outright
+            (verified - filteringWebHandler -> websocketRoutingFilter -> no WebSocketClient bean).
+            This rule is kept in the other repos as a safety net in case a webflux starter returns
+            transitively; it currently matches nothing there, which is the intended state.
+        ]]></notes>
+        <filePath regex="true">.*[\/](?:reactor-netty-core|spring-boot-netty)-.*\.jar</filePath>
+        <cpe>cpe:/a:netty:netty</cpe>
+    </suppress>
+
+    <suppress>
+        <notes><![CDATA[
+            FALSE POSITIVE. CVE-2018-1258 is an authorization bypass affecting Spring Security 5.0.5
+            used together with Spring Framework 5.0.5, fixed in 5.0.6 in 2018. The NVD entry carries
+            an open-ended version range, so Dependency-Check re-flags it against every later release
+            indefinitely. Nothing in MAS runs an affected version -- the estate is on Spring
+            Security 7.0.x.
+
+            Affects all backends: core, web, oauth2-resource-server and crypto jars.
+        ]]></notes>
+        <filePath regex="true">.*[\/]spring-security-.*\.jar</filePath>
+        <cve>CVE-2018-1258</cve>
+    </suppress>
+
+    <suppress>
+        <notes><![CDATA[
+            FALSE POSITIVE (wrong component). CVE-2026-53914 is a code-execution flaw in the
+            Kotlin Gradle build cache -- unsafe deserialization of build-cache metadata during a
+            Gradle build, fixed in Kotlin 2.4.20. Dependency-Check attaches it to kotlin-stdlib
+            through the bare cpe:2.3:a:jetbrains:kotlin wildcard (any version below 2.4.20), but
+            the vulnerable code path lives in the Kotlin build tooling, not in kotlin-stdlib.
+            kotlin-stdlib is all that ships in the MAS runtime image -- pulled in transitively
+            via reactor / the Spring Boot BOM -- and it is built with Maven, runs no Gradle and
+            reads no build cache at runtime.
+
+            FIXED AT SOURCE 2026-09-10 (VAPT round 6): mas-api-gateway and mas-backend-master
+            both pin <kotlin.version>2.4.20</kotlin.version>, so kotlin-stdlib now ships at 2.4.20
+            (>= the fix) and this rule matches nothing anywhere. Retained as a dormant safety net
+            in every backend repo in case a transitive drags an older kotlin-stdlib back in.
+        ]]></notes>
+        <filePath regex="true">.*[\/]kotlin-stdlib-.*\.jar</filePath>
+        <cve>CVE-2026-53914</cve>
+    </suppress>
+
+</suppressions>

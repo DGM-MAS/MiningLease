@@ -1,0 +1,4361 @@
+package com.mas.gov.bt.mas.primary.services;
+
+import com.mas.gov.bt.mas.primary.utility.CustomRuntimeException;
+
+import com.mas.gov.bt.mas.primary.client.MastersPaymentClient;
+import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
+import com.mas.gov.bt.mas.primary.dto.payment.PaymentInitiationRequest;
+import com.mas.gov.bt.mas.primary.dto.payment.PaymentInitiationResponse;
+import com.mas.gov.bt.mas.primary.dto.request.*;
+import com.mas.gov.bt.mas.primary.dto.response.ApplicationListResponse;
+import com.mas.gov.bt.mas.primary.dto.response.CapCheckResponse;
+import com.mas.gov.bt.mas.primary.dto.response.MiningLeaseResponse;
+import com.mas.gov.bt.mas.primary.dto.response.TaskManagementAssignedUser;
+import com.mas.gov.bt.mas.primary.entity.*;
+import com.mas.gov.bt.mas.primary.exception.BusinessException;
+import com.mas.gov.bt.mas.primary.exception.ResourceNotFoundException;
+import com.mas.gov.bt.mas.primary.exception.UnauthorizedOperationException;
+import com.mas.gov.bt.mas.primary.integration.NotificationClient;
+import com.mas.gov.bt.mas.primary.integration.SmsClient;
+import com.mas.gov.bt.mas.primary.mapper.MiningLeaseMapper;
+import com.mas.gov.bt.mas.primary.repository.*;
+import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
+import com.mas.gov.bt.mas.primary.utility.SuccessResponse;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.Year;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Core service for mining Lease Application management.
+ */
+@Service
+@Slf4j
+@RequiredArgsConstructor
+public class MiningLeaseService {
+
+    private static final String SERVICE_CODE = "MINING_LEASE";
+    private static final int DEFAULT_TAT_DAYS = 2;
+    //    private static final String SERVICE_NAME = "Mining Lease Application";
+
+    // Real sidebar menu ids (permissions.id) per recipient role — used to target
+    // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
+    // NOT the same thing as SERVICE_CODE / t_application_master.service_id, which is unrelated.
+    // Confirmed against the live DB (children of permissions.id=78 "Mining Lease") and cross-checked
+    // against mas-frontend routes:
+    //   79 = "Promoter Application List"       (/mininglease-application)          — citizen/applicant
+    //   80 = "MPCD Application List"            (/mpcdminingleaseapplicationlist)   — MPCD_FOCAL
+    //   81 = "Geologist Application List"       (/miningleasegeologisapplicantlist) — GEOLOGIST
+    //   82 = "Mining Division Application List" (/mingdivisionlist)                — labeled "Mining
+    //        Division" in the DB, but mas-frontend's mingdivisionlist.ts calls
+    //        /mining-lease/mining-engineer/assigned, i.e. this is actually the MINE ENGINEER queue.
+    //   83 = "Mining Chief Application List"    (/approverejectlist)               — MINING_CHIEF
+    //   84 = "DGM Application List"              (/mlaapplicationlist)              — labeled "DGM" in
+    //        the DB, but mas-frontend's director-dgm/mlaapplicationlist.ts calls
+    //        getdirectorMiningLeaseApplications / mlaApprovedByDirector, i.e. this is the code's
+    //        "DIRECTOR" task role (GR/FMFS/MLA review).
+
+    private static final String MENU_ID_PROMOTER      = "79";
+    private static final String MENU_ID_MPCD          = "80";
+    private static final String MENU_ID_GEOLOGIST     = "81";
+    private static final String MENU_ID_MINE_ENGINEER = "82";
+    private static final String MENU_ID_MINING_CHIEF  = "83";
+    private static final String MENU_ID_DIRECTOR      = "84";
+
+    private final MiningLeaseMapper mapper;
+
+    private final MiningLeaseApplicationRepository miningLeaseApplicationRepository;
+
+    private final DzongkhagLookupRepository dzongkhagLookupRepository;
+
+    private final GewogLookupRepository  gewogLookupRepository;
+
+    private final VillageLookupRepository villageLookupRepository;
+
+    private final PaymentMasterRepository paymentMasterRepository;
+
+    private final ApplicationMasterRepository applicationMasterRepository;
+
+    private final TaskManagementRepository taskManagementRepository;
+
+    private final NotificationClient notificationClient;
+
+    private final SmsClient smsClient;
+
+    private final ApplicationRevisionHistoryRepository revisionHistoryRepository;
+
+    private final MastersPaymentClient mastersPaymentClient;
+
+    private final SiteProvisioningService siteProvisioningService;
+
+    private final SiteMasterRepository siteMasterRepository;
+
+    private final UserActiveSiteRepository userActiveSiteRepository;
+
+    private final FMFSDetailsRepository fmfsDetailsRepository;
+
+    private final WorkflowTrackingService workflowTrackingService;
+
+    private final UserRepository userRepository;
+
+//    private final HouseholdPermitCapConfigRefRepository capConfigRepository;
+
+    private final com.mas.gov.bt.mas.primary.client.WorkflowAssignmentClient workflowAssignmentClient;
+
+    private final HouseholdPermitThresholdEntryRepository thresholdEntryRepository;
+
+//    private static final int DEFAULT_MAX_APPLICATIONS = 2;
+    private static final String THRESHOLD_SERVICE_TYPE = "MINING_LEASE";
+
+    private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
+
+    @Autowired
+    private ExplorationPermitRepository explorationPermitRepository;
+
+    @Value("${app.self.base-url}")
+    private String selfBaseUrl;
+
+    @Value("${payment.enabled:true}")
+    private boolean paymentEnabled;
+
+    /**
+     * Create a new application.
+     * If applicationType is "Draft", save as draft. Otherwise, submit immediately.
+     */
+    @Transactional
+    public MiningLeaseResponse createApplication(
+            MiningLeaseApplicationRequest request,
+            Long userId) {
+
+        log.info("Creating/updating mining lease application for user: {}", userId);
+
+        // A draft may be sparse; a submission may not (PT report 5.9 — empty bodies were
+        // accepted as numbered applications with every field null).
+        boolean isDraft = "Draft".equalsIgnoreCase(request.getApplicationType());
+        if (!isDraft && !"Submitted".equalsIgnoreCase(request.getApplicationType())) {
+            throw new IllegalArgumentException("applicationType must be either 'Draft' or 'Submitted'");
+        }
+        if (!isDraft && (!isNotBlank(request.getApplicantType()) || !isNotBlank(request.getApplicantName()))) {
+            throw new IllegalArgumentException("applicantType and applicantName are required to submit an application");
+        }
+        LocalDateTime now = LocalDateTime.now();
+
+        // ============================================================
+        // 0. Checking if the user has not more than two mining lease
+        // ============================================================
+//            String houseHoldNumber = miningLeaseApplicationRepository.findUserHouseHoldNumber(userId);
+//            Integer miningLeaseCount = miningLeaseApplicationRepository.findLeaseCountForMining(houseHoldNumber);
+
+//            if(miningLeaseCount <=1){
+                // =====================================================
+                // 1. FETCH EXISTING APPLICATION OR CREATE NEW
+                // =====================================================
+                MiningLeaseApplication application =
+                        miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationNo())
+                                .orElse(new MiningLeaseApplication());
+
+                boolean isNew = application.getId() == null;
+
+                // =====================================================
+                // 2. GENERATE APPLICATION NUMBER (ONLY IF NEW)
+                // =====================================================
+                String applicationNumber;
+
+                if (request.getApplicationNo() == null) {
+                    applicationNumber = isDraft
+                            ? generateDraftApplicationNumber()
+                            : generateApplicationNumber();
+                } else {
+//                    if(Objects.equals(request.getApplicationType(), "Submitted") && Objects.equals(application.getCurrentStatus(), "DRAFT")) {
+//                        applicationNumber = generateApplicationNumber();
+//                    }
+
+                        applicationNumber = request.getApplicationNo();
+
+                }
+
+                // =====================================================
+                // 3. CREATE MASTER ONLY FOR NEW APPLICATION
+                // =====================================================
+                if (isNew) {
+                    ApplicationMaster master =
+                            createApplicationMaster(applicationNumber, userId);
+
+                    application.setApplicationNumber(applicationNumber);
+                    application.setApplicationMaster(master);
+                    application.setApplicantUserId(userId);
+                    application.setCreatedBy(userId);
+                    application.setCurrentStatus("DRAFT");
+                    application.setIsActive(true);
+                }
+
+                // =====================================================
+                // 4. UPDATE ENTITY FROM REQUEST (SAFE UPDATE)
+                // =====================================================
+                mapper.updateEntityFromRequest(request, application);
+
+
+                if (request.getDzongkhag() != null && !request.getDzongkhag().isEmpty()) {
+                    DzongkhagLookup dzongkhag = dzongkhagLookupRepository
+                            .findById(request.getDzongkhag())
+                            .orElseThrow(() -> new RuntimeException("Invalid Dzongkhag ID"));
+
+
+                    application.setDzongkhag(dzongkhag);
+                }
+
+                if (request.getGewog() != null && !request.getGewog().isEmpty()) {
+                    GewogLookup gewog = (GewogLookup) gewogLookupRepository
+                            .findByGewogId(request.getGewog())
+                            .orElseThrow(() -> new RuntimeException("Invalid gewog ID"));
+
+                    application.setRegionId(gewog.getRegionalMaster().getId());
+                    application.setGewog(gewog);
+                }
+
+                if (request.getNearestVillage() != null && !request.getNearestVillage().isEmpty()) {
+                    VillageLookup villageLookup = villageLookupRepository
+                            .findByVillageSerialNo(Integer.parseInt(request.getNearestVillage()))
+                            .orElseThrow(() -> new RuntimeException("Invalid village ID"));
+
+                    application.setNearestVillage(villageLookup);
+                }
+
+                application.setUpdatedBy(userId);
+
+                PaymentMaster paymentMaster =
+                        paymentMasterRepository.resolveApplicable(SERVICE_CODE, "APPLICATION_FEE", "SUBMITTED").orElse(null);
+
+                // =====================================================
+                // 5. DRAFT FLOW
+                // =====================================================
+                if (isDraft) {
+
+                    application.setCurrentStatus("DRAFT");
+
+                    // Draft does not trigger workflow or notifications
+                    miningLeaseApplicationRepository.save(application);
+
+                    log.info("Application saved as DRAFT: {}", application.getApplicationNumber());
+
+                    return mapper.toResponse(application);
+                }
+
+                // =====================================================
+                // 6. SUBMIT FLOW
+                // =====================================================
+
+                // Safety checks
+                if (!userId.equals(application.getApplicantUserId())) {
+                    throw new UnauthorizedOperationException(
+                            "You are not authorized to submit this application");
+                }
+
+                boolean feeRequired =
+                        paymentMaster != null &&
+                                Boolean.TRUE.equals(paymentMaster.getIsEnabled());
+
+                if (feeRequired) {
+                    application.setCurrentStatus("PAYMENT PENDING");
+                    application.setApplicationFeesAmount(paymentMaster.getAmount());
+                    application.setApplicationFeesRequired(true);
+                } else {
+                    application.setCurrentStatus("SUBMITTED");
+                }
+
+                application.setSubmittedAt(now);
+                application.setApplicationNumber(applicationNumber);
+                // =====================================================
+                // 6. UPDATE APPLICATION MASTER
+                // =====================================================
+                ApplicationMaster master = application.getApplicationMaster();
+
+                master.setApplicationNumber(applicationNumber);
+                master.setCurrentStatus(application.getCurrentStatus());
+                master.setSubmittedAt(now);
+                applicationMasterRepository.save(master);
+
+                // =====================================================
+                // 9. FINAL SAVE
+                // =====================================================
+                miningLeaseApplicationRepository.save(application);
+
+                if (feeRequired) {
+                    if (!paymentEnabled) {
+                        onPaymentConfirmed(application.getApplicationNumber());
+                        log.info("Payment bypassed (payment.enabled=false) for application {}", application.getApplicationNumber());
+                        return mapper.toResponse(application);
+                    }
+
+                    // Initiate payment — director task is created in onPaymentConfirmed()
+                    PaymentInitiationResponse paymentResp = mastersPaymentClient.initiate(
+                            buildPaymentRequest(application, paymentMaster.getServiceCode()));
+
+                    if (application.getApplicantEmail() != null) {
+                        notificationClient.sendApplicationFeeRequiredNotification(
+                                application.getApplicantEmail(),
+                                application.getApplicantName(),
+                                application.getApplicationNumber());
+                    }
+                    if (application.getApplicantUserId() != null) {
+                        notificationClient.sendUserNotification(
+                                "Application pending for payment",
+                                "Your application will be processed after payment.",
+                                application.getApplicantUserId(),
+                                MENU_ID_PROMOTER, "CITIZEN", false, application.getApplicationNumber());
+                    }
+
+                    MiningLeaseResponse response = mapper.toResponse(application);
+                    response.setRedirectUrl(paymentResp.getRedirectUrl());
+                    log.info("Payment initiated for application {}", application.getApplicationNumber());
+                    return response;
+                }
+
+                // =====================================================
+                // No fee: assign director task immediately
+                // =====================================================
+                List<TaskManagement> getAssignedDirector =
+                        taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+                                application.getApplicationNumber(), "GR SUBMITTED", "DIRECTOR", SERVICE_CODE);
+
+                TaskManagement grTask = getAssignedDirector.getFirst();
+                Long directorId = grTask.getAssignedToUserId();
+
+                createTask(master, application, "DIRECTOR", userId, directorId);
+
+                UserWorkloadProjection directorDetails = miningLeaseApplicationRepository.findUserDetails(directorId);
+
+                if (directorDetails != null) {
+                    if (directorDetails.getEmail() != null) {
+                        notificationClient.sendMiningLeasePFSSubmittedNotification(
+                                application.getApplicantEmail(),
+                                application.getApplicantName(),
+                                application.getApplicationNumber());
+                    }
+                    if (directorDetails.getUserId() != null){
+                        notificationClient.sendUserNotification(
+                                "PFS details submitted by promoter.",
+                                "PFS details for application " + application.getApplicationNumber() + " for Mining Lease has been submitted.",
+                                directorId,
+                                MENU_ID_DIRECTOR,
+                                "STAFF",
+                                true,
+                                application.getApplicationNumber());
+                    }
+                }else {
+                    log.info("Director user details not found. Director User ID: {}", directorId);
+                }
+
+                if (application.getApplicantEmail() != null) {
+                    notificationClient.sendApplicationSubmittedNotification(
+                            application.getApplicantEmail(),
+                            application.getApplicantName(),
+                            application.getApplicationNumber());
+                }
+                if (application.getApplicantUserId() != null) {
+                    notificationClient.sendUserNotification(
+                            "Application submitted",
+                            "Your application " + application.getApplicationNumber() + " for Mining Lease has been submitted.",
+                            application.getApplicantUserId(),
+                            MENU_ID_PROMOTER,
+                            "CITIZEN",
+                            false,
+                            application.getApplicationNumber());
+                }
+
+                log.info("Application submitted successfully: {}", application.getApplicationNumber());
+                return mapper.toResponse(application);
+
+    }
+
+    /**
+     * Called by the payment callback once application fee payment is confirmed as PAID.
+     * Transitions status PAYMENT PENDING → SUBMITTED, creates director task, and notifies.
+     */
+    @Transactional
+    public void onPaymentConfirmed(String applicationNo) {
+        MiningLeaseApplication application = miningLeaseApplicationRepository.findByApplicationNumber(applicationNo)
+                .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Application not found: " + applicationNo));
+
+        application.setCurrentStatus("SUBMITTED");
+        ApplicationMaster master = application.getApplicationMaster();
+        master.setCurrentStatus("SUBMITTED");
+        applicationMasterRepository.save(master);
+        miningLeaseApplicationRepository.save(application);
+
+        List<TaskManagement> grTasks = taskManagementRepository
+                .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+                        applicationNo, "GR SUBMITTED", "DIRECTOR", SERVICE_CODE);
+        if (!grTasks.isEmpty()) {
+            Long directorId = grTasks.getFirst().getAssignedToUserId();
+            createTask(master, application, "DIRECTOR", application.getApplicantUserId(), directorId);
+        }
+
+        if (application.getApplicantEmail() != null) {
+            notificationClient.sendApplicationSubmittedNotification(
+                    application.getApplicantEmail(),
+                    application.getApplicantName(),
+                    applicationNo);
+        }
+        if (application.getApplicantUserId() != null) {
+            notificationClient.sendUserNotification(
+                    "Application submitted",
+                    "Your payment for application " + applicationNo + " has been confirmed.",
+                    application.getApplicantUserId(),
+                    MENU_ID_PROMOTER, "CITIZEN", false, applicationNo);
+        }
+        log.info("Payment confirmed — application {} transitioned to SUBMITTED", applicationNo);
+    }
+
+    private PaymentInitiationRequest buildPaymentRequest(MiningLeaseApplication application, String serviceCode) {
+        PaymentInitiationRequest.PaymentItemRequest item = new PaymentInitiationRequest.PaymentItemRequest();
+        item.setFeeType("APPLICATION_FEE");
+        item.setServiceCode(serviceCode);
+        item.setDescription("Mining Lease Application Fee");
+        item.setQuantity(1);
+
+        String documentNo = resolveDocumentNo(application);
+
+        PaymentInitiationRequest req = new PaymentInitiationRequest();
+        req.setApplicationId(application.getApplicationNumber());
+        req.setApplicationType("MINING_LEASE");
+        req.setTaxPayerName(application.getApplicantName());
+        req.setTaxPayerDocumentNo(documentNo);
+        req.setTaxPayerNo(documentNo);
+        req.setPlatform("MAS");
+        req.setOnPaidStatus("SUBMITTED");
+        req.setCallbackUrl(selfBaseUrl + "/api/mining-lease/payment-callback");
+        req.setPaymentItems(List.of(item));
+        return req;
+    }
+
+    private String resolveDocumentNo(MiningLeaseApplication application) {
+        String type = application.getApplicantType();
+        if (type == null) return application.getApplicantCid();
+        return switch (type.toUpperCase()) {
+            case "REGISTERED_COMPANY" -> application.getCompanyRegistrationNo();
+            case "BUSINESS_LICENSE"   -> application.getLicenseNo();
+            default                   -> application.getApplicantCid();
+        };
+    }
+
+    @Transactional
+    private void createTask(ApplicationMaster master, MiningLeaseApplication application, String role, Long userId, Long directorId) {
+        if (directorId == null) {
+            // No eligible candidate — the resolver already recorded this application in the
+            // escalation queue (see WorkflowAssignmentClient), nothing to create locally.
+            log.info("Skipping task creation for role {} on application {} — escalated, no assignee",
+                    role, application.getApplicationNumber());
+            return;
+        }
+
+        log.debug("Creating task for director ID: {}", directorId);
+        try {
+            LocalDateTime now = LocalDateTime.now();
+
+            TaskManagement task = new TaskManagement();
+            task.setApplicationNumber(application.getApplicationNumber());
+            task.setServiceCode(SERVICE_CODE);
+            task.setAssignedToRole(role);
+            task.setAssignedByUserId(userId);
+            task.setAssignedToUserId(directorId);
+            task.setAssignedAt(now);
+            task.setTaskStatus(master.getCurrentStatus());
+
+            task.setDeadlineDate(now.plusDays(DEFAULT_TAT_DAYS));
+            task.setCreatedBy(userId);
+
+            TaskManagement savedTask = taskManagementRepository.save(task);
+
+            log.info("Task created successfully for role {}: Task ID={}", role, savedTask.getId());
+
+        } catch (Exception ex) {
+            log.error("Error creating task for director", ex);
+            throw new BusinessException(
+                    ErrorCodes.DATABASE_CONNECTION_FAILED,
+                    "Failed to create task assignment",
+                    ex
+            );
+        }
+    }
+
+    @Transactional
+    private ApplicationMaster createApplicationMaster(String applicationNumber, Long userId) {
+        log.debug("Creating ApplicationMaster for application number: {}", applicationNumber);
+        try {
+            ApplicationMaster master = new ApplicationMaster();
+            master.setApplicationNumber(applicationNumber);
+            master.setServiceCode(SERVICE_CODE);
+            master.setApplicantUserId(userId);
+            master.setCurrentStatus("GR SUBMITTED");
+            master.setSubmittedOn(LocalDateTime.now());
+
+            ApplicationMaster savedMaster = applicationMasterRepository.save(master);
+            log.debug("Application Master created with ID: {}", savedMaster.getId());
+            return savedMaster;
+        } catch (Exception ex) {
+            log.error("Error creating application master", ex);
+            throw new BusinessException(
+                    ErrorCodes.DATABASE_CONNECTION_FAILED,
+                    "Failed to create application master",
+                    ex);
+        }
+    }
+
+    @Transactional
+    private synchronized String generateApplicationNumber() {
+        int year = Year.now().getValue();
+        String prefix = String.format("ML-%d-", year);
+
+        // Get max sequence from database for current year
+        Integer maxSequence = miningLeaseApplicationRepository.findMaxSequenceByPrefix(prefix);
+        long nextSequence = (maxSequence == null ? 0 : maxSequence) + 1;
+
+        return String.format("ML-%d-%06d", year, nextSequence);
+    }
+
+    /**
+     * Resolves the application-cap grouping key for a user based on their
+     * t_citizens.registration_type: household_number for INDIVIDUAL, license_no
+     * for BUSINESS_LICENSE, company_registration_number for REGISTERED_COMPANY.
+     * Falls back to the applicant's own CID (for counting) when the natural
+     * key is blank, so applicants with no household/license/company number on
+     * file still get capped individually instead of the check silently doing
+     * nothing. The applicant's real registration type is always returned as
+     * element [2] so the admin-configured cap for that type still applies.
+     * Returns {groupingType, groupingKey, registrationType}.
+     */
+//    private String[] resolveGroupingKey(Long userId) {
+//        return miningLeaseApplicationRepository.findGroupingInfoByUserId(userId)
+//                .map(info -> {
+//                    String rt = info.getRegistrationType();
+//                    if ("INDIVIDUAL".equals(rt) && isNotBlank(info.getHouseholdNumber())) {
+//                        return new String[]{"INDIVIDUAL", info.getHouseholdNumber(), rt};
+//                    }
+//                    if ("BUSINESS_LICENSE".equals(rt) && isNotBlank(info.getLicenseNo())) {
+//                        return new String[]{"BUSINESS_LICENSE", info.getLicenseNo(), rt};
+//                    }
+//                    if ("REGISTERED_COMPANY".equals(rt) && isNotBlank(info.getCompanyRegistrationNumber())) {
+//                        return new String[]{"REGISTERED_COMPANY", info.getCompanyRegistrationNumber(), rt};
+//                    }
+//                    return new String[]{"CID", info.getCid(), rt};
+//                })
+//                .orElse(new String[]{"CID", null, "INDIVIDUAL"});
+//    }
+
+    private boolean isNotBlank(String value) {
+        return value != null && !value.isBlank();
+    }
+
+//    /** Human-readable term for the cap-limit message, matching the grouping key resolved above. */
+//    private String groupingLabel(String groupingType) {
+//        return switch (groupingType) {
+//            case "INDIVIDUAL" -> "household";
+//            case "BUSINESS_LICENSE" -> "business license";
+//            case "REGISTERED_COMPANY" -> "registered company";
+//            default -> "applicant";
+//        };
+//    }
+
+//    private int getMaxAllowedForService(String serviceType, String registrationType) {
+//        String rt = isNotBlank(registrationType) ? registrationType : "INDIVIDUAL";
+//        return capConfigRepository.findByServiceTypeAndRegistrationType(serviceType, rt)
+//                .map(c -> c.getMaxAllowed() != null ? c.getMaxAllowed() : DEFAULT_MAX_APPLICATIONS)
+//                .orElse(DEFAULT_MAX_APPLICATIONS);
+//    }
+
+    /**
+     * Mining lease no longer enforces an application cap — always reports
+     * allowed. Kept as a method (rather than removed) so the controller and
+     * submitGR's guard don't need special-casing, matching the same no-op
+     * pattern used by Stock Lifting's checkCap().
+     */
+    public CapCheckResponse checkCap(Long userId) {
+        return new CapCheckResponse(true, 0, Integer.MAX_VALUE, null);
+    }
+
+    /** Records an ACTIVE entry in the shared threshold table when a lease is finally approved. */
+    private void recordApprovedForThreshold(MiningLeaseApplication app) {
+        if (app.getApplicantCid() == null || app.getApplicantCid().isBlank()) return;
+        if (thresholdEntryRepository.existsByServiceTypeAndApplicationNo(THRESHOLD_SERVICE_TYPE, app.getApplicationNumber())) {
+            return;
+        }
+        HouseholdPermitThresholdEntry entry = new HouseholdPermitThresholdEntry();
+        entry.setApplicantCid(app.getApplicantCid());
+        entry.setServiceType(THRESHOLD_SERVICE_TYPE);
+        entry.setApplicationNo(app.getApplicationNumber());
+        entry.setStatus("ACTIVE");
+        thresholdEntryRepository.save(entry);
+    }
+
+    @Transactional
+    private synchronized String generateDraftApplicationNumber() {
+        int year = Year.now().getValue();
+        String prefix = String.format("DRAFT-%d-", year);
+
+        Integer maxSequence =
+                miningLeaseApplicationRepository.findMaxDraftSequenceByPrefix(prefix);
+
+        long nextSequence = (maxSequence == null ? 0 : maxSequence) + 1;
+
+        return String.format("DRAFT-%d-%06d", year, nextSequence);
+    }
+
+    @Transactional
+    public MiningLeaseResponse submitGR(@Valid MiningLeaseGRRequest request, Long userId) {
+        // 1.
+        // ======== SAVE MINING LEASE GR SUBMITTED BY APPLICANT ====== //
+        MiningLeaseApplication miningLeaseApplication = new MiningLeaseApplication();
+
+        // Validate input
+        validateApplicationRequest(request, userId);
+
+//         ============================================================
+//         0. Checking the applicant hasn't exceeded the configured cap
+//         ============================================================
+        CapCheckResponse cap = checkCap(userId);
+        if (!cap.isAllowed()) {
+            throw new BusinessException(ErrorCodes.DATA_INTEGRITY_VIOLATION, cap.getMessage());
+        }
+
+        miningLeaseApplication.setExpPermitNo(request.getExpPermitNo());
+        miningLeaseApplication.setFileUploadIdGr(request.getGRDocId());
+        miningLeaseApplication.setFileUploadIdKmz(request.getKmzDocId());
+        miningLeaseApplication.setMapFileId(request.getMapFileId());
+        miningLeaseApplication.setAdditionalFileGRId(request.getAdditionalFileGRId());
+        miningLeaseApplication.setApplicationType(request.getApplicationType());
+        miningLeaseApplication.setApplicationNumber(generateApplicationNumber());
+        miningLeaseApplication.setApplicantCid(request.getApplicantCid());
+        miningLeaseApplication.setApplicantUserId(userId);
+        miningLeaseApplication.setApplicantType(request.getApplicantType());
+        miningLeaseApplication.setApplicantEmail(request.getApplicantEmail());
+        miningLeaseApplication.setApplicantName(request.getApplicantName());
+        miningLeaseApplication.setLicenseNo(request.getLicenseNo());
+        miningLeaseApplication.setBusinessLicenseNo(request.getBusinessLicenseNo());
+        miningLeaseApplication.setBusinessName(request.getBusinessName());
+        miningLeaseApplication.setCompanyRegistrationNo(request.getCompanyRegistrationNo());
+        miningLeaseApplication.setCompanyName(request.getCompanyName());
+        miningLeaseApplication.setCurrentStatus("GR SUBMITTED");
+        miningLeaseApplication.setCreatedBy(userId);
+
+        try {
+            miningLeaseApplicationRepository.save(miningLeaseApplication);
+        }catch (Exception ex) {
+            log.error("Error saving mining lease application", ex);
+            throw new BusinessException(
+                    ErrorCodes.DATABASE_CONNECTION_FAILED,
+                    "Failed to save mining lease application",
+                    ex);
+        }
+
+        // =====================================================
+        // 2. ASSIGN DIRECTOR
+        // =====================================================
+        UserWorkloadProjection assignedDirector = assignDirector(
+                miningLeaseApplication.getRegionId(),
+                miningLeaseApplication.getApplicationNumber()
+        );
+
+        // =====================================================
+        // 3. Application master and create task for director
+        // =====================================================
+        ApplicationMaster master = createApplicationMaster(miningLeaseApplication.getApplicationNumber(), userId);
+
+        miningLeaseApplication.setApplicationMaster(master);
+
+        createTask(master,miningLeaseApplication,"DIRECTOR",userId, assignedDirector.getUserId());
+
+        // No eligible director — masters already recorded this in the escalation queue, nothing to notify.
+        if (assignedDirector.getUserId() == null) {
+            return mapper.toResponse(miningLeaseApplication);
+        }
+
+        log.debug("Sending notifications to director: {}", assignedDirector.getUserId());
+
+        try {
+            if (assignedDirector.getEmail() != null && !assignedDirector.getEmail().trim().isEmpty()) {
+                try {
+                    notificationClient.sendMiningLeaseMailToDirectorAssigned(
+                            assignedDirector.getEmail(),
+                            assignedDirector.getUsername(),
+                            miningLeaseApplication.getApplicationNumber());
+                    log.info("Email notification sent to director: {}", assignedDirector.getEmail());
+                } catch (Exception ex) {
+                    log.warn("Failed to send email notification to director", ex);
+                }
+            }
+
+        if(assignedDirector.getUserId()!= null) {
+            try {
+                String title = "Mining lease application has been assigned.";
+                String message = "An application for mining lease has been assigned for review. Application No. " + miningLeaseApplication.getApplicationNumber();
+                String serviceId = MENU_ID_DIRECTOR;
+                notificationClient.sendUserNotification(title, message, assignedDirector.getUserId(), serviceId, "STAFF", true, miningLeaseApplication.getApplicationNumber());
+            }catch (Exception ex) {
+                log.warn("Failed to send in-app notification to director", ex);
+            }
+        }
+        } catch (Exception ex) {
+            log.error("Unexpected error sending notifications", ex);
+        }
+
+        try {
+            if (request.getApplicantEmail() != null && !request.getApplicantEmail().trim().isEmpty()) {
+                try {
+                    notificationClient.sendMiningLeaseGRSubmittedNotification(
+                            request.getApplicantEmail(),
+                            request.getApplicantName(),
+                            miningLeaseApplication.getApplicationNumber());
+
+                    log.info("Email notification sent to Applicant: {}", request.getApplicantEmail());
+
+                } catch (Exception ex) {
+                    log.warn("Failed to send email notification to director", ex);
+                }
+        }
+        }catch (Exception ex) {
+            log.error("Unexpected error sending notifications", ex);
+        }
+
+        return mapper.toResponse(miningLeaseApplication);
+    }
+
+    /**
+     * Resolves the Director to assign a newly-submitted application to, via the
+     * admin-configured mas_db.t_workflow_step rule for (MINING_LEASE, GR SUBMITTED).
+     * When no eligible candidate is found, the returned projection has a null
+     * userId — masters has already recorded it in the escalation queue; callers
+     * must check for that (see createTask()'s null-guard and the notification
+     * blocks below) instead of assuming a real director was always found.
+     */
+    @Transactional
+    public UserWorkloadProjection assignDirector(Long regionId, String applicationNumber) {
+        var resolved = workflowAssignmentClient.resolve(SERVICE_CODE, "GR SUBMITTED", regionId, applicationNumber);
+        return toProjection(resolved);
+    }
+
+    private UserWorkloadProjection toProjection(com.mas.gov.bt.mas.primary.dto.workflow.ResolvedAssigneeDto dto) {
+        return new UserWorkloadProjection() {
+            @Override public Long getUserId() { return dto.getUserId(); }
+            @Override public String getEmail() { return dto.getEmail(); }
+            @Override public Long getWorkload() { return dto.getWorkload(); }
+            @Override public String getUsername() { return dto.getUsername(); }
+        };
+    }
+
+    /**
+     * Validate application request data
+     */
+    private void validateApplicationRequest(MiningLeaseGRRequest request, Long userId) {
+
+        ExplorationPermit permit = explorationPermitRepository.findByPermitNumber(request.getExpPermitNo());
+
+        MiningLeaseApplication application = miningLeaseApplicationRepository.findByExpPermitNoAndCurrentStatus(request.getExpPermitNo(), "PERMIT_ISSUED");
+
+        if(application != null) {
+            throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION,
+                    "Mining lease with this exploration has been issued.");
+        }
+        Long permitIssuedTo = null;
+
+        if(permit == null ){
+            throw new BusinessException(
+                    ErrorCodes.RECORD_NOT_FOUND,
+                    "The Exploration permit number provided is not present in approved permit."
+            );
+        }
+
+        permitIssuedTo = Long.valueOf(permit.getPermitIssuedTo());
+        LocalDate today = LocalDate.now();
+
+        if(permit.getExpiryDate() == null){
+            throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION,
+                    "The expiry date of permit is NULL");
+        }
+        boolean isValid = !permit.getExpiryDate().isBefore(today);
+
+        if (!isValid) {
+            // Permit is still valid
+            throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION,
+                    "The exploration permit provided has expired.");
+        }
+
+        if(!Objects.equals(userId, permitIssuedTo)){
+            throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION,
+                    "The exploration permit does not belong to you.");
+        }
+
+        if (request == null) {
+            throw new BusinessException(
+                    ErrorCodes.INVALID_INPUT_DATA,
+                    "Application request cannot be null");
+        }
+
+        if (request.getExpPermitNo() == null || request.getExpPermitNo().trim().isEmpty()) {
+            throw new BusinessException(
+                    ErrorCodes.MISSING_REQUIRED_FIELD,
+                    "Exploration permit number is required");
+        }
+
+        if (request.getGRDocId() == null) {
+            throw new BusinessException(
+                    ErrorCodes.MISSING_REQUIRED_FIELD,
+                    "GR document ID is required");
+        }
+
+        if (request.getApplicantCid() == null || request.getApplicantCid().trim().isEmpty()) {
+            throw new BusinessException(
+                    ErrorCodes.MISSING_REQUIRED_FIELD,
+                    "Applicant CID is required");
+        }
+
+        if (request.getApplicantEmail() == null || request.getApplicantEmail().trim().isEmpty()) {
+            throw new BusinessException(
+                    ErrorCodes.MISSING_REQUIRED_FIELD,
+                    "Applicant email is required");
+        }
+
+        log.debug("Application request validation passed");
+    }
+
+    /**
+     * Get all applications (for Agency users).
+     */
+    @Transactional(readOnly = true)
+    public Page<ApplicationListResponse> getAllApplications(
+            Long currentUserId,
+            Pageable pageable) {
+
+        Page<MiningLeaseApplication> applications =
+                miningLeaseApplicationRepository.findApplicationsAssignedToUser(currentUserId, pageable);
+        return applications.map(mapper::toListResponse);
+    }
+
+    /**
+     * Get applications for an applicant.
+     */
+    @Transactional(readOnly = true)
+    public Page<ApplicationListResponse> getMyApplications(Long userId, Pageable pageable, String search) {
+        List<String> ApplicationStatus = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION",
+                "MINING RENEWAL APPROVED",
+                "QUARRY RENEWAL APPROVED",
+                "UNDER-REVIEW-CLOSURE"
+        );
+        Page<MiningLeaseApplication> applications;
+
+        if (search == null || search.isBlank()) {
+            applications = miningLeaseApplicationRepository.findByApplicantUserId(
+                    userId,
+                    ApplicationStatus,
+                    pageable);
+        }
+        else {
+
+            applications = miningLeaseApplicationRepository.findByAssignedToUserAndSearch(
+                    userId,
+                    ApplicationStatus,
+                    search.trim(),
+                    pageable
+            );
+        }
+        return applications.map(app -> {
+            ApplicationListResponse response = mapper.toListResponse(app);
+            hidePfsRemarksIfPending(response);
+            return response;
+        });
+    }
+
+    /**
+     * Get application by application number.
+     * Agency users can view any application, regular users can only view their own.
+     */
+    @Transactional(readOnly = true)
+    public MiningLeaseResponse getApplicationByNumber(String applicationNumber, Long userId, boolean isAgencyUser) {
+        MiningLeaseApplication application = miningLeaseApplicationRepository.findByApplicationNumber(applicationNumber)
+                .orElseThrow(() -> new ResourceNotFoundException("Application not found: " + applicationNumber));
+
+
+        // Agency users can view any application, others can only view their own
+        if (!isAgencyUser && !application.getApplicantUserId().equals(userId)) {
+            throw new UnauthorizedOperationException("You are not authorized to view this application");
+        }
+
+        MiningLeaseResponse response = mapper.toResponse(application);
+        if (!isAgencyUser) {
+            hidePfsRemarksIfPending(response);
+        }
+        return response;
+    }
+
+    /**
+     * PFS is reviewed by MPCD and Geologist in parallel — either can approve first (see
+     * ACCEPTED PFS / ACCEPTED PFS MPCD transitions in reviewApplicationGeologist/
+     * reviewApplicationMPCD). While status is one of those two "one side approved,
+     * waiting on the other" states, the approving side's remark must not reach the
+     * applicant: otherwise they can see which focal is holding things up and blame them.
+     * Mirrors the frontend gate in miningleasedetails.ts / querylease-applicantapplicationdetails.ts.
+     * Only ever called for applicant-scoped responses — staff need to see both remarks.
+     */
+    private boolean isPfsPendingOtherFocal(String status) {
+        return "ACCEPTED PFS".equals(status) || "ACCEPTED PFS MPCD".equals(status);
+    }
+
+    private void hidePfsRemarksIfPending(MiningLeaseResponse response) {
+        if (isPfsPendingOtherFocal(response.getCurrentStatus())) {
+            response.setRemarksMPCD(null);
+            response.setRemarksGeologist(null);
+        }
+    }
+
+    private void hidePfsRemarksIfPending(ApplicationListResponse response) {
+        if (isPfsPendingOtherFocal(response.getCurrentStatus())) {
+            response.setRemarksMPCD(null);
+            response.setRemarksGeologist(null);
+        }
+    }
+
+    /**
+     * Get archived applications (APPROVED or REJECTED) for all users (Agency users).
+     */
+    @Transactional(readOnly = true)
+    public Page<ApplicationListResponse> getArchivedApplications(Pageable pageable, String search, Long userId) {
+
+        List<String> archivedStatuses = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION",
+                "UNDER-REVIEW-CLOSURE"
+        );
+
+        Page<MiningLeaseApplication> applications;
+
+        if (search == null || search.isBlank()) {
+            applications = miningLeaseApplicationRepository.findArchivedAssignedToUserMPCD(
+                    userId,
+                    archivedStatuses,
+                    pageable);
+        }
+        else {
+
+            applications = miningLeaseApplicationRepository.findArchivedAssignedToUserAndSearch(
+                    userId,
+                    archivedStatuses,
+                    search.trim(),
+                    pageable
+            );
+        }
+        return applications.map(mapper::toListResponse);
+    }
+
+    /**
+     * Get archived applications (APPROVED or REJECTED) for a specific user.
+     */
+    @Transactional(readOnly = true)
+    public Page<ApplicationListResponse> getMyArchivedApplications(Long userId, Pageable pageable, String search) {
+        List<String> archivedStatuses = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION",
+                "MINING RENEWAL APPROVED",
+                "QUARRY RENEWAL APPROVED",
+                "UNDER-REVIEW-CLOSURE"
+        );
+        Page<MiningLeaseApplication> applications ;
+
+        if (search == null || search.isBlank()) {
+            applications =  miningLeaseApplicationRepository.findByApplicantUserIdAndCurrentStatusIn(userId, archivedStatuses, pageable);
+        } else {
+            applications = miningLeaseApplicationRepository.findByApplicantUserIdAndSearch(userId, archivedStatuses, search.trim(), pageable);
+        }
+
+        return applications.map(mapper::toListResponse);
+    }
+
+    /**
+     * Tab-count badge for the shared "archived" tab used by all of MPCD/Geologist/MiningChief/
+     * MiningEngineer/Director (frontend calls the same /mining-lease/archived-applications
+     * endpoint regardless of role) — mirrors the isAgencyUser() branch already in
+     * getArchivedApplications()/getMyArchivedApplications() above.
+     */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Long> getArchivedCount(Long userId, boolean isAgencyUser) {
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        long archivedCount;
+        if (isAgencyUser) {
+            List<String> archivedStatuses = List.of(
+                    "MINING LEASE APPROVED",
+                    "REJECTED",
+                    "TERMINATED",
+                    "RENEWAL APPLICATION",
+                    "TEMPORARY CLOSURE APPROVED",
+                    "UNDER-REVIEW-TERMINATION"
+            );
+            archivedCount = miningLeaseApplicationRepository.countArchivedAssignedToUserMPCD(userId, archivedStatuses);
+        } else {
+            List<String> archivedStatuses = List.of(
+                    "MINING LEASE APPROVED",
+                    "REJECTED",
+                    "TERMINATED",
+                    "RENEWAL APPLICATION",
+                    "TEMPORARY CLOSURE APPROVED",
+                    "UNDER-REVIEW-TERMINATION",
+                    "MINING RENEWAL APPROVED",
+                    "QUARRY RENEWAL APPROVED"
+            );
+            archivedCount = miningLeaseApplicationRepository.countByApplicantUserIdAndCurrentStatusIn(userId, archivedStatuses);
+        }
+        counts.put("archived", archivedCount);
+        return counts;
+    }
+
+    public SuccessResponse<List<MiningLeaseResponse>> getArchivedApplicationToMPCD(Long userId, Pageable pageable, String search) {
+
+        Page<MiningLeaseApplication> page;
+
+        List<String> archivedStatuses = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION",
+                "MINING RENEWAL APPROVED",
+                "QUARRY RENEWAL APPROVED",
+                "UNDER-REVIEW-CLOSURE"
+        );
+
+        if (search == null || search.isBlank()) {
+
+            page = miningLeaseApplicationRepository
+                    .findArchivedAssignedToUserMPCD(userId, archivedStatuses, pageable);
+
+        } else {
+
+            page = miningLeaseApplicationRepository
+                    .findArchivedAssignedToUserAndSearchMPCD(
+                            userId,
+                            archivedStatuses,
+                            search.trim(),
+                            pageable
+                    );
+        }
+
+        Page<MiningLeaseResponse> responsePage =
+                page.map(mapper::toResponse);
+
+        return SuccessResponse.fromPage(
+                "Assigned applications fetched successfully",
+                responsePage
+        );
+    }
+
+    @Transactional
+    public void reassignTaskGeologist(ReassignTaskRequest request, Long userId) {
+
+        Optional<MiningLeaseApplication> miningLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationNumber());
+
+        MiningLeaseApplication miningLeaseApplication1;
+
+        if(miningLeaseApplication.isPresent()) {
+            miningLeaseApplication1 = miningLeaseApplication.get();
+            miningLeaseApplication1.setLatestRemarkFocal(request.getRemarks());
+        }else {
+            throw new BusinessException(
+                    ErrorCodes.RECORD_NOT_FOUND,
+                    "Application with this application number not found " + request.getApplicationNumber() +". Please contact support.");
+        }
+
+        List<String> assignedRoles = new ArrayList<>();
+        assignedRoles.add("GEOLOGIST");
+        List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleIn(request.getApplicationNumber(),"ASSIGNED",assignedRoles);
+
+        if (task == null) {
+            throw new BusinessException("No Task Found");
+        }
+        for(TaskManagement taskManagement : task) {
+            taskManagement.setAssignedToUserId(request.getNewAssigneeUserId());
+            taskManagement.setAssignedByUserId(userId);
+            taskManagement.setAssignedAt(LocalDateTime.now());
+            taskManagement.setReassignmentCount(taskManagement.getReassignmentCount() + 1);
+            taskManagement.setActionRemarks(request.getRemarks());
+        }
+
+        taskManagementRepository.saveAll(task);
+
+        miningLeaseApplicationRepository.save(miningLeaseApplication1);
+
+        TaskManagement firstTask = task.getFirst();
+
+        UserWorkloadProjection userDetails = miningLeaseApplicationRepository.findUserDetails(request.getNewAssigneeUserId());
+        notificationClient.sendTaskReassignmentNotification(
+                userDetails.getEmail(),
+                userDetails.getUsername(),
+                firstTask.getApplicationNumber(),
+                firstTask.getAssignedToRole(),
+                request.getRemarks());
+
+        if(userDetails.getUserId()!= null) {
+            String title = "An new application has been reassigned.";
+            String message = "An application for mining lease has been assigned for review. Application No. "+request.getApplicationNumber()+" Please review the application.";
+            String serviceId = MENU_ID_GEOLOGIST;
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true, request.getApplicationNumber());
+        }else {
+            throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+        }
+
+        log.info("Geologist task {} reassigned to user {}", firstTask.getId(), request.getNewAssigneeUserId());
+    }
+
+    @Transactional
+    public void reassignTaskMPCD(@Valid ReassignTaskRequest request, Long userId) {
+        List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(),"MPCD ASSIGNED","MPCD_FOCAL", SERVICE_CODE);
+        if (task == null) {
+           throw new BusinessException("No Task Found");
+        }
+
+        for(TaskManagement taskManagement : task) {
+            taskManagement.setAssignedToUserId(request.getNewAssigneeUserId());
+            taskManagement.setAssignedByUserId(userId);
+            taskManagement.setAssignedAt(LocalDateTime.now());
+            taskManagement.setReassignmentCount(taskManagement.getReassignmentCount() + 1);
+            taskManagement.setActionRemarks(request.getRemarks());
+        }
+
+        taskManagementRepository.saveAll(task);
+
+        TaskManagement firstTask = task.getFirst();
+
+        UserWorkloadProjection userDetails = miningLeaseApplicationRepository.findUserDetails(request.getNewAssigneeUserId());
+        notificationClient.sendTaskReassignmentNotification(
+                userDetails.getEmail(), userDetails.getUsername(),
+                firstTask.getApplicationNumber(),
+                firstTask.getAssignedToRole(),
+                request.getRemarks());
+
+        if(userDetails.getUserId()!= null) {
+            String title = "An new application has been reassigned.";
+            String message = "An application for mining lease has been assigned for review. Application No. "+ request.getApplicationNumber()+" Please login in review the application";
+            String serviceId = MENU_ID_MPCD;
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true, request.getApplicationNumber());
+        }else {
+            throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+        }
+
+        log.info("MPCD task {} reassigned to user {}", firstTask.getId(), request.getNewAssigneeUserId());
+    }
+
+    @Transactional
+    public void reassignTaskME(@Valid ReassignTaskRequest request, Long userId) {
+        log.info("Reassigning task by mining engineer: {} by user: {}", request.getApplicationNumber(), userId);
+        List<TaskManagement> tasks = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(),"FMFS SUBMITTED","MINE ENGINEER", SERVICE_CODE);
+
+        if (tasks.isEmpty()) {
+            throw new CustomRuntimeException("No tasks found");
+        }
+
+        for (TaskManagement taskManagement : tasks) {
+            taskManagement.setAssignedToUserId(request.getNewAssigneeUserId());
+            taskManagement.setAssignedByUserId(userId);
+            taskManagement.setAssignedAt(LocalDateTime.now());
+            taskManagement.setReassignmentCount
+                    (taskManagement.getReassignmentCount() + 1);
+            taskManagement.setActionRemarks(request.getRemarks());
+
+        }
+
+        taskManagementRepository.saveAll(tasks);
+
+        TaskManagement firstTask = tasks.getFirst();
+
+        UserWorkloadProjection userDetails = miningLeaseApplicationRepository.findUserDetails(request.getNewAssigneeUserId());
+
+        notificationClient.sendTaskReassignmentNotification(
+                userDetails.getEmail(),
+                userDetails.getUsername(),
+                firstTask.getApplicationNumber(),
+                firstTask.getAssignedToRole(),
+                request.getRemarks());
+
+        if(userDetails.getUserId()!= null) {
+            String title = "An new application has been reassigned.";
+            String message = "An application for mining lease has been assigned for review. Application No. "+request.getApplicationNumber()+" Please login in review the application";
+            String serviceId = MENU_ID_MINE_ENGINEER;
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true, request.getApplicationNumber());
+        }else {
+            throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+        }
+
+        log.info("Mining engineer task {} reassigned to user {}", request.getApplicationNumber(), request.getNewAssigneeUserId());
+    }
+
+    @Transactional
+    public void reassignTaskMineChief(@Valid ReassignTaskRequest request, Long userId) {
+        log.info("Mine chief reassigning task: {} by user: {}", request.getApplicationNumber(), userId);
+
+        List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNumber(),"MINING_CHIEF_REVIEW","MINING_CHIEF_REVIEW", SERVICE_CODE);
+
+
+        if (task == null) {
+            throw new BusinessException("No Task Found");
+        }
+
+        for(TaskManagement taskManagement : task) {
+            taskManagement.setAssignedToUserId(request.getNewAssigneeUserId());
+            taskManagement.setAssignedByUserId(userId);
+            taskManagement.setAssignedAt(LocalDateTime.now());
+            taskManagement.setReassignmentCount(taskManagement.getReassignmentCount() + 1);
+            taskManagement.setActionRemarks(request.getRemarks());
+        }
+
+
+        taskManagementRepository.saveAll(task);
+
+        TaskManagement firstTask = task.getFirst();
+
+        UserWorkloadProjection userDetails = miningLeaseApplicationRepository.findUserDetails(request.getNewAssigneeUserId());
+        notificationClient.sendTaskReassignmentNotification(
+                userDetails.getEmail(), userDetails.getUsername(),
+                firstTask.getApplicationNumber(),
+                firstTask.getAssignedToRole(),
+                request.getRemarks());
+
+        if(userDetails.getUserId()!= null) {
+            String title = "An new application has been reassigned.";
+            String message = "An application for mining lease has been assigned for review. Application No. "+request.getApplicationNumber()+" Please login in review the application";
+            String serviceId = MENU_ID_MINING_CHIEF;
+            notificationClient.sendUserNotification(title, message, userDetails.getUserId(), serviceId, "STAFF", true, request.getApplicationNumber());
+        }else {
+            throw new CustomRuntimeException(ErrorCodes.DATA_TYPE_MISMATCH);
+        }
+
+        log.info("Task {} reassigned to user {}", firstTask.getId(), request.getNewAssigneeUserId());
+    }
+
+    @Transactional
+    public MiningLeaseResponse submitPAFC(MiningLeasePAFCRequest request, Long userId) {
+        MiningLeaseApplication miningLeaseApplication = null;
+        if (request.getApplicationNo() != null) {
+            Optional<MiningLeaseApplication> miningLeaseApplication1 = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationNo());
+            if (miningLeaseApplication1.isPresent()) {
+                List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNo(),"MPCD ASSIGNED","MPCD_FOCAL", SERVICE_CODE);
+
+                TaskManagement taskManagement = new TaskManagement();
+
+                if (task != null) {
+                    taskManagement = task.getFirst();
+                }
+                Long assignedMPCDFocalId = taskManagement.getAssignedToUserId();
+
+                miningLeaseApplication = miningLeaseApplication1.get();
+                ApplicationMaster applicationMaster = miningLeaseApplication.getApplicationMaster();
+                miningLeaseApplication.setFileUploadIdPA(request.getPaDocId());
+                miningLeaseApplication.setFileUploadIdFC(request.getFcDocId());
+                miningLeaseApplication.setFileUploadIdPublicClearance(request.getPublicClearanceDocId());
+                miningLeaseApplication.setCurrentStatus("PA/FC SUBMITTED");
+                applicationMaster.setCurrentStatus("PA/FC SUBMITTED");
+                applicationMasterRepository.save(applicationMaster);
+                miningLeaseApplicationRepository.save(miningLeaseApplication);
+
+                createTask(applicationMaster,miningLeaseApplication,"MPCD_FOCAL", userId, assignedMPCDFocalId);
+
+                if(assignedMPCDFocalId != null) {
+                    String title = "PA/FC submitted. ";
+                    String message = "PA/FC has been submitted by applicant. Please login an process the application."+ "Application No. : "+ miningLeaseApplication.getApplicationNumber();
+                    String serviceId = MENU_ID_MPCD;
+                    notificationClient.sendUserNotification(title, message, assignedMPCDFocalId, serviceId, "STAFF", true, miningLeaseApplication.getApplicationNumber());
+                }
+
+                if(miningLeaseApplication.getApplicantEmail() != null) {
+                    notificationClient.sendStatusUpdateNotification(
+                            miningLeaseApplication.getApplicantEmail(),
+                            miningLeaseApplication.getApplicantCid(),
+                            miningLeaseApplication.getApplicationNumber(),
+                            "PA/FC SUBMITTED",
+                            "PA/FC has been submitted for application " + miningLeaseApplication.getApplicationNumber() + ".");
+                }
+
+            }else {
+                throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
+            }
+        }
+        return mapper.toResponse(miningLeaseApplication);
+    }
+
+    @Transactional
+    public MiningLeaseResponse resubmitPAFC(MiningLeasePAFCRequest request, Long userId) {
+        MiningLeaseApplication miningLeaseApplication = null;
+        if (request.getApplicationNo() != null) {
+            Optional<MiningLeaseApplication> miningLeaseApplication1 = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationNo());
+            if (miningLeaseApplication1.isPresent()) {
+                List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNo(),"MPCD ASSIGNED","MPCD_FOCAL", SERVICE_CODE);
+
+                TaskManagement taskManagement = new TaskManagement();
+
+                if (task != null) {
+                    taskManagement = task.getFirst();
+                }
+                Long assignedMPCDFocalId = taskManagement.getAssignedToUserId();
+
+                miningLeaseApplication = miningLeaseApplication1.get();
+                ApplicationMaster applicationMaster = miningLeaseApplication.getApplicationMaster();
+                miningLeaseApplication.setFileUploadIdPA(request.getPaDocId());
+                miningLeaseApplication.setFileUploadIdFC(request.getFcDocId());
+                miningLeaseApplication.setFileUploadIdPublicClearance(request.getPublicClearanceDocId());
+                miningLeaseApplication.setCurrentStatus("PA/FC RESUBMITTED");
+                applicationMaster.setCurrentStatus("PA/FC RESUBMITTED");
+                applicationMasterRepository.save(applicationMaster);
+                miningLeaseApplicationRepository.save(miningLeaseApplication);
+
+                createTask(applicationMaster,miningLeaseApplication,"MPCD_FOCAL", userId, assignedMPCDFocalId);
+
+                if(assignedMPCDFocalId != null) {
+                    String title = "PA/FC resubmitted. ";
+                    String message = "PA/FC has been resubmitted by applicant. Please login to process the application."+ "Application No. : "+ miningLeaseApplication.getApplicationNumber();
+                    String serviceId = MENU_ID_MPCD;
+                    notificationClient.sendUserNotification(title, message, assignedMPCDFocalId, serviceId, "STAFF", true, miningLeaseApplication.getApplicationNumber());
+                }
+
+                if(miningLeaseApplication.getApplicantEmail() != null) {
+                    notificationClient.sendStatusUpdateNotification(
+                            miningLeaseApplication.getApplicantEmail(),
+                            miningLeaseApplication.getApplicantCid(),
+                            miningLeaseApplication.getApplicationNumber(),
+                            "PA/FC RESUBMITTED",
+                            "PA/FC has been resubmitted for application " + miningLeaseApplication.getApplicationNumber() + ".");
+                }
+
+            }else {
+                throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
+            }
+        }
+        return mapper.toResponse(miningLeaseApplication);
+    }
+
+    @Transactional
+    public MiningLeaseResponse submitFMFS(@Valid MiningLeaseFMFSRequest request, Long userId) {
+        MiningLeaseApplication miningLeaseApplication = null;
+        if (request.getApplicationNo() != null) {
+            Optional<MiningLeaseApplication> miningLeaseApplication1 = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationNo());
+            if (miningLeaseApplication1.isPresent()) {
+                miningLeaseApplication = miningLeaseApplication1.get();
+                ApplicationMaster applicationMaster = miningLeaseApplication.getApplicationMaster();
+
+                if(request.getFmfsDocId() != null && request.getTorFileId() != null) {
+                    miningLeaseApplication.setFmfsDocId(request.getFmfsDocId());
+                    miningLeaseApplication.setTorFileId(request.getTorFileId());
+                    miningLeaseApplication.setOtherFMFSFileId(request.getOtherFMFSFileId());
+                }
+
+                // New Requirement from client side
+                if(request.getEcFileId() != null && request.getEcNumber() != null && request.getEcExpiryDate() != null) {
+                    miningLeaseApplication.setEcFileId(request.getEcFileId());
+                    miningLeaseApplication.setEcNumber(request.getEcNumber());
+                    miningLeaseApplication.setEcExpiryDate(request.getEcExpiryDate());
+                    miningLeaseApplication.setECStatus("ACTIVE");
+                }else{
+                    log.info("EC file is not present");
+                }
+
+                miningLeaseApplication.setCurrentStatus("FMFS SUBMITTED");
+
+                applicationMaster.setCurrentStatus("FMFS SUBMITTED");
+                applicationMasterRepository.save(applicationMaster);
+                miningLeaseApplicationRepository.save(miningLeaseApplication);
+
+                MiningLeaseApplication app = miningLeaseApplication;
+                FmfsDetails fmfsDetails = fmfsDetailsRepository
+                        .findFirstByApplicationNumberOrderByUpdatedAtDescIdDesc(app.getApplicationNumber())
+                        .orElseGet(FmfsDetails::new);
+                boolean isNewFmfsRow = fmfsDetails.getId() == null;
+                if (fmfsDetails.getFmfsId() == null || fmfsDetails.getFmfsId().isBlank()) {
+                    fmfsDetails.setFmfsId(generateUniqueFmfsId());
+                }
+
+                fmfsDetails.setApplicantCid(app.getApplicantCid());
+                fmfsDetails.setApplicantType(app.getApplicantType());
+                fmfsDetails.setApplicantContact(app.getApplicantContact());
+                fmfsDetails.setApplicantEmail(app.getApplicantEmail());
+                fmfsDetails.setApplicantName(app.getApplicantName());
+                fmfsDetails.setApplicantUserId(app.getApplicantUserId());
+
+                fmfsDetails.setBusinessLicenseNo(app.getBusinessLicenseNo());
+                fmfsDetails.setCompanyName(app.getCompanyName());
+
+                fmfsDetails.setApplicationNumber(app.getApplicationNumber());
+                fmfsDetails.setSubmittedAt(LocalDateTime.now());
+
+                fmfsDetails.setCurrentStatus(app.getCurrentStatus());
+                fmfsDetails.setDungkhag(app.getDungkhag());
+                fmfsDetails.setDzongkhag(app.getDzongkhag() != null ? app.getDzongkhag().getDzongkhagName() : null);
+                fmfsDetails.setGewog(app.getGewog() != null ? app.getGewog().getGewogName() : null);
+
+                fmfsDetails.setLeaseEndDate(app.getLeaseEndDate());
+                fmfsDetails.setLeaseStartDate(app.getLeaseStartDate());
+
+                fmfsDetails.setLicenseNo(app.getLicenseNo());
+                fmfsDetails.setNearestVillage(app.getNearestVillage() != null ? app.getNearestVillage().getVillageName() : null);
+                fmfsDetails.setPlaceOfMiningActivity(app.getPlaceOfMiningActivity());
+
+                fmfsDetails.setPostalAddress(app.getPostalAddress());
+                fmfsDetails.setProposedLeasePeriod(app.getProposedLeasePeriod());
+
+                fmfsDetails.setRequiredInvestment(app.getRequiredInvestment());
+                fmfsDetails.setSourceOfFinance(app.getSourceOfFinance());
+                fmfsDetails.setSrf(app.getSrf());
+
+                fmfsDetails.setTechnicalCompetenceExperience(app.getTechnicalCompetenceExperience());
+                fmfsDetails.setTelephoneNo(app.getTelephoneNo());
+                fmfsDetails.setTotalLand(app.getTotalLand());
+                fmfsDetails.setTypeOfMineralsProducts(app.getTypeOfMineralsProducts());
+                fmfsDetails.setTypeOfMines(app.getTypeOfMines());
+
+                fmfsDetails.setWorkforceRequirementRecruitment(app.getWorkforceRequirementRecruitment());
+                fmfsDetails.setApplicationMasterId(app.getApplicationMaster().getId());
+                fmfsDetails.setApplicationType(app.getApplicationType());
+                fmfsDetails.setApplicationFeesRequired(app.getApplicationFeesRequired());
+                fmfsDetails.setConsentLetterDocId(app.getConsentLetterDocId());
+                fmfsDetails.setExplorationReportDocId(app.getExplorationReportDocId());
+                fmfsDetails.setFinancialCapabilityDocId(app.getFinancialCapabilityDocId());
+                fmfsDetails.setFmfsDocId(app.getFmfsDocId());
+                fmfsDetails.setGeologicalReportDocId(app.getGeologicalReportDocId());
+                fmfsDetails.setLocationMapDocId(app.getLocationMapDocId());
+                fmfsDetails.setPfsDocId(app.getPfsDocId());
+
+                fmfsDetails.setMpcdFileUploadIdPa(app.getMpcdFileUploadIdPA());
+                fmfsDetails.setRemarksMpcd(app.getRemarksMPCD());
+                fmfsDetails.setRemarksGeologist(app.getRemarksGeologist());
+
+                fmfsDetails.setApprovedArea(app.getApprovedArea());
+                fmfsDetails.setApprovedErb(app.getApprovedErb());
+                fmfsDetails.setApprovedLeasePeriod(app.getApprovedLeasePeriod());
+                fmfsDetails.setApprovedMineral(app.getApprovedMineral());
+
+                fmfsDetails.setChiefReviewedAt(app.getChiefReviewedAt());
+                fmfsDetails.setDirectorReviewedAt(app.getDirectorReviewedAt());
+
+                fmfsDetails.setFmfsStatus(app.getFmfsStatus());
+                fmfsDetails.setGeologicalReportStatus(app.getGeologicalReportStatus());
+                fmfsDetails.setGeologistReviewedAt(app.getGeologistReviewedAt());
+
+                fmfsDetails.setLlcDocId(app.getLlcDocId());
+                fmfsDetails.setMeReviewedAt(app.getMeReviewedAt());
+
+                fmfsDetails.setMlaDocId(app.getMlaDocId());
+                fmfsDetails.setMlaSignedAt(app.getMlaSignedAt());
+                fmfsDetails.setMlaStatus(app.getMlaStatus());
+
+                fmfsDetails.setMpcdReviewedAt(app.getMpcdReviewedAt());
+                fmfsDetails.setNotesheetDocId(app.getNotesheetDocId());
+                fmfsDetails.setRemarksChief(app.getRemarksChief());
+                fmfsDetails.setRemarksDirector(app.getRemarksDirector());
+                fmfsDetails.setRemarksMe(app.getRemarksME());
+                fmfsDetails.setMpcdFileUploadIdMa(app.getMpcdFileUploadIdMa());
+                fmfsDetails.setFileUploadIdGr(app.getFileUploadIdGr());
+                fmfsDetails.setFileUploadIdPaFc(app.getFileUploadIdFC());
+                fmfsDetails.setCompanyRegistrationNo(app.getCompanyRegistrationNo());
+                fmfsDetails.setCompanyType(app.getCompanyType());
+                fmfsDetails.setEcNo(app.getEcNumber());
+                fmfsDetails.setEcStatus(app.getECStatus());
+                fmfsDetails.setEcExpiryDate(app.getEcExpiryDate() != null
+                        ? app.getEcExpiryDate().toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDateTime()
+                        : null);
+
+                fmfsDetails.setBankGurantorDocId(app.getBankGuarantorDocId());
+                fmfsDetails.setUpfrontPaymentAmount(app.getUpfrontPaymentAmount());
+                fmfsDetails.setWorkOrderDocId(app.getWorkOrderDocId());
+                fmfsDetails.setWorkOrderRemarks(app.getWorkOrderRemarks());
+                fmfsDetails.setDzongkhagId(app.getDzongkhag() != null ? app.getDzongkhag().getId() : null);
+                fmfsDetails.setGewogId(app.getGewog() != null ? app.getGewog().getGewogSerialNo() : null);
+                fmfsDetails.setVillageId(app.getNearestVillage() != null ? app.getNearestVillage().getVillageSerialNo() : null);
+
+                fmfsDetails.setFileUploadIdPa(app.getFileUploadIdPA());
+                fmfsDetails.setFileUploadIdFc(app.getFileUploadIdFC());
+                fmfsDetails.setFileUploadIdPublicClearance(app.getFileUploadIdPublicClearance());
+
+                fmfsDetails.setIsActive(true);
+                if (isNewFmfsRow) {
+                    fmfsDetails.setCreatedAt(LocalDateTime.now());
+                    fmfsDetails.setCreatedBy(userId);
+                }
+                fmfsDetails.setUpdatedAt(LocalDateTime.now());
+                fmfsDetails.setUpdatedBy(userId);
+
+                fmfsDetailsRepository.save(fmfsDetails);
+
+                // Region -> HQ region -> escalate is now handled natively by the resolver.
+                var resolvedMineEngineer = workflowAssignmentClient.resolve(
+                        SERVICE_CODE, "FMFS SUBMITTED", miningLeaseApplication.getRegionId(),
+                        miningLeaseApplication.getApplicationNumber());
+                UserWorkloadProjection assignedMineEngineer = toProjection(resolvedMineEngineer);
+
+                createTask(applicationMaster,miningLeaseApplication,"MINE ENGINEER", userId, assignedMineEngineer.getUserId());
+
+                if (assignedMineEngineer.getEmail() != null) {
+                    notificationClient.sendStatusUpdateNotification(
+                            miningLeaseApplication.getApplicantEmail(),
+                            miningLeaseApplication.getApplicantCid(),
+                            miningLeaseApplication.getApplicationNumber(),
+                            "FMFS SUBMITTED",
+                            "FMFS for application " + miningLeaseApplication.getApplicationNumber() + " has been submitted by the client.");
+                }
+
+                if(assignedMineEngineer.getUserId() != null) {
+                    String title = "Mining lease application has been assigned for FMFS review.";
+                    String message = "Mining lease application has been  assigned for FMFS review.";
+                    String serviceId = MENU_ID_MINE_ENGINEER;
+                    notificationClient.sendUserNotification(title, message, assignedMineEngineer.getUserId(), serviceId, "STAFF", true, miningLeaseApplication.getApplicationNumber());
+                }
+
+            }else {
+                throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
+            }
+        }
+        return mapper.toResponse(miningLeaseApplication);
+    }
+
+    @Transactional
+    public MiningLeaseResponse submitEC(@Valid MiningLeaseFMFSRequest request, Long userId) {
+        MiningLeaseApplication miningLeaseApplication = null;
+        if (request.getApplicationNo() != null) {
+            Optional<MiningLeaseApplication> miningLeaseApplication1 = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationNo());
+            if (miningLeaseApplication1.isPresent()) {
+                miningLeaseApplication = miningLeaseApplication1.get();
+                ApplicationMaster applicationMaster = miningLeaseApplication.getApplicationMaster();
+
+                // New Requirement from client side
+                if(request.getEcFileId() != null && request.getEcNumber() != null && request.getEcExpiryDate() != null) {
+                    miningLeaseApplication.setEcFileId(request.getEcFileId());
+                    miningLeaseApplication.setEcNumber(request.getEcNumber());
+                    miningLeaseApplication.setEcExpiryDate(request.getEcExpiryDate());
+                    miningLeaseApplication.setECStatus("ACTIVE");
+                }else{
+                    throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION, "EC DETAILS HAS TO BE SUBMITTED");
+                }
+
+                miningLeaseApplication.setCurrentStatus("EC SUBMITTED");
+
+                applicationMaster.setCurrentStatus("EC SUBMITTED");
+                applicationMasterRepository.save(applicationMaster);
+                miningLeaseApplicationRepository.save(miningLeaseApplication);
+
+                List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(request.getApplicationNo(),"FMFS SUBMITTED","MINE ENGINEER", SERVICE_CODE);
+
+                TaskManagement taskManagement = new TaskManagement();
+
+                if (task != null) {
+                    taskManagement = task.getFirst();
+                }
+                Long assignedEnginnerFocalId = taskManagement.getAssignedToUserId();
+
+                UserWorkloadProjection assignedMineEngineer = miningLeaseApplicationRepository.findUserDetailsME(assignedEnginnerFocalId);
+
+                createTask(applicationMaster, miningLeaseApplication,"MINE ENGINEER", userId, assignedMineEngineer.getUserId());
+
+                if (assignedMineEngineer.getEmail() != null) {
+                    notificationClient.sendStatusUpdateNotification(
+                            miningLeaseApplication.getApplicantEmail(),
+                            miningLeaseApplication.getApplicantCid(),
+                            miningLeaseApplication.getApplicationNumber(),
+                            "EC SUBMITTED",
+                            "EC for application " + miningLeaseApplication.getApplicationNumber() + " has been submitted by the client.");
+                }
+
+                if(assignedMineEngineer.getUserId() != null) {
+                    String title = "Mining lease application has been assigned for EC review.";
+                    String message = "Mining lease application has been  assigned for EC review.";
+                    String serviceId = MENU_ID_MINE_ENGINEER;
+                    notificationClient.sendUserNotification(title, message, assignedMineEngineer.getUserId(), serviceId, "STAFF", true, miningLeaseApplication.getApplicationNumber());
+                }
+
+            }else {
+                throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
+            }
+        }
+        return mapper.toResponse(miningLeaseApplication);
+    }
+
+    @Transactional
+    public MiningLeaseResponse submitBankDetails(@Valid MiningLeaseBankDetailsRequest request) {
+        MiningLeaseApplication miningLeaseApplication = null;
+        if (request.getApplicationNo() != null) {
+            Optional<MiningLeaseApplication> miningLeaseApplication1 = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationNo());
+            if (miningLeaseApplication1.isPresent()) {
+                miningLeaseApplication = miningLeaseApplication1.get();
+                ApplicationMaster applicationMaster = miningLeaseApplication.getApplicationMaster();
+                miningLeaseApplication.setBankGuarantorDocId(request.getBankGuarantorDocId());
+                miningLeaseApplication.setUpfrontPaymentAmount(request.getUpfrontPaymentAmount());
+
+                PaymentMaster bgFeeRow = paymentMasterRepository
+                        .resolveApplicable(SERVICE_CODE, "BG_UPFRONT_FEE", "BG SUBMITTED").orElse(null);
+                boolean bgFeeEnabled = bgFeeRow != null && Boolean.TRUE.equals(bgFeeRow.getIsEnabled());
+
+                if (bgFeeEnabled && paymentEnabled) {
+                    if (request.getUpfrontPaymentAmount() == null) {
+                        throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Upfront payment amount is required");
+                    }
+                    miningLeaseApplication.setCurrentStatus("BG PAYMENT PENDING");
+                    applicationMaster.setCurrentStatus("BG PAYMENT PENDING");
+                    applicationMasterRepository.save(applicationMaster);
+                    miningLeaseApplicationRepository.save(miningLeaseApplication);
+
+                    PaymentInitiationResponse paymentResp = mastersPaymentClient.initiate(
+                            buildBgPaymentRequest(miningLeaseApplication, bgFeeRow.getServiceCode(), request.getUpfrontPaymentAmount()));
+
+                    MiningLeaseResponse response = mapper.toResponse(miningLeaseApplication);
+                    response.setRedirectUrl(paymentResp.getRedirectUrl());
+                    log.info("BG upfront payment initiated for application {}", request.getApplicationNo());
+                    return response;
+                }
+
+                miningLeaseApplication.setCurrentStatus("BG SUBMITTED");
+                applicationMaster.setCurrentStatus("BG SUBMITTED");
+                applicationMasterRepository.save(applicationMaster);
+                miningLeaseApplicationRepository.save(miningLeaseApplication);
+
+                if (miningLeaseApplication.getApplicantUserId() != null) {
+                    notificationClient.sendUserNotification(
+                            "Bank guarantee details submitted.",
+                            "Your Bank Guarantee for application " + miningLeaseApplication.getApplicationNumber() + " has been submitted.",
+                            miningLeaseApplication.getApplicantUserId(), MENU_ID_PROMOTER, "CITIZEN", false, miningLeaseApplication.getApplicationNumber());
+                }
+            }
+        }
+        return mapper.toResponse(miningLeaseApplication);
+    }
+
+    /**
+     * Called by the payment callback once the BG upfront payment is confirmed as PAID.
+     * Transitions status BG PAYMENT PENDING → BG SUBMITTED (today's existing next step).
+     */
+    @Transactional
+    public void onBgPaymentConfirmed(String applicationNo) {
+        MiningLeaseApplication application = miningLeaseApplicationRepository.findByApplicationNumber(applicationNo)
+                .orElseThrow(() -> new BusinessException(ErrorCodes.RECORD_NOT_FOUND, "Application not found: " + applicationNo));
+        application.setCurrentStatus("BG SUBMITTED");
+        ApplicationMaster master = application.getApplicationMaster();
+        master.setCurrentStatus("BG SUBMITTED");
+        applicationMasterRepository.save(master);
+        miningLeaseApplicationRepository.save(application);
+        log.info("BG upfront payment confirmed — application {} transitioned to BG SUBMITTED", applicationNo);
+
+        if (application.getApplicantUserId() != null) {
+            notificationClient.sendUserNotification(
+                    "Bank guarantee payment confirmed.",
+                    "Your bank guarantee payment for application " + applicationNo + " has been confirmed.",
+                    application.getApplicantUserId(), MENU_ID_PROMOTER, "CITIZEN", false, applicationNo);
+        }
+    }
+
+    private PaymentInitiationRequest buildBgPaymentRequest(MiningLeaseApplication application, String serviceCode, BigDecimal upfrontAmount) {
+        PaymentInitiationRequest.PaymentItemRequest item = new PaymentInitiationRequest.PaymentItemRequest();
+        item.setFeeType("BG_UPFRONT_FEE");
+        item.setServiceCode(serviceCode);
+        item.setDescription("Mining Lease Bank Guarantee Upfront Payment");
+        item.setQuantity(1);
+        item.setAmount(upfrontAmount); // caller-supplied — this amount is inherently case-specific, never centrally configured
+
+        String documentNo = resolveDocumentNo(application);
+
+        PaymentInitiationRequest req = new PaymentInitiationRequest();
+        req.setApplicationId(application.getApplicationNumber());
+        req.setApplicationType("MINING_LEASE");
+        req.setTaxPayerName(application.getApplicantName());
+        req.setTaxPayerDocumentNo(documentNo);
+        req.setTaxPayerNo(documentNo);
+        req.setPlatform("MAS");
+        req.setOnPaidStatus("BG SUBMITTED");
+        req.setCallbackUrl(selfBaseUrl + "/api/mining-lease/bg-payment-callback");
+        req.setPaymentItems(List.of(item));
+        return req;
+    }
+
+    @Transactional
+    public MiningLeaseResponse deleteFileUpload(DeleteFileRequest request) {
+        MiningLeaseApplication miningLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationNumber()).orElseThrow();
+
+        switch (request.getFileType()) {
+            case "PFS" -> miningLeaseApplication.setPfsDocId(null);
+            case "GR" -> miningLeaseApplication.setFileUploadIdGr(null);
+            case "PA" -> miningLeaseApplication.setFileUploadIdPA(null);
+            case "FC" -> miningLeaseApplication.setFileUploadIdFC(null);
+            case "KMZ" -> miningLeaseApplication.setFileUploadIdKmz(null);
+            case "Map" -> miningLeaseApplication.setMapFileId(null);
+            case "Location Map" -> miningLeaseApplication.setLocationMapDocId(null);
+            case "Consent Letter" -> miningLeaseApplication.setConsentLetterDocId(null);
+            case "Other file" -> miningLeaseApplication.setOtherFilesId(null);
+            case "Financial Capability" -> miningLeaseApplication.setFinancialCapabilityDocId(null);
+            case "TOR file" -> miningLeaseApplication.setTorFileId(null);
+            case "Additional GR file" -> miningLeaseApplication.setAdditionalFileGRId(null);
+            case "Other FMFS File" -> miningLeaseApplication.setOtherFMFSFileId(null);
+            case null, default -> miningLeaseApplication.setFmfsDocId(null);
+        }
+        miningLeaseApplicationRepository.save(miningLeaseApplication);
+        return mapper.toResponse(miningLeaseApplication);
+    }
+
+    public SuccessResponse<List<MiningLeaseResponse>> getAssignedToDirector(Long userId, Pageable pageable, String search) {
+        Page<MiningLeaseApplication> page;
+
+        List<String> archivedStatuses = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION",
+                "MINING RENEWAL APPROVED",
+                "QUARRY RENEWAL APPROVED"
+        );
+
+        if (search == null || search.isBlank()) {
+
+            page = miningLeaseApplicationRepository
+                    .findAssignedToUserDirector(userId, archivedStatuses, pageable);
+
+        } else {
+
+            page = miningLeaseApplicationRepository
+                    .findAssignedToUserAndSearchDirector(
+                            userId,
+                            archivedStatuses,
+                            search.trim(),
+                            pageable
+                    );
+        }
+
+        Page<MiningLeaseResponse> responsePage =
+                page.map(mapper::toResponse);
+
+        return SuccessResponse.fromPage(
+                "Assigned applications fetched successfully",
+                responsePage
+        );
+    }
+
+    /** Tab-count badges for the Director dashboard's nav-tabs. */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Long> getDirectorCounts(Long userId) {
+        List<String> archivedStatuses = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION",
+                "MINING RENEWAL APPROVED",
+                "QUARRY RENEWAL APPROVED"
+        );
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("submitted", miningLeaseApplicationRepository.countAssignedToUserDirector(userId, archivedStatuses));
+        return counts;
+    }
+
+    @Transactional
+    public MiningLeaseResponse reviewApplicationDirector(@Valid ReviewMiningLeaseApplicationDirector request, Long userId) {
+        log.info("Reviewing mining lease application by Director user: {}", userId);
+
+        MiningLeaseApplication app = findApplicationById(request.getId());
+        ApplicationMaster master = app.getApplicationMaster();
+
+        completeCurrentTask(master,request.getStatus(), request.getRemarks());
+
+        if (request.getStatus() != null) {
+            switch (request.getStatus()) {
+
+                case "Accepted" -> {
+                    LocalDateTime now = LocalDateTime.now();
+                    app.setCurrentStatus("DIRECTOR APPROVED FMFS");
+                    app.setRemarksDirector(request.getRemarks());
+                    app.setDirectorReviewedAt(now);
+                    app.setApprovedAt(now);
+                    // New added to keep latest remarks from focal side.
+                    // The remarks will be saved in their respective field as well
+                    app.setLatestRemarkFocal(request.getRemarks());
+
+//                    List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(app.getApplicationNumber(),"FMFS SUBMITTED","MINE ENGINEER", SERVICE_CODE);
+//                    Long mineEngineerId = null;
+//                    if (taskManagement != null) {
+//                        TaskManagement taskManagement1 = taskManagement.getFirst();
+//                        mineEngineerId = taskManagement1.getAssignedToUserId();
+//                    }
+
+                    if (master != null) {
+                        master.setCurrentStatus("DIRECTOR APPROVED FMFS");
+                        master.setApprovedAt(now);
+                        master.setCompletedAt(now);
+                        applicationMasterRepository.save(master);
+                    }
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendApprovalFMFSNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber());
+
+
+                    }
+                    smsClient.sendApplicationStatusSms(app.getApplicantUserId(), app.getApplicationNumber(), "FMFS Approved");
+                    assert master != null;
+                    createTask( master, app, "DIRECTOR APPROVED FMFS", userId, app.getCreatedBy());
+
+                    if (app.getApplicantUserId() != null) {
+                        String title = "Mining lease application FMFS Approved.";
+                        String message = "Director has approved FMFS. Application No. " + app.getApplicationNumber() + "Your FMFS is approved by the department, please submit IEE/EIA to DECC for the issuance of EC”. After getting the EC Please upload the EC in the system.";
+                        String serviceId = MENU_ID_PROMOTER;
+                        notificationClient.sendUserNotification(
+                                title,
+                                message,
+                                app.getApplicantUserId(),
+                                serviceId,
+                                "STAFF",
+                                true,
+                                app.getApplicationNumber()
+                        );
+                    }
+                }
+                case "Approved" -> {
+                    LocalDateTime now = LocalDateTime.now();
+                    app.setCurrentStatus("APPROVED BY DIRECTOR");
+                    app.setRemarksDirector(request.getRemarks());
+                    app.setMlaSignedAt(now);
+                    app.setMlaStatus("SIGNED");
+                    app.setDirectorReviewedAt(now);
+                    app.setApprovedAt(now);
+
+                    app.setLatestRemarkFocal(request.getRemarks());
+
+                    if (master != null) {
+                        master.setCurrentStatus("APPROVED BY DIRECTOR");
+                        master.setApprovedAt(now);
+                        master.setCompletedAt(now);
+                        applicationMasterRepository.save(master);
+                    }
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendApprovalMLANotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber(),
+                                app.getApprovedErb()
+                        );
+                    }
+                    smsClient.sendApplicationStatusSms(app.getApplicantUserId(), app.getApplicationNumber(), "MLA Issued");
+
+                    if (app.getCreatedBy() != null) {
+                        String title = "Mining lease application MLA has been signed by the Director.";
+                        String message = "Director has signed MLA Application No. " + app.getApplicationNumber() + "Please deposit an upfront EBB amount of Nu:" +app.getUpfrontPaymentAmount()+ " or an equivalent amount of Bank Guarantee in system and submit the original to  the DGM with validity till " + app.getLeaseEndDate();
+                        String serviceId = MENU_ID_PROMOTER;
+                        notificationClient.sendUserNotification(title, message, app.getCreatedBy(), serviceId, "STAFF", true, app.getApplicationNumber());
+                    }
+
+                    assert master != null;
+                    createTask(master, app, "DIRECTOR", userId, userId);
+                }
+                case "Rejected" -> {
+                    if (request.getRemarks() == null || request.getRemarks().trim().isEmpty()) {
+                        throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Remarks are mandatory for rejection.");
+                    }
+                    app.setCurrentStatus("REJECTED");
+                    app.setRemarksDirector(request.getRemarks());
+                    app.setDirectorReviewedAt(LocalDateTime.now());
+                    app.setRejectedAt(LocalDateTime.now());
+                    app.setRejectionReason(request.getRemarks());
+
+                    app.setLatestRemarkFocal(request.getRemarks());
+
+                    if (master != null) {
+                        master.setCurrentStatus("REJECTED");
+                        master.setRejectedAt(LocalDateTime.now());
+                        master.setRejectionRemarks(request.getRemarks());
+                        master.setCompletedAt(LocalDateTime.now());
+                        applicationMasterRepository.save(master);
+                    }
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendRejectionNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber(),
+                                request.getRemarks());
+                    }
+                }
+                default -> throw new IllegalArgumentException("Application status not recognized");
+            }
+            miningLeaseApplicationRepository.save(app);
+        }
+        return mapper.toResponse(app);
+    }
+
+    private MiningLeaseApplication findApplicationById(Long id) {
+        return miningLeaseApplicationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Application not found with ID: " + id));
+    }
+
+    @Transactional
+    private void completeCurrentTask(ApplicationMaster master, String action, String remarks) {
+        if (master == null) return;
+
+        List<TaskManagement> pendingTasks = taskManagementRepository.findByApplicationNumber(master.getApplicationNumber());
+        pendingTasks.stream()
+                .filter(t -> "PENDING".equals(t.getTaskStatus()))
+                .findFirst()
+                .ifPresent(task -> {
+                    task.setTaskStatus("COMPLETED");
+                    task.setActionTaken(action);
+                    task.setActionRemarks(remarks);
+                    taskManagementRepository.save(task);
+                });
+    }
+
+    @Transactional
+    public MiningLeaseResponse assignApplicationDirector(@Valid AssignTaskDirector request, Long userId) {
+        MiningLeaseApplication miningLeaseApplication = findApplicationById(request.getApplicationId());
+
+        ApplicationMaster applicationMaster ;
+
+        if(miningLeaseApplication != null) {
+            applicationMaster = miningLeaseApplication.getApplicationMaster();
+        }else {
+            throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
+        }
+
+        miningLeaseApplication.setLatestRemarkFocal(request.getRemarks());
+
+        if (request.getMpcdFocalId() != null && request.getGeologistId() != null) {
+            miningLeaseApplication.setCurrentStatus("MPCD ASSIGNED");
+            applicationMaster.setCurrentStatus("MPCD ASSIGNED");
+        }else {
+            miningLeaseApplication.setCurrentStatus("ASSIGNED");
+            applicationMaster.setCurrentStatus("ASSIGNED");
+        }
+
+        applicationMasterRepository.save(applicationMaster);
+        miningLeaseApplicationRepository.save(miningLeaseApplication);
+
+        if (request.getGeologistId() != null) {
+            createTask(
+                    applicationMaster,
+                    miningLeaseApplication,
+                    "GEOLOGIST",
+                    userId,
+                    request.getGeologistId());
+
+            UserWorkloadProjection userGeologist = miningLeaseApplicationRepository.findUserDetailsME(request.getGeologistId());
+
+            if (miningLeaseApplication.getApplicantEmail() != null) {
+                notificationClient.sendStatusUpdateNotification(
+                        miningLeaseApplication.getApplicantEmail(),
+                        miningLeaseApplication.getApplicantName(),
+                        miningLeaseApplication.getApplicationNumber(),
+                        miningLeaseApplication.getCurrentStatus(),
+                        "ASSIGNED");
+
+                String promoterTitle = "Mining lease application status has been updated";
+                String promoterMessage = "A mining lease application " + miningLeaseApplication.getApplicationNumber() + " has been forwarded for review.";
+                String promoterServiceId = MENU_ID_PROMOTER;
+
+                notificationClient.sendUserNotification(
+                        promoterTitle,
+                        promoterMessage,
+                        miningLeaseApplication.getCreatedBy(),
+                        promoterServiceId,
+                        "CITIZEN",
+                        false,
+                        miningLeaseApplication.getApplicationNumber()
+                );
+            }
+
+            if (userGeologist != null) {
+                notificationClient.sendAssignmentNotification(
+                        userGeologist.getEmail(),
+                        userGeologist.getUsername(),
+                        miningLeaseApplication.getApplicationNumber(),
+                        "ASSIGNED");
+
+                String title = "A new mining application has been assigned.";
+                String message = "A new mining application has been assigned.";
+                String serviceId = MENU_ID_GEOLOGIST;
+                notificationClient.sendUserNotification(title, message, userGeologist.getUserId(), serviceId, "STAFF", true, miningLeaseApplication.getApplicationNumber());
+            }
+        }
+
+        if(request.getMpcdFocalId() != null){
+
+            createTask(
+                    applicationMaster,
+                    miningLeaseApplication,
+                    "MPCD_FOCAL",
+                    userId,
+                    request.getMpcdFocalId());
+
+            UserWorkloadProjection userGeologist = miningLeaseApplicationRepository.findUserDetailsME(request.getMpcdFocalId());
+
+            if (miningLeaseApplication.getApplicantEmail() != null) {
+                notificationClient.sendStatusUpdateNotification(
+                        miningLeaseApplication.getApplicantEmail(),
+                        miningLeaseApplication.getApplicantName(),
+                        miningLeaseApplication.getApplicationNumber(),
+                        miningLeaseApplication.getCurrentStatus(),
+                        "ASSIGNED");
+            }
+
+            if (userGeologist != null) {
+                notificationClient.sendAssignmentNotification(
+                        userGeologist.getEmail(),
+                        userGeologist.getUsername(),
+                        miningLeaseApplication.getApplicationNumber(),
+                        "ASSIGNED");
+
+                String title = "A new mining application has been assigned.";
+                String message = "A new mining application has been assigned.";
+                String serviceId = MENU_ID_MPCD;
+                notificationClient.sendUserNotification(title, message, userGeologist.getUserId(), serviceId, "STAFF", true, miningLeaseApplication.getApplicationNumber());
+            }
+        }
+        return mapper.toResponse(miningLeaseApplication);
+    }
+
+    @Transactional
+    public MiningLeaseResponse reviewApplicationGeologist(@Valid ReviewMiningLeaseApplicationGeologist reviewQuarryLeaseApplicationGeologist, Long userId) {
+        log.info("Reviewing mining lease application by Geologist user: {}", userId);
+
+        Long geologistRegionId = 0L;
+                //
+        Optional<User> user = userRepository.findById(userId);
+
+        if(user.isPresent()) {
+            User user1 = user.get();
+            geologistRegionId = user1.getRegion().getId();
+        }
+
+        MiningLeaseApplication miningLeaseApplication = findApplicationById(reviewQuarryLeaseApplicationGeologist.getId());
+        ApplicationMaster applicationMaster = miningLeaseApplication.getApplicationMaster();
+
+        miningLeaseApplication.setRegionId(geologistRegionId);
+
+        // Complete current task
+        completeCurrentTask(applicationMaster, reviewQuarryLeaseApplicationGeologist.getStatus(), reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+
+        if(reviewQuarryLeaseApplicationGeologist.getStatus() != null) {
+            switch (reviewQuarryLeaseApplicationGeologist.getStatus()) {
+                case "ACCEPTED" -> {
+                    boolean fullyApprovedPfs = Objects.equals(miningLeaseApplication.getCurrentStatus(), "ACCEPTED PFS MPCD");
+                    if (fullyApprovedPfs) {
+                        miningLeaseApplication.setCurrentStatus("APPROVED");
+                    }else {
+                        miningLeaseApplication.setCurrentStatus("ACCEPTED PFS");
+                    }
+
+                    miningLeaseApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+                    miningLeaseApplication.setGeologistReviewedAt(LocalDateTime.now());
+
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus(miningLeaseApplication.getCurrentStatus());
+                        applicationMasterRepository.save(applicationMaster);
+                    }
+
+                    // Only forward to the Mining Engineer once PFS is fully approved by both
+                    // Geologist and MPCD (see the symmetric check in the MPCD review branch) —
+                    // otherwise this is still waiting on the other reviewer.
+                    if (fullyApprovedPfs && applicationMaster != null) {
+                        // Region -> HQ region -> escalate is now handled natively by the resolver.
+                        var resolvedMineEngineer = workflowAssignmentClient.resolve(
+                                SERVICE_CODE, "FMFS SUBMITTED", geologistRegionId, miningLeaseApplication.getApplicationNumber());
+                        UserWorkloadProjection assignedMineEngineer = toProjection(resolvedMineEngineer);
+
+                        {
+                            createTask(applicationMaster, miningLeaseApplication, "MINE ENGINEER", userId, assignedMineEngineer.getUserId());
+
+                            if (assignedMineEngineer.getUserId() != null) {
+                                String meTitle = "Mining lease application has been assigned for review.";
+                                String meMessage = "A mining lease application " + miningLeaseApplication.getApplicationNumber() + " has been forwarded to you for review.";
+                                String meServiceId = MENU_ID_MINE_ENGINEER;
+                                notificationClient.sendUserNotification(meTitle, meMessage, assignedMineEngineer.getUserId(), meServiceId, "STAFF", true, miningLeaseApplication.getApplicationNumber());
+                            }
+                        }
+                    }
+
+                    if (miningLeaseApplication.getApplicantEmail() != null) {
+                        notificationClient.sendStatusUpdateNotification(
+                                miningLeaseApplication.getApplicantEmail(),
+                                miningLeaseApplication.getApplicantName(),
+                                miningLeaseApplication.getApplicationNumber(),
+                                "Mining Engineer Review",
+                                "Your application " + miningLeaseApplication.getApplicationNumber() + " has been forwarded to the Mining Engineer for review.");
+                    }else {
+                        throw new BusinessException(ErrorCodes.DATA_INTEGRITY_VIOLATION, "Applicant email ID is not present.");
+                    }
+
+                    String title = "Application status updated.";
+                    String message = "Your application " + miningLeaseApplication.getApplicationNumber() + " has been forwarded to geologist to review.";
+                    String serviceId = MENU_ID_PROMOTER;
+                    notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN", false, miningLeaseApplication.getApplicationNumber());
+                }
+                case "ACCEPTED GR" -> {
+                    miningLeaseApplication.setCurrentStatus("APPROVED GR");
+                    miningLeaseApplication.setApprovedGeologicalFileId(reviewQuarryLeaseApplicationGeologist.getApprovedGeologicalFileId());
+                    miningLeaseApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+                    miningLeaseApplication.setGeologistReviewedAt(LocalDateTime.now());
+
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus("APPROVED GR");
+                        applicationMasterRepository.save(applicationMaster);
+                    }
+
+                    assert applicationMaster != null;
+                    createTask(applicationMaster, miningLeaseApplication, "APPLICANT", userId, miningLeaseApplication.getApplicantUserId());
+
+                    if (miningLeaseApplication.getApplicantEmail() != null) {
+                        notificationClient.sendStatusUpdateNotification(
+                                miningLeaseApplication.getApplicantEmail(),
+                                miningLeaseApplication.getApplicantName(),
+                                miningLeaseApplication.getApplicationNumber(),
+                                "GR APPROVED",
+                                "Geological Report for application " + miningLeaseApplication.getApplicationNumber() + " has been accepted. Please upload PFS to proceed further.");
+                    }else {
+                        throw new BusinessException(ErrorCodes.DATA_INTEGRITY_VIOLATION, "Applicant email ID is not present.");
+                    }
+
+                    if(miningLeaseApplication.getApplicantUserId() != null) {
+                        String title = "Geological report has been approved.";
+                        String message = "Geological Report for application " + miningLeaseApplication.getApplicationNumber() + " has been accepted. Please upload PFS to proceed further.";
+                        String serviceId = MENU_ID_PROMOTER;
+                        notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN", true, miningLeaseApplication.getApplicationNumber());
+                    }else {
+                        throw new BusinessException(ErrorCodes.DATA_INTEGRITY_VIOLATION, "Applicant user ID is not present.");
+                    }
+                }
+                case "ACCEPTED FMFS" -> {
+                    miningLeaseApplication.setCurrentStatus("ACCEPTED FMFS");
+                    miningLeaseApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+                    miningLeaseApplication.setGeologistReviewedAt(LocalDateTime.now());
+
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus("ACCEPTED FMFS");
+                        applicationMasterRepository.save(applicationMaster);
+                    }
+
+                    assert applicationMaster != null;
+                    createTask(applicationMaster, miningLeaseApplication, "MINING_ENGINEER", userId, userId);
+
+                    if (miningLeaseApplication.getApplicantEmail() != null) {
+                        notificationClient.sendStatusUpdateNotification(
+                                miningLeaseApplication.getApplicantEmail(),
+                                miningLeaseApplication.getApplicantName(),
+                                miningLeaseApplication.getApplicationNumber(),
+                                "Mining Engineer Review",
+                                "Your application " + miningLeaseApplication.getApplicationNumber() + " has been forwarded to the Mining Engineer for review.");
+                    }
+                }
+                case "Rejected" -> {
+                    if (reviewQuarryLeaseApplicationGeologist.getGeologistRemarks() == null
+                            || reviewQuarryLeaseApplicationGeologist.getGeologistRemarks().trim().isEmpty()) {
+                        throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Remarks are mandatory for rejection.");
+                    }
+                    miningLeaseApplication.setCurrentStatus("REJECTED");
+                    miningLeaseApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+                    miningLeaseApplication.setGeologistReviewedAt(LocalDateTime.now());
+                    miningLeaseApplication.setRejectedAt(LocalDateTime.now());
+                    miningLeaseApplication.setRejectionReason(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus("REJECTED");
+                        applicationMasterRepository.save(applicationMaster);
+                    }
+
+                    if (miningLeaseApplication.getApplicantEmail() != null) {
+                        notificationClient.sendRejectionNotification(
+                                miningLeaseApplication.getApplicantEmail(),
+                                miningLeaseApplication.getApplicantName(),
+                                miningLeaseApplication.getApplicationNumber(),
+                                reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+                    }
+                }
+                case "Resubmit PFS" -> {
+                    miningLeaseApplication.setCurrentStatus("RESUBMIT PFS GEOLOGIST");
+                    miningLeaseApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+                    miningLeaseApplication.setGeologistReviewedAt(LocalDateTime.now());
+
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus("RESUBMIT PFS GEOLOGIST");
+                        applicationMasterRepository.save(applicationMaster);
+                    }
+                    createRevisionRecord(miningLeaseApplication, "GEOLOGIST_REVIEW", reviewQuarryLeaseApplicationGeologist.getGeologistRemarks(), userId);
+                    assert applicationMaster != null;
+                    createTask(applicationMaster, miningLeaseApplication, "APPLICANT", userId, miningLeaseApplication.getApplicantUserId());
+
+                    if (miningLeaseApplication.getApplicantEmail() != null) {
+                        notificationClient.sendRevisionRequestNotification(
+                                miningLeaseApplication.getApplicantEmail(),
+                                miningLeaseApplication.getApplicantName(),
+                                miningLeaseApplication.getApplicationNumber(),
+                                "Geologist Review",
+                                reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+                    }
+                    smsClient.sendApplicationStatusSms(miningLeaseApplication.getApplicantUserId(), miningLeaseApplication.getApplicationNumber(), "Revision Required");
+                }
+                case "Resubmit GR" -> {
+                    miningLeaseApplication.setCurrentStatus("RESUBMIT GR");
+                    miningLeaseApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+                    miningLeaseApplication.setGeologistReviewedAt(LocalDateTime.now());
+
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus("RESUBMIT GR");
+                        applicationMasterRepository.save(applicationMaster);
+                    }
+
+                    createRevisionRecord(miningLeaseApplication, "GEOLOGIST_REVIEW", reviewQuarryLeaseApplicationGeologist.getGeologistRemarks(), userId);
+                    assert applicationMaster != null;
+                    createTask(applicationMaster, miningLeaseApplication, "APPLICANT", userId, miningLeaseApplication.getApplicantUserId());
+
+                    if (miningLeaseApplication.getApplicantEmail() != null) {
+                        notificationClient.sendRevisionRequestNotification(
+                                miningLeaseApplication.getApplicantEmail(),
+                                miningLeaseApplication.getApplicantName(),
+                                miningLeaseApplication.getApplicationNumber(),
+                                "Geologist Review",
+                                reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+                    }
+                    smsClient.sendApplicationStatusSms(miningLeaseApplication.getApplicantUserId(), miningLeaseApplication.getApplicationNumber(), "Revision Required");
+                }
+                case "FMFS Review" -> {
+                    miningLeaseApplication.setCurrentStatus("ADDITIONAL DATA NEEDED FMFS");
+                    miningLeaseApplication.setRemarksGeologist(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+                    miningLeaseApplication.setGeologistReviewedAt(LocalDateTime.now());
+
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus("ADDITIONAL DATA NEEDED FMFS");
+                        applicationMasterRepository.save(applicationMaster);
+                    }
+
+                    createRevisionRecord(miningLeaseApplication, "GEOLOGIST_REVIEW", reviewQuarryLeaseApplicationGeologist.getGeologistRemarks(), userId);
+                    createTask(applicationMaster, miningLeaseApplication, "APPLICANT", userId, userId);
+
+                    if (miningLeaseApplication.getApplicantEmail() != null) {
+                        notificationClient.sendRevisionRequestNotification(
+                                miningLeaseApplication.getApplicantEmail(),
+                                miningLeaseApplication.getApplicantName(),
+                                miningLeaseApplication.getApplicationNumber(),
+                                "Geologist Review",
+                                reviewQuarryLeaseApplicationGeologist.getGeologistRemarks());
+                    }
+                    smsClient.sendApplicationStatusSms(miningLeaseApplication.getApplicantUserId(), miningLeaseApplication.getApplicationNumber(), "Revision Required");
+                }
+                default -> throw new IllegalArgumentException("Application status not recognized");
+            }
+            miningLeaseApplicationRepository.save(miningLeaseApplication);
+        }
+        return mapper.toResponse(miningLeaseApplication);
+    }
+
+    @Transactional
+    private void createRevisionRecord(MiningLeaseApplication miningLeaseApplication, String geologistReview, String geologistRemarks, Long userId) {
+        long revisionCount = revisionHistoryRepository.countByApplicationIdAndRevisionStage(miningLeaseApplication.getId(), geologistReview);
+
+        ApplicationRevisionHistory revision = ApplicationRevisionHistory.builder()
+                .applicationId(miningLeaseApplication.getId())
+                .applicationNumber(miningLeaseApplication.getApplicationNumber())
+                .revisionStage(geologistReview)
+                .revisionNumber((int) revisionCount + 1)
+                .remarks(geologistRemarks)
+                .requestedBy(userId)
+                .requestedAt(LocalDateTime.now())
+                .status("PENDING")
+                .createdBy(userId)
+                .build();
+
+        revisionHistoryRepository.save(revision);
+        log.info("Created revision record #{} for application {} at stage {}", revision.getRevisionNumber(), miningLeaseApplication.getApplicationNumber(), geologistReview);
+    }
+
+    @Transactional(readOnly = true)
+    public SuccessResponse<List<MiningLeaseResponse>> getAssignedToGeologist(
+            Long userId, Pageable pageable, String search) {
+
+        Page<MiningLeaseApplication> page;
+
+        if (search == null || search.isBlank()) {
+
+            page = miningLeaseApplicationRepository
+                    .findAssignedToUserGeologist(userId, pageable);
+
+        } else {
+
+            page = miningLeaseApplicationRepository
+                    .findAssignedToUserAndSearchGeologist(
+                            userId,
+                            search.trim(),
+                            pageable
+                    );
+        }
+
+        Page<MiningLeaseResponse> responsePage =
+                page.map(mapper::toResponse);
+
+        return SuccessResponse.fromPage(
+                "Assigned applications fetched successfully",
+                responsePage
+        );
+    }
+
+    /** Tab-count badges for the Geologist dashboard's nav-tabs. */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Long> getGeologistCounts(Long userId) {
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("submitted", miningLeaseApplicationRepository.countAssignedToUserGeologist(userId));
+        return counts;
+    }
+
+    @Transactional
+    public MiningLeaseResponse reviewApplicationMPCD(@Valid ReviewMiningLeaseApplicationMPCD reviewQuarryLeaseApplication, Long userId) {
+        log.info("Reviewing mining lease application by MPCD user: {}", userId);
+
+        MiningLeaseApplication miningLeaseApplication = findApplicationById(reviewQuarryLeaseApplication.getId());
+        ApplicationMaster applicationMaster = miningLeaseApplication.getApplicationMaster();
+
+//        // Complete current task
+        completeCurrentTask(applicationMaster, reviewQuarryLeaseApplication.getStatus(), reviewQuarryLeaseApplication.getMpcdRemarks());
+
+        if(reviewQuarryLeaseApplication.getStatus() != null) {
+            switch (reviewQuarryLeaseApplication.getStatus()) {
+                case "ACCEPTED APP" -> {
+                    List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(miningLeaseApplication.getApplicationNumber(),"ASSIGNED","GEOLOGIST", SERVICE_CODE);
+                    Long geologistId = null;
+                    if (taskManagement != null) {
+                        TaskManagement taskManagement1 = taskManagement.getFirst();
+                        geologistId = taskManagement1.getAssignedToUserId();
+                    }
+                    miningLeaseApplication.setCurrentStatus("GEOLOGIST_REVIEW");
+                    miningLeaseApplication.setRemarksMPCD(reviewQuarryLeaseApplication.getMpcdRemarks());
+                    miningLeaseApplication.setMpcdReviewedAt(LocalDateTime.now());
+
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplication.getMpcdRemarks());
+
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus("GEOLOGIST_REVIEW");
+                        applicationMasterRepository.save(applicationMaster);
+                    }
+
+                    assert applicationMaster != null;
+                    createTask(applicationMaster, miningLeaseApplication, "GEOLOGIST", userId, geologistId);
+
+                    if (miningLeaseApplication.getApplicantEmail() != null) {
+                        notificationClient.sendStatusUpdateNotification(
+                                miningLeaseApplication.getApplicantEmail(),
+                                miningLeaseApplication.getApplicantName(),
+                                miningLeaseApplication.getApplicationNumber(),
+                                "Geologist Review",
+                                "Your application " + miningLeaseApplication.getApplicationNumber() + " has been forwarded to the Geologist for review.");
+                    }
+
+                    String title = "Application status updated.";
+                    String message = "Your application " + miningLeaseApplication.getApplicationNumber() + " has been forwarded to geologist to review.";
+                    String serviceId = MENU_ID_PROMOTER;
+                    notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN", false, miningLeaseApplication.getApplicationNumber());
+
+                    if (geologistId != null) {
+                        String geoTitle = "Mining lease application forwarded for review.";
+                        String geoMessage = "Application No. " + miningLeaseApplication.getApplicationNumber() + " has been forwarded to you for review.";
+                        notificationClient.sendUserNotification(geoTitle, geoMessage, geologistId, MENU_ID_GEOLOGIST, "STAFF", true, miningLeaseApplication.getApplicationNumber());
+                    }
+                }
+                case "ACCEPTED" -> {
+                    if (Objects.equals(miningLeaseApplication.getCurrentStatus(), "ACCEPTED PFS")) {
+                        miningLeaseApplication.setCurrentStatus("APPROVED");
+
+                        if (miningLeaseApplication.getApplicantEmail() != null) {
+                            notificationClient.sendStatusUpdateNotification(
+                                    miningLeaseApplication.getApplicantEmail(),
+                                    miningLeaseApplication.getApplicantName(),
+                                    miningLeaseApplication.getApplicationNumber(),
+                                    "MPCD MA UPLOAD",
+                                    "Your application " + miningLeaseApplication.getApplicationNumber() + " has been forwarded to the MPCD for MA-1 upload.");
+                        }
+
+                        String title = "Application status updated.";
+                        String message = "Your application " + miningLeaseApplication.getApplicationNumber() + " has been forwarded to the MPCD for MA-1 upload.";
+                        String serviceId = MENU_ID_PROMOTER;
+                        notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN", false, miningLeaseApplication.getApplicationNumber());
+
+                    }else {
+                        miningLeaseApplication.setCurrentStatus("ACCEPTED PFS MPCD");
+
+                        if (miningLeaseApplication.getApplicantEmail() != null) {
+                            notificationClient.sendStatusUpdateNotification(
+                                    miningLeaseApplication.getApplicantEmail(),
+                                    miningLeaseApplication.getApplicantName(),
+                                    miningLeaseApplication.getApplicationNumber(),
+                                    "MPCD PFS ACCEPTED",
+                                    "Your application " + miningLeaseApplication.getApplicationNumber() + " has been forwarded to the Geologist for review.");
+                        }
+
+                        String title = "Application status updated.";
+                        String message = "Your application " + miningLeaseApplication.getApplicationNumber() + " has been forwarded to Geologist for review.";
+                        String serviceId = MENU_ID_PROMOTER;
+                        notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN", false, miningLeaseApplication.getApplicationNumber());
+                    }
+                    miningLeaseApplication.setRemarksMPCD(reviewQuarryLeaseApplication.getMpcdRemarks());
+                    miningLeaseApplication.setMpcdReviewedAt(LocalDateTime.now());
+
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplication.getMpcdRemarks());
+
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus(miningLeaseApplication.getCurrentStatus());
+                        applicationMasterRepository.save(applicationMaster);
+                    }
+
+                    assert applicationMaster != null;
+                    createTask(applicationMaster, miningLeaseApplication, "MPCD_FOCAL", userId, userId);
+
+                }
+                case "Approved PA/FC" -> {
+                    miningLeaseApplication.setCurrentStatus("APPROVED PA/FC");
+                    miningLeaseApplication.setRemarksMPCD(reviewQuarryLeaseApplication.getMpcdRemarks());
+                    miningLeaseApplication.setMpcdReviewedAt(LocalDateTime.now());
+
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplication.getMpcdRemarks());
+
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus(miningLeaseApplication.getCurrentStatus());
+                        applicationMasterRepository.save(applicationMaster);
+                    }
+
+                    assert applicationMaster != null;
+                    createTask(applicationMaster, miningLeaseApplication, "APPLICANT", userId, miningLeaseApplication.getApplicantUserId());
+
+                    if (miningLeaseApplication.getApplicantEmail() != null) {
+                        notificationClient.sendPAFCPublicClearanceNotification(
+                                miningLeaseApplication.getApplicantEmail(),
+                                miningLeaseApplication.getApplicantName(),
+                                miningLeaseApplication.getApplicationNumber(),
+                                "PA/FC accepted by MPCD",
+                                "PA/FC for application " + miningLeaseApplication.getApplicationNumber() + " has been approved. Please proceed by uploading FMFS before the set deadline.");
+                    }
+
+                    String title = "Application status updated.";
+                    String message = "Application No. " + miningLeaseApplication.getApplicationNumber() + " The submitted PA, FC, and public clearance have been approved. Please check your email for further instruction.";
+
+                    notificationClient.sendUserNotification(
+                            title,
+                            message,
+                            miningLeaseApplication.getApplicantUserId(),
+                            MENU_ID_PROMOTER,
+                            "CITIZEN",
+                            true,
+                            miningLeaseApplication.getApplicationNumber()
+                    );
+
+                }
+                case "Rejected" -> {
+                    if (reviewQuarryLeaseApplication.getMpcdRemarks() == null
+                            || reviewQuarryLeaseApplication.getMpcdRemarks().trim().isEmpty()) {
+                        throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Remarks are mandatory for rejection.");
+                    }
+                    miningLeaseApplication.setCurrentStatus("REJECTED");
+                    miningLeaseApplication.setRemarksMPCD(reviewQuarryLeaseApplication.getMpcdRemarks());
+                    miningLeaseApplication.setMpcdReviewedAt(LocalDateTime.now());
+                    miningLeaseApplication.setRejectedAt(LocalDateTime.now());
+                    miningLeaseApplication.setRejectionReason(reviewQuarryLeaseApplication.getMpcdRemarks());
+
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplication.getMpcdRemarks());
+
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus("REJECTED");
+                        applicationMasterRepository.save(applicationMaster);
+                    }
+
+                    if (miningLeaseApplication.getApplicantEmail() != null) {
+                        notificationClient.sendRejectionNotification(
+                                miningLeaseApplication.getApplicantEmail(),
+                                miningLeaseApplication.getApplicantName(),
+                                miningLeaseApplication.getApplicationNumber(),
+                                reviewQuarryLeaseApplication.getMpcdRemarks());
+                    }
+                }
+                case "Resubmit PFS" -> {
+                    miningLeaseApplication.setCurrentStatus("RESUBMIT PFS MPCD");
+                    miningLeaseApplication.setRemarksMPCD(reviewQuarryLeaseApplication.getMpcdRemarks());
+                    miningLeaseApplication.setMpcdReviewedAt(LocalDateTime.now());
+
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplication.getMpcdRemarks());
+
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus("RESUBMIT PFS MPCD");
+                        applicationMasterRepository.save(applicationMaster);
+                    }
+
+                    createRevisionRecord(miningLeaseApplication, "MPCD_REVIEW", reviewQuarryLeaseApplication.getMpcdRemarks(), userId);
+                    createTask(applicationMaster, miningLeaseApplication, "APPLICANT", userId, miningLeaseApplication.getApplicantUserId());
+
+                    if (miningLeaseApplication.getApplicantEmail() != null) {
+                        notificationClient.sendRevisionRequestNotification(
+                                miningLeaseApplication.getApplicantEmail(),
+                                miningLeaseApplication.getApplicantName(),
+                                miningLeaseApplication.getApplicationNumber(),
+                                "MPCD Review",
+                                reviewQuarryLeaseApplication.getMpcdRemarks());
+                    }
+                    String title = "Application status updated.";
+                    String message = "Application No. " + miningLeaseApplication.getApplicationNumber() + " Please resubmit the PFS details as per the remarks provided.";
+
+                    notificationClient.sendUserNotification(
+                            title,
+                            message,
+                            miningLeaseApplication.getApplicantUserId(),
+                            MENU_ID_PROMOTER,
+                            "CITIZEN",
+                            true,
+                            miningLeaseApplication.getApplicationNumber()
+                    );
+                    smsClient.sendApplicationStatusSms(miningLeaseApplication.getApplicantUserId(), miningLeaseApplication.getApplicationNumber(), "Revision Required");
+                }
+                case "Resubmit PA/FC" -> {
+                    miningLeaseApplication.setCurrentStatus("RESUBMIT PA/FC");
+                    miningLeaseApplication.setRemarksMPCD(reviewQuarryLeaseApplication.getMpcdRemarks());
+                    miningLeaseApplication.setMpcdReviewedAt(LocalDateTime.now());
+
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplication.getMpcdRemarks());
+
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus("RESUBMIT PA/FC");
+                        applicationMasterRepository.save(applicationMaster);
+                    }
+
+                    createRevisionRecord(miningLeaseApplication, "MPCD_REVIEW", reviewQuarryLeaseApplication.getMpcdRemarks(), userId);
+                    createTask(applicationMaster, miningLeaseApplication, "APPLICANT", userId, miningLeaseApplication.getApplicantUserId());
+
+                    if (miningLeaseApplication.getApplicantEmail() != null) {
+                        notificationClient.sendRevisionRequestNotification(
+                                miningLeaseApplication.getApplicantEmail(),
+                                miningLeaseApplication.getApplicantName(),
+                                miningLeaseApplication.getApplicationNumber(),
+                                "MPCD Review",
+                                reviewQuarryLeaseApplication.getMpcdRemarks());
+                    }
+                    smsClient.sendApplicationStatusSms(miningLeaseApplication.getApplicantUserId(), miningLeaseApplication.getApplicationNumber(), "Revision Required");
+                }
+                case "Resubmit Application" -> {
+                    miningLeaseApplication.setCurrentStatus("RESUBMIT APPLICATION");
+                    miningLeaseApplication.setRemarksMPCD(reviewQuarryLeaseApplication.getMpcdRemarks());
+                    miningLeaseApplication.setMpcdReviewedAt(LocalDateTime.now());
+
+                    miningLeaseApplication.setLatestRemarkFocal(reviewQuarryLeaseApplication.getMpcdRemarks());
+
+                    if (applicationMaster != null) {
+                        applicationMaster.setCurrentStatus("RESUBMIT APPLICATION");
+                        applicationMasterRepository.save(applicationMaster);
+                    }
+
+                    createRevisionRecord(miningLeaseApplication, "MPCD_REVIEW", reviewQuarryLeaseApplication.getMpcdRemarks(), userId);
+                    createTask(applicationMaster, miningLeaseApplication, "APPLICANT", userId, miningLeaseApplication.getApplicantUserId());
+
+                    if (miningLeaseApplication.getApplicantEmail() != null) {
+                        notificationClient.sendRevisionRequestNotification(
+                                miningLeaseApplication.getApplicantEmail(),
+                                miningLeaseApplication.getApplicantName(),
+                                miningLeaseApplication.getApplicationNumber(),
+                                "MPCD Review",
+                                reviewQuarryLeaseApplication.getMpcdRemarks());
+                    }
+                    smsClient.sendApplicationStatusSms(miningLeaseApplication.getApplicantUserId(), miningLeaseApplication.getApplicationNumber(), "Revision Required");
+                }
+                default -> throw new IllegalArgumentException("Application status not recognized");
+            }
+
+            miningLeaseApplicationRepository.save(miningLeaseApplication);
+        }
+        return mapper.toResponse(miningLeaseApplication);
+    }
+
+    public SuccessResponse<List<MiningLeaseResponse>> getAssignedToMPCD(Long userId, Pageable pageable, String search) {
+        Page<MiningLeaseApplication> page;
+
+        List<String> ApplicationStatus = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION",
+                "MINING RENEWAL APPROVED",
+                "QUARRY RENEWAL APPROVED"
+        );
+
+        if (search == null || search.isBlank()) {
+
+            page = miningLeaseApplicationRepository
+                    .findAssignedToUserMPCD(userId, ApplicationStatus, pageable);
+
+        } else {
+
+            page = miningLeaseApplicationRepository
+                    .findAssignedToUserAndSearchMPCD(
+                            userId,
+                            search.trim(),
+                            ApplicationStatus,
+                            pageable
+                    );
+        }
+
+        Page<MiningLeaseResponse> responsePage =
+                page.map(mapper::toResponse);
+
+        return SuccessResponse.fromPage(
+                "Assigned applications fetched successfully",
+                responsePage
+        );
+    }
+
+    /** Tab-count badges for the MPCD Focal dashboard's nav-tabs. */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Long> getMpcdCounts(Long userId) {
+        List<String> applicationStatus = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION",
+                "MINING RENEWAL APPROVED",
+                "QUARRY RENEWAL APPROVED"
+        );
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("submitted", miningLeaseApplicationRepository.countAssignedToUserMPCD(userId, applicationStatus));
+        return counts;
+    }
+
+    @Transactional
+    public MiningLeaseResponse submitMA(@Valid MiningLeaseMARequest request, Long userId) {
+        MiningLeaseApplication miningleaseapplication = null;
+        if (request.getApplicationNo() != null) {
+            Optional<MiningLeaseApplication> miningLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationNo());
+            if (miningLeaseApplication.isPresent()) {
+                miningleaseapplication = miningLeaseApplication.get();
+                ApplicationMaster applicationMaster = miningleaseapplication.getApplicationMaster();
+                applicationMaster.setCurrentStatus("MA-1 ISSUED");
+                miningleaseapplication.setMpcdFileUploadIdMa(request.getMaDocId());
+                miningleaseapplication.setSignedPFSId(request.getSignedPFSId());
+                miningleaseapplication.setCurrentStatus("MA-1 ISSUED");
+                applicationMasterRepository.save(applicationMaster);
+                miningLeaseApplicationRepository.save(miningleaseapplication);
+
+                createTask(applicationMaster,miningleaseapplication,"APPLICANT", userId, miningleaseapplication.getApplicantUserId());
+
+                if(miningleaseapplication.getApplicantUserId() != null) {
+                    String title = "Mining lease application has been send to you with MA-1 document.";
+                    String message = "Your mining application has been accepted. You are hereby required to print the approved Prefeasibility Study (PFS) report along with the duly completed MA-1 Form and submit the documents to the Dzongkhag Land Lease Committee for obtaining the necessary sectoral clearances.";
+                    String serviceId = MENU_ID_PROMOTER;
+                    notificationClient.sendUserNotification(title, message, miningleaseapplication.getApplicantUserId(), serviceId, "CITIZEN", true, miningleaseapplication.getApplicationNumber());
+                }
+                if (miningleaseapplication.getApplicantEmail() != null) {
+                    notificationClient.sendStatusUpdateNotification(
+                            miningleaseapplication.getApplicantEmail(),
+                            miningleaseapplication.getApplicantName(),
+                            miningleaseapplication.getApplicationNumber(),
+                            "MA-1 ISSUED",
+                            "Your mining application has been accepted. You are hereby required to print the approved Prefeasibility Study (PFS) report along with the duly completed MA-1 Form and submit the documents to the Dzongkhag Land Lease Committee for obtaining the necessary sectoral clearances.");
+                }
+
+            }else {
+                throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
+            }
+        }
+        return mapper.toResponse(miningleaseapplication);
+    }
+
+    public TaskManagementAssignedUser getAssignedGeologist(String applicationNo, boolean agencyUser) {
+        TaskManagementAssignedUser assignedUser = new TaskManagementAssignedUser();
+        if(agencyUser){
+            List<TaskManagement> taskManagements =
+                    taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode
+                            (applicationNo,"ASSIGNED", "GEOLOGIST", SERVICE_CODE);
+            TaskManagement taskManagement = taskManagements.getFirst();
+            assignedUser.setAssignedToRole(taskManagement.getAssignedToRole());
+            assignedUser.setAssignedToUserId(taskManagement.getAssignedToUserId());
+            assignedUser.setApplicationNumber(applicationNo);
+        }else {
+            throw new BusinessException(ErrorCodes.UNAUTHORIZED_REQUEST);
+        }
+        return assignedUser;
+    }
+
+    @Transactional
+    public MiningLeaseResponse reviewApplicationChief(@Valid ReviewMiningLeaseApplicationChief request, Long userId) {
+        log.info("Reviewing quarry lease application by Mining Chief user: {}", userId);
+
+        MiningLeaseApplication app = findApplicationById(request.getId());
+        ApplicationMaster master = app.getApplicationMaster();
+
+        completeCurrentTask(master, request.getStatus(), request.getRemarks());
+
+        TaskManagement task = taskManagementRepository.findByApplicationNumberAndAssignedToRoleAndTaskStatusAndServiceCode
+                (app.getApplicationNumber(),"DIRECTOR", "GR SUBMITTED", SERVICE_CODE);
+
+        Long directorId = task.getAssignedToUserId();
+
+        if (request.getStatus() != null) {
+            switch (request.getStatus()) {
+                case "Approved" -> {
+                    app.setCurrentStatus("FORWARDED TO DIRECTOR");
+                    app.setRemarksChief(request.getRemarks());
+                    app.setChiefReviewedAt(LocalDateTime.now());
+                    app.setFmfsId(generateFMFSId());
+
+                    app.setLatestRemarkFocal(request.getRemarks());
+
+                    if (master != null) {
+                        master.setCurrentStatus("FORWARDED TO DIRECTOR");
+                        applicationMasterRepository.save(master);
+                    }
+
+                    assert master != null;
+                    createTask(master, app, "DIRECTOR", userId, directorId);
+
+                    UserWorkloadProjection fetchDirectorDetails  = miningLeaseApplicationRepository.findUserDetails(directorId);
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendStatusUpdateNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber(),
+                                "Director Review",
+                                request.getRemarks());
+                    }
+
+                    if (app.getCreatedBy() != null) {
+                        String title = "Mining lease application has been forwarded to Director for FMFS Approval.";
+                        String message = "Mining lease application has been forwarded to Director for FMFS approval Application No. " + app.getApplicationNumber() ;
+                        String serviceId = MENU_ID_PROMOTER;
+                        notificationClient.sendUserNotification(title, message, app.getCreatedBy(), serviceId, "CITIZEN", false, app.getApplicationNumber());
+                    }
+
+                    if (fetchDirectorDetails.getEmail() != null) {
+                        notificationClient.sendAssignmentNotification(
+                                fetchDirectorDetails.getEmail(),
+                                fetchDirectorDetails.getUsername(),
+                                app.getApplicationNumber(),
+                                "Director Review");
+                    }
+
+                    if (directorId != null) {
+                        String title = "Mining lease application has been forwarded to Director for FMFS Approval.";
+                        String message = "Mining lease application has been forwarded to Director for FMFS approval Application No. " + app.getApplicationNumber() + "Please review the FMFS document forwarded to you by the mining chief.";
+                        String serviceId = MENU_ID_DIRECTOR;
+                        notificationClient.sendUserNotification(title, message, directorId, serviceId, "STAFF", true, app.getApplicationNumber());
+                    }
+                }
+                case "Rejected" -> {
+                    if (request.getRemarks() == null || request.getRemarks().trim().isEmpty()) {
+                        throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Remarks are mandatory for rejection.");
+                    }
+                    app.setCurrentStatus("REJECTED");
+                    app.setRemarksChief(request.getRemarks());
+                    app.setChiefReviewedAt(LocalDateTime.now());
+                    app.setRejectedAt(LocalDateTime.now());
+                    app.setRejectionReason(request.getRemarks());
+
+                    app.setLatestRemarkFocal(request.getRemarks());
+
+                    if (master != null) {
+                        master.setCurrentStatus("REJECTED");
+                        master.setRejectedAt(LocalDateTime.now());
+                        master.setRejectionRemarks(request.getRemarks());
+                        master.setCompletedAt(LocalDateTime.now());
+                        applicationMasterRepository.save(master);
+                    }
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendRejectionNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber(),
+                                request.getRemarks());
+                    }
+
+                    if (app.getCreatedBy() != null) {
+                        String title = "Mining lease application has been rejected.";
+                        String message = "We regret to inform you that your mining lease application has been rejected. Application No. : " + app.getApplicationNumber() + "Please view the application details to view the remarks provided." ;
+                        String serviceId = MENU_ID_PROMOTER;
+                        notificationClient.sendUserNotification(title, message, app.getCreatedBy(), serviceId, "CITIZEN", false, app.getApplicationNumber());
+                    }
+                }
+                case "Return" -> {
+
+                    TaskManagement taskEngineer = taskManagementRepository.findByApplicationNumberAndAssignedToRoleAndTaskStatusAndServiceCode
+                            (app.getApplicationNumber(),"MINE ENGINEER", "FMFS SUBMITTED", SERVICE_CODE);
+
+                    Long miningEngineerId = taskEngineer.getAssignedToUserId();
+
+                    UserWorkloadProjection fetchMiningEngineerDetails  = miningLeaseApplicationRepository.findUserDetails(miningEngineerId);
+
+                    // Return to Mining Engineer
+                    app.setCurrentStatus("ME_REVIEW");
+                    app.setRemarksChief(request.getRemarks());
+                    app.setChiefReviewedAt(LocalDateTime.now());
+
+                    app.setLatestRemarkFocal(request.getRemarks());
+
+                    if (master != null) {
+                        master.setCurrentStatus("ME_REVIEW");
+                        applicationMasterRepository.save(master);
+                    }
+
+                    assert master != null;
+                    createTask(master, app, "MINING_ENGINEER", userId, userId);
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendStatusUpdateNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber(),
+                                "Mining Engineer Review",
+                                "Your application has been returned to the Mining Engineer for review.");
+                    }
+
+                    if (app.getCreatedBy() != null) {
+                        String title = "Mining lease application has been returned to mining engineer for review.";
+                        String message = "Mining lease application has been returned to mining engineer for review by the mining chief. " + app.getApplicationNumber() ;
+                        String serviceId = MENU_ID_PROMOTER;
+                        notificationClient.sendUserNotification(title, message, app.getCreatedBy(), serviceId, "CITIZEN", false, app.getApplicationNumber());
+                    }
+
+                    if ( fetchMiningEngineerDetails.getUserId() != null) {
+                        notificationClient.sendStatusUpdateNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber(),
+                                "Mining Engineer Review",
+                                "Your application has been returned to the Mining Engineer for review.");
+                    }
+
+                    if (fetchMiningEngineerDetails.getUserId() != null) {
+                        String title = "Mining lease application has been returned to mining engineer for review.";
+                        String message = "Mining lease application has been returned to mining engineer for review by the mining chief. " + app.getApplicationNumber() + "Please review the application.";
+                        String serviceId = MENU_ID_PROMOTER;
+                        notificationClient.sendUserNotification(title, message, app.getCreatedBy(), serviceId, "STAFF", true, app.getApplicationNumber());
+                    }
+
+                }
+                default -> throw new IllegalArgumentException("Application status not recognized");
+            }
+            miningLeaseApplicationRepository.save(app);
+        }
+        return mapper.toResponse(app);
+    }
+
+    private synchronized String generateFMFSId() {
+
+        String year = String.valueOf(LocalDate.now().getYear());
+        String prefix = "FMFS-" + year + "-";
+
+        String lastFmfsId = miningLeaseApplicationRepository.findLastFmfsId(prefix);
+
+        int nextNumber = 1;
+
+        if (lastFmfsId != null && !lastFmfsId.isBlank()) {
+            // Example: FMFS-2026-00012
+            String lastNumber = lastFmfsId.substring(prefix.length());
+            nextNumber = Integer.parseInt(lastNumber) + 1;
+        }
+
+        return prefix + String.format("%05d", nextNumber);
+    }
+
+    private String generateUniqueFmfsId() {
+        return "FMFS-" + DateTimeFormatter.ofPattern("yyMMddHHmmssSSS").format(LocalDateTime.now());
+    }
+
+    public SuccessResponse<List<MiningLeaseResponse>> getAssignedToMiningChief(Long userId, Pageable pageable, String search) {
+        Page<MiningLeaseApplication> page;
+
+        List<String> ApplicationStatus = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION",
+                "MINING RENEWAL APPROVED",
+                "QUARRY RENEWAL APPROVED"
+        );
+
+        if (search == null || search.isBlank()) {
+
+            page = miningLeaseApplicationRepository
+                    .findAssignedToUserMPCD(userId, ApplicationStatus, pageable);
+
+        } else {
+
+            page = miningLeaseApplicationRepository
+                    .findAssignedToUserAndSearchMPCD(
+                            userId,
+                            search.trim(),
+                            ApplicationStatus,
+                            pageable
+                    );
+        }
+
+        Page<MiningLeaseResponse> responsePage =
+                page.map(mapper::toResponse);
+
+        return SuccessResponse.fromPage(
+                "Assigned applications fetched successfully",
+                responsePage
+        );
+    }
+
+    /** Tab-count badges for the Mining Chief dashboard's nav-tabs. */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Long> getMiningChiefCounts(Long userId) {
+        List<String> applicationStatus = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION",
+                "MINING RENEWAL APPROVED",
+                "QUARRY RENEWAL APPROVED"
+        );
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("submitted", miningLeaseApplicationRepository.countAssignedToUserMPCD(userId, applicationStatus));
+        return counts;
+    }
+
+    @Transactional
+    public MiningLeaseResponse reviewApplicationME(@Valid ReviewMiningLeaseApplicationME request, Long userId) {
+        log.info("Reviewing mining lease application by Mining Engineer user: {}", userId);
+
+        MiningLeaseApplication app = findApplicationById(request.getId());
+        ApplicationMaster master = app.getApplicationMaster();
+
+        completeCurrentTask(master,  request.getStatus(), request.getRemarks());
+
+        if (request.getStatus() != null) {
+            switch (request.getStatus()) {
+                case "Approved" -> {
+                    app.setCurrentStatus("APPROVED");
+                    app.setRemarksME(request.getRemarks());
+                    app.setFmfsStatus(request.getFmfsStatus());
+                    app.setApprovedArea(request.getApprovedArea());
+                    app.setApprovedErb(request.getApprovedErb());
+                    app.setApprovedLeasePeriod(request.getApprovedLeasePeriod());
+                    app.setApprovedMineral(request.getApprovedMineral());
+                    app.setMeReviewedAt(LocalDateTime.now());
+
+                    app.setLatestRemarkFocal(request.getRemarks());
+
+                        if (master != null) {
+                            master.setCurrentStatus("APPROVED");
+                            applicationMasterRepository.save(master);
+                        }
+
+                    // =====================================================
+                    // 8. ASSIGN DIRECTOR + CREATE TASK
+                    // =====================================================
+                    // Region -> HQ region -> escalate is now handled natively by the resolver.
+                    UserWorkloadProjection assignedMiningChief =
+                            assignMiningChief("APPROVED", app.getRegionId(), app.getApplicationNumber());
+
+                    assert master != null;
+                    createTask(master, app, "MINING_CHIEF", userId, assignedMiningChief.getUserId());
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendStatusUpdateNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber(),
+                                "Mining Chief Review",
+                                "Your application " + app.getApplicationNumber() + " has been forwarded to the Mining Chief for review.");
+                    }
+
+                    if (assignedMiningChief.getEmail() != null) {
+                        notificationClient.sendAssignmentNotification(
+                                assignedMiningChief.getEmail(),
+                                assignedMiningChief.getUsername(),
+                                app.getApplicationNumber(),
+                                "Mining Chief Review");
+
+                    }
+
+                    if (assignedMiningChief.getUserId() != null) {
+                        String title = "An new application has been assigned.";
+                        String message = "An application for mining lease has been assigned for review. Application No. "+ app.getApplicationNumber() ;
+                        String serviceId = MENU_ID_MINING_CHIEF;
+                        notificationClient.sendUserNotification(title, message, assignedMiningChief.getUserId(), serviceId, "STAFF", true, app.getApplicationNumber());
+                    }
+                }
+                case "Forwarded FMFS" -> {
+                    app.setCurrentStatus("MINING_CHIEF_REVIEW");
+                    app.setRemarksME(request.getRemarks());
+                    app.setFmfsStatus(request.getFmfsStatus());
+                    app.setApprovedArea(request.getApprovedArea());
+                    app.setApprovedErb(request.getApprovedErb());
+                    app.setApprovedLeasePeriod(request.getApprovedLeasePeriod());
+                    app.setApprovedMineral(request.getApprovedMineral());
+                    app.setMeReviewedAt(LocalDateTime.now());
+
+                    app.setGeologicalReserve(request.getGeologicalReserve());
+                    app.setMineableReserve(request.getMineableReserve());
+                    app.setStrippingRatio(request.getStrippingRatio());
+
+                    // Newly added after review
+                    app.setNameOfMine(request.getNameOfMine());
+                    app.setLeaseStartDate(request.getLeaseStartDate());
+                    app.setLeaseEndDate(request.getLeaseEndDate());
+
+                    app.setLatestRemarkFocal(request.getRemarks());
+
+                    FmfsDetails fmfsDetails = fmfsDetailsRepository
+                            .findFirstByApplicationNumberOrderByUpdatedAtDescIdDesc(app.getApplicationNumber())
+                            .orElseGet(FmfsDetails::new);
+                    boolean isNewFmfsRow = fmfsDetails.getId() == null;
+                    fmfsDetails.setApplicantCid(app.getApplicantCid());
+                    fmfsDetails.setApplicantType(app.getApplicantType());
+                    fmfsDetails.setApplicantContact(app.getApplicantContact());
+                    fmfsDetails.setApplicantEmail(app.getApplicantEmail());
+                    fmfsDetails.setApplicantName(app.getApplicantName());
+                    fmfsDetails.setApplicantUserId(app.getApplicantUserId());
+                    fmfsDetails.setApplicantUserId(app.getApplicantUserId());
+
+                    fmfsDetails.setBusinessLicenseNo(app.getBusinessLicenseNo());
+                    fmfsDetails.setCompanyName(app.getCompanyName());
+
+                    fmfsDetails.setApplicationNumber(app.getApplicationNumber());
+                    fmfsDetails.setApprovedAt(LocalDateTime.now());
+
+                    fmfsDetails.setCurrentStatus(app.getCurrentStatus());
+                    fmfsDetails.setDungkhag(app.getDungkhag());
+                    fmfsDetails.setDzongkhag(app.getDzongkhag().getDzongkhagName());
+                    fmfsDetails.setGewog(app.getGewog().getGewogName());
+
+                    fmfsDetails.setLeaseEndDate(request.getLeaseEndDate());
+                    fmfsDetails.setLeaseStartDate(request.getLeaseStartDate());
+
+                    fmfsDetails.setLicenseNo(app.getLicenseNo());
+                    fmfsDetails.setNearestVillage(app.getNearestVillage().getVillageName());
+                    fmfsDetails.setPlaceOfMiningActivity(app.getPlaceOfMiningActivity());
+
+                    fmfsDetails.setPostalAddress(app.getPostalAddress());
+                    fmfsDetails.setProposedLeasePeriod(app.getProposedLeasePeriod());
+
+                    fmfsDetails.setRequiredInvestment(app.getRequiredInvestment());
+                    fmfsDetails.setSourceOfFinance(app.getSourceOfFinance());
+                    fmfsDetails.setSrf(app.getSrf());
+
+                    fmfsDetails.setTechnicalCompetenceExperience(app.getTechnicalCompetenceExperience());
+                    fmfsDetails.setTelephoneNo(app.getTelephoneNo());
+                    fmfsDetails.setTotalLand(app.getTotalLand());
+                    fmfsDetails.setTypeOfMineralsProducts(app.getTypeOfMineralsProducts());
+                    fmfsDetails.setTypeOfMines(app.getTypeOfMines());
+
+                    fmfsDetails.setWorkforceRequirementRecruitment(app.getWorkforceRequirementRecruitment());
+                    fmfsDetails.setApplicationMasterId(app.getApplicationMaster().getId());
+                    fmfsDetails.setApplicationType(app.getApplicationType());
+                    fmfsDetails.setApplicationFeesRequired(app.getApplicationFeesRequired());
+                    fmfsDetails.setConsentLetterDocId(app.getConsentLetterDocId());
+                    fmfsDetails.setExplorationReportDocId(app.getExplorationReportDocId());
+                    fmfsDetails.setFinancialCapabilityDocId(app.getFinancialCapabilityDocId());
+                    fmfsDetails.setFmfsDocId(app.getFmfsDocId());
+                    fmfsDetails.setGeologicalReportDocId(app.getGeologicalReportDocId());
+                    fmfsDetails.setLocationMapDocId(app.getLocationMapDocId());
+                    fmfsDetails.setPfsDocId(app.getPfsDocId());
+
+                    fmfsDetails.setMpcdFileUploadIdPa(app.getMpcdFileUploadIdPA());
+                    fmfsDetails.setRemarksMpcd(app.getRemarksMPCD());
+                    fmfsDetails.setRemarksGeologist(app.getRemarksGeologist());
+
+                    fmfsDetails.setApprovedArea(app.getApprovedArea());
+                    fmfsDetails.setApprovedErb(app.getApprovedErb());
+                    fmfsDetails.setApprovedLeasePeriod(app.getApprovedLeasePeriod());
+                    fmfsDetails.setApprovedMineral(app.getApprovedMineral());
+
+                    fmfsDetails.setChiefReviewedAt(app.getChiefReviewedAt());
+                    fmfsDetails.setDirectorReviewedAt(app.getDirectorReviewedAt());
+
+                    fmfsDetails.setFmfsStatus(app.getFmfsStatus());
+                    fmfsDetails.setGeologicalReportStatus(app.getGeologicalReportStatus());
+                    fmfsDetails.setGeologistReviewedAt(app.getGeologistReviewedAt());
+
+                    fmfsDetails.setLlcDocId(app.getLlcDocId());
+                    fmfsDetails.setMeReviewedAt(app.getMeReviewedAt());
+
+                    fmfsDetails.setMlaDocId(app.getMlaDocId());
+                    fmfsDetails.setMlaSignedAt(app.getMlaSignedAt());
+                    fmfsDetails.setMlaStatus(app.getMlaStatus());
+
+                    fmfsDetails.setMpcdReviewedAt(app.getMpcdReviewedAt());
+                    fmfsDetails.setNotesheetDocId(app.getNotesheetDocId());
+                    fmfsDetails.setRemarksChief(app.getRemarksChief());
+                    fmfsDetails.setRemarksDirector(app.getRemarksDirector());
+                    fmfsDetails.setRemarksMe(app.getRemarksME());
+                    fmfsDetails.setMpcdFileUploadIdMa(app.getMpcdFileUploadIdMa());
+                    fmfsDetails.setFileUploadIdGr(app.getFileUploadIdGr());
+                    fmfsDetails.setFileUploadIdPaFc(app.getFileUploadIdFC());
+                    if (fmfsDetails.getFmfsId() == null || fmfsDetails.getFmfsId().isBlank()) {
+                        fmfsDetails.setFmfsId(app.getFmfsId() != null && !app.getFmfsId().isBlank()
+                                ? app.getFmfsId()
+                                : generateUniqueFmfsId());
+                    }
+                    fmfsDetails.setCompanyRegistrationNo(app.getCompanyRegistrationNo());
+                    fmfsDetails.setCompanyType(app.getCompanyType());
+                    fmfsDetails.setEcNo(app.getEcNumber());
+                    fmfsDetails.setEcStatus(app.getECStatus());
+
+                    fmfsDetails.setBankGurantorDocId(app.getBankGuarantorDocId());
+                    fmfsDetails.setUpfrontPaymentAmount(app.getUpfrontPaymentAmount());
+                    fmfsDetails.setWorkOrderDocId(app.getWorkOrderDocId());
+                    fmfsDetails.setWorkOrderRemarks(app.getWorkOrderRemarks());
+                    fmfsDetails.setDzongkhagId(app.getDzongkhag().getId());
+                    fmfsDetails.setGewogId(app.getGewog().getGewogSerialNo());
+                    fmfsDetails.setVillageId(app.getNearestVillage().getVillageSerialNo());
+
+                    fmfsDetails.setFileUploadIdPa(app.getFileUploadIdPA());
+                    fmfsDetails.setFileUploadIdFc(app.getFileUploadIdFC());
+                    fmfsDetails.setFileUploadIdPublicClearance(app.getFileUploadIdPublicClearance());
+
+                    if (isNewFmfsRow) {
+                        fmfsDetails.setCreatedAt(LocalDateTime.now());
+                        fmfsDetails.setCreatedBy(app.getApplicantUserId());
+                    }
+                    fmfsDetails.setUpdatedAt(LocalDateTime.now());
+                    fmfsDetails.setUpdatedBy(userId);
+
+                    fmfsDetailsRepository.save(fmfsDetails);
+
+                    if (master != null) {
+                        master.setCurrentStatus("MINING_CHIEF_REVIEW");
+                        applicationMasterRepository.save(master);
+                    }
+
+                    // =====================================================
+                    // 8. ASSIGN DIRECTOR + CREATE TASK
+                    // =====================================================
+                    // Region -> HQ region -> escalate is now handled natively by the resolver.
+                    UserWorkloadProjection assignedMiningChief =
+                            assignMiningChief("MINING_CHIEF_REVIEW", app.getRegionId(), app.getApplicationNumber());
+
+                    assert master != null;
+                    createTask(master, app, "MINING_CHIEF_REVIEW", userId, assignedMiningChief.getUserId());
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendStatusUpdateNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber(),
+                                "Mining Chief Review",
+                                "Your application " + app.getApplicationNumber() + " has been forwarded to the Mining Chief for review.");
+                    }
+
+                    if (assignedMiningChief.getUserId() != null && assignedMiningChief.getEmail() != null) {
+                        notificationClient.sendAssignmentNotification(
+                                assignedMiningChief.getEmail(),
+                                assignedMiningChief.getUsername(),
+                                app.getApplicationNumber(),
+                                "Mining Chief Review");
+
+                        String title = "An new application has been assigned.";
+                        String message = "An application for mining lease has been assigned for review. Application No. "+ app.getApplicationNumber() +" Please login in review the application";
+                        String serviceId = MENU_ID_MINING_CHIEF;
+                        notificationClient.sendUserNotification(title, message, assignedMiningChief.getUserId(), serviceId, "STAFF", true, app.getApplicationNumber());
+                    }
+                }
+                case "Rejected" -> {
+                    if (request.getRemarks() == null || request.getRemarks().trim().isEmpty()) {
+                        throw new BusinessException(ErrorCodes.MISSING_REQUIRED_FIELD, "Remarks are mandatory for rejection.");
+                    }
+                    app.setCurrentStatus("REJECTED");
+                    app.setRemarksME(request.getRemarks());
+                    app.setMeReviewedAt(LocalDateTime.now());
+                    app.setRejectedAt(LocalDateTime.now());
+                    app.setRejectionReason(request.getRemarks());
+
+                    app.setLatestRemarkFocal(request.getRemarks());
+
+                    if (master != null) {
+                        master.setCurrentStatus("REJECTED");
+                        applicationMasterRepository.save(master);
+                    }
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendRejectionNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber(),
+                                request.getRemarks());
+                    }
+                }
+                case "Resubmit FMFS" -> {
+                    app.setCurrentStatus("RESUBMIT FMFS");
+                    app.setRemarksME(request.getRemarks());
+                    app.setMeReviewedAt(LocalDateTime.now());
+
+                    app.setLatestRemarkFocal(request.getRemarks());
+
+                    if (master != null) {
+                        master.setCurrentStatus("RESUBMIT FMFS");
+                        applicationMasterRepository.save(master);
+                    }
+
+                    createRevisionRecord(app, "ME_REVIEW", request.getRemarks(), userId);
+                    createTask(master, app, "APPLICANT", userId, app.getApplicantUserId());
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendRevisionRequestNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber(),
+                                "Mining Engineer Review",
+                                request.getRemarks());
+                    }
+                    smsClient.sendApplicationStatusSms(app.getApplicantUserId(), app.getApplicationNumber(), "Revision Required");
+                }
+                case "Resubmit EC" -> {
+                    app.setCurrentStatus("RESUBMIT EC");
+                    app.setRemarksME(request.getRemarks());
+                    app.setMeReviewedAt(LocalDateTime.now());
+
+                    app.setLatestRemarkFocal(request.getRemarks());
+
+                    if (master != null) {
+                        master.setCurrentStatus("RESUBMIT EC");
+                        applicationMasterRepository.save(master);
+                    }
+
+                    createRevisionRecord(app, "ME_REVIEW", request.getRemarks(), userId);
+                    createTask(master, app, "APPLICANT", userId, app.getApplicantUserId());
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendRevisionRequestNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber(),
+                                "Mining Engineer EC Review",
+                                request.getRemarks());
+                    }
+                    smsClient.sendApplicationStatusSms(app.getApplicantUserId(), app.getApplicationNumber(), "Revision Required");
+                }
+                case "Resubmit BG" -> {
+                    app.setCurrentStatus("RESUBMIT BG");
+                    app.setRemarksME(request.getRemarks());
+                    app.setMeReviewedAt(LocalDateTime.now());
+
+                    app.setLatestRemarkFocal(request.getRemarks());
+
+                    if (master != null) {
+                        master.setCurrentStatus("RESUBMIT BG");
+                        applicationMasterRepository.save(master);
+                    }
+
+                    createRevisionRecord(app, "ME_REVIEW", request.getRemarks(), userId);
+                    createTask(master, app, "APPLICANT", userId, app.getApplicantUserId());
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendRevisionRequestNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber(),
+                                "Mining Engineer BG Review",
+                                request.getRemarks());
+                    }
+                    smsClient.sendApplicationStatusSms(app.getApplicantUserId(), app.getApplicationNumber(), "Revision Required");
+                }
+                default -> throw new IllegalArgumentException("Application status not recognized");
+            }
+            miningLeaseApplicationRepository.save(app);
+        }
+        return mapper.toResponse(app);
+    }
+
+    /**
+     * Resolves the Mining Chief to forward to, via the admin-configured
+     * mas_db.t_workflow_step rule. When no eligible candidate is found, the
+     * returned projection has a null userId — masters has already recorded it
+     * in the escalation queue.
+     */
+    @Transactional
+    public UserWorkloadProjection assignMiningChief(String triggerStatus, Long regionId, String applicationNumber) {
+        var resolved = workflowAssignmentClient.resolve(SERVICE_CODE, triggerStatus, regionId, applicationNumber);
+        return toProjection(resolved);
+    }
+
+    public SuccessResponse<List<MiningLeaseResponse>> getAssignedToMineEngineer(Long userId, Pageable pageable, String search) {
+        Page<MiningLeaseApplication> page;
+
+        List<String> archivedStatuses = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION",
+                "MINING RENEWAL APPROVED",
+                "QUARRY RENEWAL APPROVED"
+        );
+
+        if (search == null || search.isBlank()) {
+
+            page = miningLeaseApplicationRepository
+                    .findAssignedToUserMineEngineer(userId, archivedStatuses, pageable);
+
+        } else {
+
+            page = miningLeaseApplicationRepository
+                    .findAssignedToUserIdAndSearchMineEngineer(
+                            userId,
+                            search.trim(),
+                            archivedStatuses,
+                            pageable
+                    );
+        }
+
+        Page<MiningLeaseResponse> responsePage =
+                page.map(mapper::toResponse);
+
+        return SuccessResponse.fromPage(
+                "Assigned applications fetched successfully",
+                responsePage
+        );
+    }
+
+    /** Team-wide Mine Engineer queue — every pending application regardless of who it auto-assigned to */
+    public SuccessResponse<List<MiningLeaseResponse>> getMineEngineerTeamQueue(Pageable pageable, String search) {
+        Page<MiningLeaseApplication> page = (search == null || search.isBlank())
+                ? miningLeaseApplicationRepository.findTeamQueueMineEngineer(pageable)
+                : miningLeaseApplicationRepository.findTeamQueueWithSearchMineEngineer(search.trim(), pageable);
+
+        Page<MiningLeaseResponse> responsePage = page.map(app -> {
+            MiningLeaseResponse response = mapper.toResponse(app);
+            taskManagementRepository.findByApplicationNumber(app.getApplicationNumber())
+                    .stream()
+                    .filter(t -> t.getAssignedToUserId() != null)
+                    .findFirst()
+                    .ifPresent(t -> {
+                        response.setAssignedEngineerUserId(t.getAssignedToUserId());
+                        UserWorkloadProjection engineer = miningLeaseApplicationRepository.findUserDetails(t.getAssignedToUserId());
+                        response.setAssignedEngineerName(engineer != null ? engineer.getUsername() : null);
+                    });
+            return response;
+        });
+
+        return SuccessResponse.fromPage(
+                "Team-wide queue fetched successfully",
+                responsePage
+        );
+    }
+
+    /** Tab-count badges for the Mining Engineer (Mining Division) dashboard's nav-tabs. */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Long> getMiningEngineerCounts(Long userId) {
+        List<String> archivedStatuses = List.of(
+                "MINING LEASE APPROVED",
+                "REJECTED",
+                "TERMINATED",
+                "RENEWAL APPLICATION",
+                "TEMPORARY CLOSURE APPROVED",
+                "UNDER-REVIEW-TERMINATION",
+                "MINING RENEWAL APPROVED",
+                "QUARRY RENEWAL APPROVED"
+        );
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put("submitted", miningLeaseApplicationRepository.countAssignedToUserMineEngineer(userId, archivedStatuses));
+        counts.put("teamQueue", miningLeaseApplicationRepository.countTeamQueueMineEngineer());
+        return counts;
+    }
+
+    @Transactional
+    public MiningLeaseResponse submitLLC(@Valid MiningLeaseLLCRequest request) {
+
+        MiningLeaseApplication quarryLeaseApplication1 = null;
+        if (request.getApplicationNo() != null) {
+            Optional<MiningLeaseApplication> quarryLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationNo());
+            if (quarryLeaseApplication.isPresent()) {
+                quarryLeaseApplication1 = quarryLeaseApplication.get();
+                ApplicationMaster applicationMaster = quarryLeaseApplication1.getApplicationMaster();
+                applicationMaster.setCurrentStatus("LLC UPLOADED");
+                quarryLeaseApplication1.setLlcDocId(request.getLLCDocId());
+                quarryLeaseApplication1.setCurrentStatus("LLC UPLOADED");
+                applicationMasterRepository.save(applicationMaster);
+                miningLeaseApplicationRepository.save(quarryLeaseApplication1);
+
+                // Keep the open Mining Engineer task alive but record progress, since the same
+                // engineer still has the Note Sheet + Work Order steps left before this task closes.
+                workflowTrackingService.updateCurrentTask(
+                        quarryLeaseApplication1.getApplicationNumber(), SERVICE_CODE,
+                        "IN_PROGRESS", "LLC_UPLOADED", "LLC document uploaded by mine engineer.");
+
+                if(quarryLeaseApplication1.getApplicantUserId() != null) {
+                    String title = "LLC has been uploaded by mine engineer.";
+                    String message = "LLC for you application has been uploaded by mine engineer. Please submit updated FMFS report";
+                    String serviceId = MENU_ID_PROMOTER;
+                    notificationClient.sendUserNotification(title, message, quarryLeaseApplication1.getApplicantUserId(), serviceId, "CITIZEN", false, quarryLeaseApplication1.getApplicationNumber());
+                }
+
+            }else {
+                throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
+            }
+        }
+        return mapper.toResponse(quarryLeaseApplication1);
+    }
+
+    @Transactional
+    public MiningLeaseResponse submitNoteSheetAndAdditionalDetails(@Valid MiningLeaseNoteSheetRequest request) {
+        MiningLeaseApplication quarryLeaseApplication1 = null;
+        if (request.getApplicationNo() != null) {
+            Optional<MiningLeaseApplication> quarryLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationNo());
+            if (quarryLeaseApplication.isPresent()) {
+                quarryLeaseApplication1 = quarryLeaseApplication.get();
+                ApplicationMaster applicationMaster = quarryLeaseApplication1.getApplicationMaster();
+                applicationMaster.setCurrentStatus("APPROVED BY MINISTRY");
+                quarryLeaseApplication1.setNotesheetDocId(request.getNoteSheetDocId());
+                quarryLeaseApplication1.setCurrentStatus("APPROVED BY MINISTRY");
+                applicationMasterRepository.save(applicationMaster);
+                miningLeaseApplicationRepository.save(quarryLeaseApplication1);
+
+                // Same open Mining Engineer task, one step closer to the Work Order — not closed yet.
+                workflowTrackingService.updateCurrentTask(
+                        quarryLeaseApplication1.getApplicationNumber(), SERVICE_CODE,
+                        "IN_PROGRESS",
+                        "APPROVED BY MINISTRY",
+                        "Note sheet uploaded by mine engineer."
+                );
+
+                if(quarryLeaseApplication1.getApplicantUserId() != null) {
+                    String title = "Note sheet has been uploaded by mine engineer.";
+                    String message = "Note sheet for you application has been uploaded by mine engineer.";
+                    String serviceId = MENU_ID_PROMOTER;
+                    notificationClient.sendUserNotification(title, message, quarryLeaseApplication1.getApplicantUserId(), serviceId, "CITIZEN", false, quarryLeaseApplication1.getApplicationNumber());
+                }
+
+            }else {
+                throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
+            }
+        }
+        return mapper.toResponse(quarryLeaseApplication1);
+    }
+
+    @Transactional
+    public MiningLeaseResponse submitWorkOrder(@Valid MiningLeaseWorkOrderRequest request) {
+        MiningLeaseApplication miningLeaseApplication = null;
+        if (request.getApplicationNo() != null) {
+            Optional<MiningLeaseApplication> quarryLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationNo());
+            if (quarryLeaseApplication.isPresent()) {
+                miningLeaseApplication = quarryLeaseApplication.get();
+                ApplicationMaster applicationMaster = miningLeaseApplication.getApplicationMaster();
+                LocalDateTime now = LocalDateTime.now();
+                applicationMaster.setCurrentStatus("MINING LEASE APPROVED");
+                applicationMaster.setApprovedAt(now);
+                applicationMaster.setCompletedAt(now);
+                miningLeaseApplication.setWorkOrderDocId(request.getWorkOrderDocId());
+                miningLeaseApplication.setLatestRemarkFocal(request.getRemarks());
+                miningLeaseApplication.setWorkOrderRemarks(request.getRemarks());
+                miningLeaseApplication.setCurrentStatus("MINING LEASE APPROVED");
+                applicationMasterRepository.save(applicationMaster);
+                miningLeaseApplicationRepository.save(miningLeaseApplication);
+
+                SiteMaster provisionedSite = siteProvisioningService.provisionSiteForApprovedLease(miningLeaseApplication);
+                applicationMaster.setSiteId(provisionedSite.getId());
+                applicationMasterRepository.save(applicationMaster);
+                recordApprovedForThreshold(miningLeaseApplication);
+
+                // Terminal approval — close out the open Mining Engineer task instead of leaving
+                // it dangling in the queue forever.
+                workflowTrackingService.completeCurrentTask(
+                        miningLeaseApplication.getApplicationNumber(), SERVICE_CODE,
+                        "APPROVED", "Work order uploaded; mining lease approved.");
+
+                if(miningLeaseApplication.getApplicantUserId() != null) {
+                    String title = "Work order has been uploaded by mine engineer.";
+                    String message = "Work order for your application has been uploaded by mine engineer. Your application " + miningLeaseApplication.getApplicationNumber() + " for Mining Lease has been approved.";
+                    String serviceId = MENU_ID_PROMOTER;
+                    notificationClient.sendUserNotification(title, message, miningLeaseApplication.getApplicantUserId(), serviceId, "CITIZEN", false, miningLeaseApplication.getApplicationNumber());
+                }
+                if (miningLeaseApplication.getApplicantEmail() != null) {
+                    notificationClient.sendWorkOrderNotification(
+                            miningLeaseApplication.getApplicantEmail(),
+                            miningLeaseApplication.getApplicantName(),
+                            miningLeaseApplication.getApplicationNumber());
+                }
+
+                HouseholdPermitThresholdEntity entity = new HouseholdPermitThresholdEntity();
+
+                entity.setServiceType(SERVICE_CODE);
+                entity.setApplicationNo(miningLeaseApplication.getApplicationNumber());
+                entity.setPermitNo(miningLeaseApplication.getExpPermitNo());
+                entity.setApplicantCid(miningLeaseApplication.getApplicantCid());
+                entity.setStatus("ACTIVE");
+
+                householdPermitThresholdRepository.save(entity);
+
+            }else {
+                throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
+            }
+        }
+        return mapper.toResponse(miningLeaseApplication);
+    }
+
+    @Transactional
+    public MiningLeaseResponse submitMLA(@Valid MiningLeaseMLARequest request, Long userId) {
+
+        MiningLeaseApplication quarryLeaseApplication1 = null;
+        if (request.getApplicationNo() != null) {
+            Optional<MiningLeaseApplication> quarryLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(request.getApplicationNo());
+            if (quarryLeaseApplication.isPresent()) {
+                quarryLeaseApplication1 = quarryLeaseApplication.get();
+                ApplicationMaster applicationMaster = quarryLeaseApplication1.getApplicationMaster();
+                quarryLeaseApplication1.setMlaDocId(request.getMlaDocId());
+                quarryLeaseApplication1.setLeaseStartDate(request.getLeaseStartDate());
+                quarryLeaseApplication1.setLeaseEndDate(request.getLeaseEndDate());
+                quarryLeaseApplication1.setMlaStatus("SUBMITTED");
+                quarryLeaseApplication1.setCurrentStatus("MLA SUBMITTED");
+                applicationMaster.setCurrentStatus("MLA SUBMITTED");
+                applicationMasterRepository.save(applicationMaster);
+                miningLeaseApplicationRepository.save(quarryLeaseApplication1);
+
+
+                List<String> status = new ArrayList<>();
+                status.add("SUBMITTED");
+                status.add("PAYMENT PENDING");
+                List<TaskManagement> taskManagement = taskManagementRepository.findByApplicationNumberAndTaskStatusInAndAssignedToRole(quarryLeaseApplication1.getApplicationNumber(),status,"DIRECTOR");
+                Long directorId = null;
+                if (taskManagement != null && !taskManagement.isEmpty()) {
+                    TaskManagement taskManagement1 = taskManagement.getFirst();
+                    directorId = taskManagement1.getAssignedToUserId();
+                }
+
+                createTask(applicationMaster,quarryLeaseApplication1,"DIRECTOR", userId, directorId);
+
+                UserWorkloadProjection assignedDirectorDetails = miningLeaseApplicationRepository.findUserDetails(directorId);
+                if(assignedDirectorDetails != null && assignedDirectorDetails.getUserId() != null) {
+                    String title = "Mining lease application has been assigned for MLA review.";
+                    String message = "Mining lease application has been  assigned for MLA review.";
+                    String serviceId = MENU_ID_DIRECTOR;
+                    notificationClient.sendUserNotification(title, message, assignedDirectorDetails.getUserId(), serviceId, "STAFF", true, quarryLeaseApplication1.getApplicationNumber());
+                }
+
+                if(quarryLeaseApplication1.getApplicantUserId() != null) {
+                    String title = "MLA submitted. Bank Guarantee needs to be submitted.";
+                    String message = "Please deposit an upfront EBB amount of Nu:"+ quarryLeaseApplication1.getApprovedErb() + " or an equivalent amount of Bank Guarantee in system and submit the original to the DGM.";
+                    String serviceId = MENU_ID_PROMOTER;
+                    notificationClient.sendUserNotification(title, message, quarryLeaseApplication1.getApplicantUserId(), serviceId, "CITIZEN", false, quarryLeaseApplication1.getApplicationNumber());
+                }
+
+            }else {
+                throw new BusinessException(ErrorCodes.RECORD_NOT_FOUND);
+            }
+        }
+        return mapper.toResponse(quarryLeaseApplication1);
+    }
+
+    @Transactional
+    public MiningLeaseResponse resubmitApplication(FileUploadRequest request, Long userId, MiningLeaseApplicationRequest miningLeaseApplicationRequest) {
+        /* * ============================================================
+        * 1. Determine Application Number
+        * ============================================================ *
+        * Application number can come from either:
+        * - MiningLeaseApplicationRequest
+        * - FileUploadRequest
+        */
+        String applicationNumber = null;
+        if (miningLeaseApplicationRequest != null && miningLeaseApplicationRequest.getApplicationNo() != null
+                && !miningLeaseApplicationRequest.getApplicationNo().trim().isEmpty())
+        {
+            applicationNumber = miningLeaseApplicationRequest.getApplicationNo();
+        }
+        else if (request != null && request.getApplicationNumber() != null && !request.getApplicationNumber().trim().isEmpty()) {
+            applicationNumber = request.getApplicationNumber();
+        }
+        if (applicationNumber == null) {
+            throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
+        }
+
+        /* * ============================================================
+        * 2. Fetch Mining Lease Application
+        * ============================================================ */
+        MiningLeaseApplication quarryLeaseApplication = miningLeaseApplicationRepository.findByApplicationNumber(applicationNumber)
+                .orElseThrow();
+
+        ApplicationMaster applicationMaster = quarryLeaseApplication.getApplicationMaster();
+
+        /* * ============================================================
+        * 3. Find Assigned Geologist
+        * ============================================================
+        * Used when PFS / GR / Map / KMZ / FMFS is resubmitted. */
+        Long geologistId = null;
+
+        List<TaskManagement> geologistTasks = taskManagementRepository .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+                applicationNumber,
+                "ASSIGNED",
+                "GEOLOGIST",
+                SERVICE_CODE
+        );
+
+        if (!geologistTasks.isEmpty()) {
+            TaskManagement geologistTask = geologistTasks.getFirst();
+            geologistId = geologistTask.getAssignedToUserId();
+        }
+
+        /* * ============================================================
+        * 4. Find Assigned MPCD Focal
+        * ============================================================ */
+        Long mpcdId = null;
+
+        List<TaskManagement> mpcdTasks = taskManagementRepository .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+                applicationNumber,
+                "MPCD_FOCAL",
+                "MPCD",
+                SERVICE_CODE
+        );
+        if (!mpcdTasks.isEmpty()) {
+            /* * FIX:
+            * Previously this was using taskManagement.getFirst()
+            * instead of taskManagement2.getFirst(). */
+            TaskManagement mpcdTask = mpcdTasks.getFirst();
+            mpcdId = mpcdTask.getAssignedToUserId();
+        }
+
+        /* * ============================================================
+        * 5. Resubmission Without File Upload
+        * ============================================================ * *
+        * This is used when the applicant resubmits the application
+        *  details only.
+        * */
+        if (request == null) {
+
+            if (miningLeaseApplicationRequest == null) {
+                throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
+            }
+
+            /* * Find the user who originally assigned the
+            * "RESUBMIT APPLICATION" task to the applicant.
+            */
+            Long assignedByUserId = null;
+            List<TaskManagement> resubmitTasks = taskManagementRepository .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+                    applicationNumber,
+                    "RESUBMIT APPLICATION",
+                    "APPLICANT",
+                    SERVICE_CODE
+            );
+
+            if (!resubmitTasks.isEmpty()) {
+                assignedByUserId = resubmitTasks.getFirst().getAssignedByUserId();
+            }
+            if (assignedByUserId == null) {
+                throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
+            }
+
+            /* * Update the existing application entity with
+            * the newly submitted application information.
+            * */
+            mapper.updateEntityFromRequest(
+                    miningLeaseApplicationRequest,
+                    quarryLeaseApplication
+            );
+
+            /*
+            * * Update application status.
+            * */
+            applicationMaster.setCurrentStatus("RESUBMITTED APPLICATION");
+            quarryLeaseApplication.setCurrentStatus("RESUBMITTED APPLICATION");
+
+            /*
+            * * Create a new task for MPCD Focal.
+            * */
+            createTask(
+                    applicationMaster,
+                    quarryLeaseApplication,
+                    "MPCD FOCAL",
+                    userId,
+                    assignedByUserId
+            );
+
+            /*
+            * * Notify the MPCD Focal that the application
+            * * has been resubmitted.
+            * */
+            notifyStaffAssignment(
+                    mpcdId,
+                    quarryLeaseApplication.getApplicationNumber(),
+                    "Application resubmitted for your review.",
+                    MENU_ID_MPCD
+            );
+        } else {
+
+            /* * ========================================================
+            * * 6. Resubmission With File Upload
+            * * ========================================================
+            * * The behavior depends on the type of document
+            * * being resubmitted.
+            * */
+            switch (request.getFileType()) {
+                /* * ----------------------------------------------------
+                * * PFS
+                * * ---------------------------------------------------- */
+                case "PFS" -> {
+
+                    quarryLeaseApplication.setPfsDocId(request.getFileId());
+
+                    /* * If PFS was previously sent back by Geologist,
+                    * * return it to Geologist.
+                    * * Otherwise, return it to MPCD Focal.
+                    * */
+
+                    if (Objects.equals(
+                            quarryLeaseApplication.getCurrentStatus(),
+                            "RESUBMIT PFS GEOLOGIST")) {
+                        applicationMaster.setCurrentStatus( "RESUBMITTED PFS GEOLOGIST" );
+                        quarryLeaseApplication.setCurrentStatus( "RESUBMITTED PFS GEOLOGIST" );
+                        createTask( applicationMaster, quarryLeaseApplication, "GEOLOGIST", userId, geologistId );
+                        notifyStaffAssignment(
+                                geologistId,
+                                quarryLeaseApplication.getApplicationNumber(),
+                                "PFS resubmitted for your review.",
+                                MENU_ID_GEOLOGIST );
+                    } else {
+                        applicationMaster.setCurrentStatus( "RESUBMITTED PFS MPCD" );
+                        quarryLeaseApplication.setCurrentStatus( "RESUBMITTED PFS MPCD" );
+                        createTask( applicationMaster, quarryLeaseApplication, "MPCD FOCAL", userId, mpcdId );
+                        notifyStaffAssignment(
+                                mpcdId,
+                                quarryLeaseApplication.getApplicationNumber(),
+                                "PFS resubmitted for your review.",
+                                MENU_ID_MPCD );
+                    }
+                }
+                /* * ----------------------------------------------------
+                * * GR
+                * * ----------------------------------------------------
+                * */
+                case "GR" -> {
+                    quarryLeaseApplication.setFileUploadIdGr(
+                            Long.valueOf(request.getFileId())
+                    );
+
+                    applicationMaster.setCurrentStatus("RESUBMITTED GR");
+                    quarryLeaseApplication.setCurrentStatus("RESUBMITTED GR");
+
+                    createTask(
+                            applicationMaster,
+                            quarryLeaseApplication,
+                            "GEOLOGIST",
+                            userId,
+                            geologistId);
+                }
+                /* * ----------------------------------------------------
+                *  * Map
+                * * ---------------------------------------------------- */
+                case "Map" -> {
+                    quarryLeaseApplication.setMapFileId(request.getFileId());
+
+                    applicationMaster.setCurrentStatus("RESUBMITTED GR");
+                    quarryLeaseApplication.setCurrentStatus("RESUBMITTED GR");
+
+                    createTask(
+                            applicationMaster,
+                            quarryLeaseApplication,
+                            "GEOLOGIST",
+                            userId,
+                            geologistId
+                    );
+                }
+                /* * ----------------------------------------------------
+                * * KMZ
+                * * ----------------------------------------------------
+                * */
+                case "KMZ" -> {
+                    quarryLeaseApplication.setFileUploadIdKmz(Long.valueOf(request.getFileId()));
+
+                    applicationMaster.setCurrentStatus("RESUBMITTED GR");
+                    quarryLeaseApplication.setCurrentStatus("RESUBMITTED GR");
+
+                    createTask(
+                            applicationMaster,
+                            quarryLeaseApplication,
+                            "GEOLOGIST",
+                            userId,
+                            geologistId
+                    );
+                }
+
+                /* * ----------------------------------------------------
+                * * Other Files
+                * * ----------------------------------------------------
+                * */
+                case "Other files" -> {
+
+                    quarryLeaseApplication.setOtherFilesId(
+                            request.getFileId()
+                    );
+                    /* *
+                    * * Determine whether the PFS was previously returned
+                    * * by Geologist or MPCD.
+                    * */
+                    Long assignedPfsUserId =
+                            findPfsResubmissionAssignedUserId(
+                                    applicationNumber,
+                                    quarryLeaseApplication.getCurrentStatus()
+                            );
+
+                    if (Objects.equals(
+                            quarryLeaseApplication.getCurrentStatus(),
+                            "RESUBMIT PFS GEOLOGIST")) {
+
+                        if (assignedPfsUserId == null) {
+                            throw new BusinessException( ErrorCodes.BUSINESS_RULE_VIOLATION );
+                        }
+
+                        applicationMaster.setCurrentStatus( "RESUBMITTED PFS GEOLOGIST" );
+                        quarryLeaseApplication.setCurrentStatus( "RESUBMITTED PFS GEOLOGIST" );
+
+                        createTask(
+                                applicationMaster,
+                                quarryLeaseApplication,
+                                "GEOLOGIST",
+                                userId,
+                                assignedPfsUserId
+                        );
+                    } else {
+                        if (assignedPfsUserId == null) {
+                            throw new BusinessException( ErrorCodes.BUSINESS_RULE_VIOLATION );
+                        }
+
+                        applicationMaster.setCurrentStatus( "RESUBMITTED PFS MPCD" );
+                        quarryLeaseApplication.setCurrentStatus( "RESUBMITTED PFS MPCD" );
+                        createTask(
+                                applicationMaster,
+                                quarryLeaseApplication,
+                                "MPCD FOCAL",
+                                userId,
+                                assignedPfsUserId );
+                    }
+                }
+
+                /*
+                * * ----------------------------------------------------
+                * * Financial Evidence
+                * * ---------------------------------------------------- */
+                case "Financial Capability" -> {
+
+                    quarryLeaseApplication.setFinancialCapabilityDocId(
+                            request.getFileId()
+                    );
+
+                    Long assignedPfsUserId =
+                            findPfsResubmissionAssignedUserId(
+                                    applicationNumber,
+                                    quarryLeaseApplication.getCurrentStatus()
+                            );
+
+                    if (Objects.equals(
+                            quarryLeaseApplication.getCurrentStatus(),
+                            "RESUBMIT PFS GEOLOGIST")) {
+
+                        if (assignedPfsUserId == null) {
+
+                            throw new BusinessException( ErrorCodes.BUSINESS_RULE_VIOLATION );
+                        }
+                        applicationMaster.setCurrentStatus( "RESUBMITTED PFS GEOLOGIST" );
+                        quarryLeaseApplication.setCurrentStatus( "RESUBMITTED PFS GEOLOGIST" );
+                        createTask(
+                                applicationMaster,
+                                quarryLeaseApplication,
+                                "GEOLOGIST",
+                                userId,
+                                assignedPfsUserId
+                        );
+                    } else {
+                        if (assignedPfsUserId == null) {
+                            throw new BusinessException( ErrorCodes.BUSINESS_RULE_VIOLATION );
+                        }
+                        applicationMaster.setCurrentStatus( "RESUBMITTED PFS MPCD" );
+                        quarryLeaseApplication.setCurrentStatus( "RESUBMITTED PFS MPCD" );
+                        createTask(
+                                applicationMaster,
+                                quarryLeaseApplication,
+                                "MPCD FOCAL",
+                                userId,
+                                assignedPfsUserId
+                        );
+                    }
+                }
+
+                /*
+                * *----------------------------------------------------
+                * * Location Map
+                * * ----------------------------------------------------
+                * */
+                case "Location Map" -> {
+                    quarryLeaseApplication.setLocationMapDocId(
+                            request.getFileId()
+                    );
+                    Long assignedPfsUserId =
+                            findPfsResubmissionAssignedUserId(
+                                    applicationNumber,
+                                    quarryLeaseApplication.getCurrentStatus()
+                            );
+
+                    if (Objects.equals(
+                            quarryLeaseApplication.getCurrentStatus(),
+                            "RESUBMIT PFS GEOLOGIST")) {
+
+                        if (assignedPfsUserId == null) {
+                            throw new BusinessException( ErrorCodes.BUSINESS_RULE_VIOLATION );
+                        }
+
+                        applicationMaster.setCurrentStatus( "RESUBMITTED PFS GEOLOGIST" );
+                        quarryLeaseApplication.setCurrentStatus( "RESUBMITTED PFS GEOLOGIST" );
+                        createTask(
+                                applicationMaster,
+                                quarryLeaseApplication,
+                                "GEOLOGIST",
+                                userId,
+                                assignedPfsUserId
+                        );
+                    }
+                    else {
+
+                        if (assignedPfsUserId == null) {
+                            throw new BusinessException( ErrorCodes.BUSINESS_RULE_VIOLATION );
+                        }
+
+                        applicationMaster.setCurrentStatus( "RESUBMITTED PFS MPCD" );
+                        quarryLeaseApplication.setCurrentStatus( "RESUBMITTED PFS MPCD" );
+                        createTask(
+                                applicationMaster,
+                                quarryLeaseApplication,
+                                "MPCD FOCAL",
+                                userId,
+                                assignedPfsUserId
+                        );
+                    }
+                }
+
+                /* *
+                 * ----------------------------------------------------
+                 * * Consent Letter
+                 * * ----------------------------------------------------
+                 * */
+
+                case "Consent Letter" -> {
+
+                    quarryLeaseApplication.setConsentLetterDocId(
+                            request.getFileId()
+                    );
+
+                    Long assignedPfsUserId =
+                            findPfsResubmissionAssignedUserId(
+                                    applicationNumber,
+                                    quarryLeaseApplication.getCurrentStatus()
+                            );
+
+                    if (Objects.equals(
+                            quarryLeaseApplication.getCurrentStatus(),
+                            "RESUBMIT PFS GEOLOGIST")) {
+
+                        if (assignedPfsUserId == null) {
+                            throw new BusinessException( ErrorCodes.BUSINESS_RULE_VIOLATION
+                            );
+                        }
+
+                        applicationMaster.setCurrentStatus( "RESUBMITTED PFS GEOLOGIST" );
+                        quarryLeaseApplication.setCurrentStatus( "RESUBMITTED PFS GEOLOGIST" );
+                        createTask(
+                                applicationMaster,
+                                quarryLeaseApplication,
+                                "GEOLOGIST",
+                                userId,
+                                assignedPfsUserId
+                        );
+                    }
+                    else {
+
+                        if (assignedPfsUserId == null) {
+                            throw new BusinessException( ErrorCodes.BUSINESS_RULE_VIOLATION );
+                        }
+
+                        applicationMaster.setCurrentStatus( "RESUBMITTED PFS MPCD" );
+                        quarryLeaseApplication.setCurrentStatus( "RESUBMITTED PFS MPCD" );
+                        createTask(
+                                applicationMaster,
+                                quarryLeaseApplication,
+                                "MPCD FOCAL",
+                                userId,
+                                assignedPfsUserId
+                        );
+                    }
+                }
+
+                /* *
+                * ----------------------------------------------------
+                * * FMFS / Default
+                * * ----------------------------------------------------
+                * *
+                * * Any file type not explicitly handled above is * treated as FMFS.
+                * */
+
+                default -> {
+                    quarryLeaseApplication.setFmfsDocId(
+                            request.getFileId()
+                    );
+
+                    quarryLeaseApplication.setTorFileId(
+                            request.getTorFileId()
+                    );
+
+                    applicationMaster.setCurrentStatus(
+                            "RESUBMITTED FMFS"
+                    );
+
+                    quarryLeaseApplication.setCurrentStatus(
+                            "RESUBMITTED FMFS"
+                    );
+
+                    /* *
+                    * * FMFS requires both Geologist and MPCD Focal
+                    * * tasks.
+                    * */
+                    createTask(
+                            applicationMaster,
+                            quarryLeaseApplication,
+                            "GEOLOGIST",
+                            userId,
+                            geologistId
+                    );
+
+                    createTask(
+                            applicationMaster,
+                            quarryLeaseApplication,
+                            "MPCD FOCAL",
+                            userId,
+                            mpcdId
+                    );
+
+                    notifyStaffAssignment(
+                            geologistId,
+                            quarryLeaseApplication.getApplicationNumber(),
+                            "FMFS resubmitted for your review.",
+                            MENU_ID_GEOLOGIST
+                    );
+
+                    notifyStaffAssignment(
+                            mpcdId,
+                            quarryLeaseApplication.getApplicationNumber(),
+                            "FMFS resubmitted for your review.",
+                            MENU_ID_MPCD
+                    );
+                }
+            }
+        }
+
+        /* *
+        * * ============================================================
+        * * 7. Save Application
+        * * ============================================================
+        * */
+
+        applicationMasterRepository.save(applicationMaster);
+        miningLeaseApplicationRepository.save(quarryLeaseApplication);
+
+        /*
+        * * ============================================================
+        * * 8. Additional MPCD Notification
+        * * ============================================================
+        * * GR, Map and KMZ resubmissions need to notify MPCD.
+        * */
+
+        if(request != null){
+            if(Objects.equals(request.getFileType(), "KMZ")
+                    || Objects.equals(request.getFileType(), "Map")
+                    || Objects.equals(request.getFileType(), "GR")) {
+
+                notifyStaffAssignment(
+                        mpcdId,
+                        quarryLeaseApplication.getApplicationNumber(),
+                        "Application resubmitted for your review.",
+                        MENU_ID_MPCD
+                );
+            }
+        }
+
+        /*
+        * * ============================================================
+        * * 9. Notify Applicant
+        * * ============================================================
+        * */
+        if (quarryLeaseApplication.getApplicantUserId() != null) {
+
+            notificationClient.sendUserNotification(
+                    "Application resubmitted.",
+                    "Your application " + quarryLeaseApplication.getApplicationNumber()
+                            + " for Mining Lease has been resubmitted.",
+                    quarryLeaseApplication.getApplicantUserId(),
+                    MENU_ID_PROMOTER,
+                    "CITIZEN",
+                    false,
+                    quarryLeaseApplication.getApplicationNumber()
+            );
+        }
+
+        return mapper.toResponse(quarryLeaseApplication);
+    }
+
+
+    /**
+     * *
+     * Finds the user who originally assigned the PFS resubmission task.
+     * * *
+     * If the application was returned by the Geologist, the task
+     * * "RESUBMIT PFS GEOLOGIST" is searched.
+     * * * Otherwise, the task "RESUBMIT PFS MPCD" is searched.
+     * * *
+     * @param applicationNumber application number
+     * @param currentStatus current application status
+     * @return assigned user ID, or null if no matching task is found
+     *
+     * */
+    private Long findPfsResubmissionAssignedUserId(
+            String applicationNumber,
+            String currentStatus) {
+
+        if (Objects.equals(currentStatus, "RESUBMIT PFS GEOLOGIST")) {
+            List<TaskManagement> taskGeologist =
+                    taskManagementRepository .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+                            applicationNumber,
+                            "RESUBMIT PFS GEOLOGIST",
+                            "APPLICANT",
+                            SERVICE_CODE
+                    );
+
+            if (!taskGeologist.isEmpty()) {
+                return taskGeologist.getFirst().getAssignedByUserId();
+            }
+        } else {
+            List<TaskManagement> taskMpcd =
+                    taskManagementRepository .findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(
+                            applicationNumber,
+                            "RESUBMIT PFS MPCD",
+                            "APPLICANT",
+                            SERVICE_CODE
+                    );
+
+            if (!taskMpcd.isEmpty()) {
+                return taskMpcd.getFirst().getAssignedByUserId();
+            }
+        }
+
+        return null;
+    }
+    /**
+     * @param menuId Real sidebar menu id (permissions.id) for the specific staff role being
+     *               notified — callers must pass the constant matching the recipient's actual
+     *               role (e.g. MENU_ID_GEOLOGIST vs MENU_ID_MPCD), since this helper is reused
+     *               for multiple different roles across resubmitApplication().
+     */
+    private void notifyStaffAssignment(Long staffUserId, String applicationNumber, String message, String menuId) {
+        if (staffUserId == null) {
+            return;
+        }
+        notificationClient.sendUserNotification(
+                "Mining lease application resubmitted.",
+                "Application " + applicationNumber + ": " + message,
+                staffUserId, menuId, "STAFF", true, applicationNumber);
+    }
+
+    public SuccessResponse<List<MiningLeaseResponse>> getAllApplicationAdmin(Pageable pageable, String search) {
+        Page<MiningLeaseApplication> page;
+
+        if (search == null || search.isBlank()) {
+            page = miningLeaseApplicationRepository.findAll(pageable);
+        } else {
+            page = miningLeaseApplicationRepository.findAllBySearch(search.trim(), pageable);
+        }
+
+        return SuccessResponse.fromPage("Applications fetched successfully", page.map(mapper::toResponse));
+    }
+
+    private Integer getExistingPermitCount(MiningLeaseGRRequest request, Long userId) {
+
+        String applicantType = request.getApplicantType();
+
+        if ("INDIVIDUAL".equalsIgnoreCase(applicantType)) {
+            String householdNumber =
+                    miningLeaseApplicationRepository.findUserHouseHoldNumber(userId);
+
+            return miningLeaseApplicationRepository
+                    .countMiningLeasesByHousehold(householdNumber);
+        }
+
+        String identifier;
+
+        if ("BUSINESS_LICENSE".equalsIgnoreCase(applicantType)) {
+            identifier = request.getBusinessLicenseNo();
+        } else if ("REGISTERED_COMPANY".equalsIgnoreCase(applicantType)) {
+            identifier = request.getCompanyRegistrationNo();
+        } else {
+            throw new BusinessException(
+                    ErrorCodes.INVALID_REQUEST,
+                    "Invalid applicant type."
+            );
+        }
+
+        return miningLeaseApplicationRepository
+                .countByApplicantCidAndServiceType(identifier, SERVICE_CODE);
+    }
+
+    public SuccessResponse<List<MiningLeaseResponse>> getArchivedApplicationApproved(
+            Long userId, boolean isAgencyUser, Pageable pageable, String search) {
+
+        // System-wide, used by RC/MD staff screens — had no role gate at all, so any
+        // authenticated citizen JWT could pull every applicant's approved lease data via
+        // this endpoint directly. Citizens have getMyApprovedApplicationsForActiveSite
+        // (the /mine route) instead.
+        if (!isAgencyUser) {
+            throw new UnauthorizedOperationException("You are not authorized to view this data");
+        }
+
+        Page<MiningLeaseApplication> page;
+
+        List<String> archivedStatuses = List.of(
+                "MINING LEASE APPROVED"
+        );
+
+        if (search == null || search.isBlank()) {
+
+            page = miningLeaseApplicationRepository
+                    .findByStatusIn(archivedStatuses, pageable);
+
+        } else {
+
+            page = miningLeaseApplicationRepository
+                    .findByStatusInAndSearch(
+                            archivedStatuses,
+                            search,
+                            pageable
+                    );
+        }
+
+        Page<MiningLeaseResponse> responsePage =
+                page.map(mapper::toResponse);
+
+        return SuccessResponse.fromPage(
+                "Assigned applications fetched successfully",
+                responsePage
+        );
+    }
+
+    /**
+     * Approved Mining Lease applications belonging to the logged-in promotor's own active
+     * site only — used by promotor-facing pickers (Temporary Closure). Unlike
+     * getArchivedApplicationApproved (system-wide, used by RC/MD staff screens), this must
+     * never leak other promotors' leases.
+     */
+    public SuccessResponse<List<MiningLeaseResponse>> getMyApprovedApplicationsForActiveSite(
+            Long userId, Pageable pageable, String search) {
+
+        List<String> archivedStatuses = List.of("MINING LEASE APPROVED");
+
+        Optional<UserActiveSite> activeSite = userActiveSiteRepository.findById(userId);
+        if (activeSite.isEmpty()) {
+            return SuccessResponse.fromPage("Assigned applications fetched successfully", Page.<MiningLeaseApplication>empty(pageable).map(mapper::toResponse));
+        }
+
+        Optional<SiteMaster> site = siteMasterRepository.findById(activeSite.get().getSiteId());
+        if (site.isEmpty() || !"MINING_LEASE".equals(site.get().getLeaseType())
+                || !userId.equals(site.get().getApplicantUserId())) {
+            return SuccessResponse.fromPage("Assigned applications fetched successfully", Page.<MiningLeaseApplication>empty(pageable).map(mapper::toResponse));
+        }
+
+        Page<MiningLeaseApplication> page = miningLeaseApplicationRepository.findByStatusInAndOwnerAndApplicationNumber(
+                archivedStatuses, userId, site.get().getLeaseApplicationNumber(),
+                (search == null || search.isBlank()) ? null : search.trim(), pageable);
+
+        Page<MiningLeaseResponse> responsePage = page.map(mapper::toResponse);
+
+        return SuccessResponse.fromPage("Assigned applications fetched successfully", responsePage);
+    }
+
+    /**
+     * Approved Mining Lease applications belonging to the logged-in promotor's own active
+     * site only — used by promotor-facing pickers (Temporary Closure). Unlike
+     * getArchivedApplicationApproved (system-wide, used by RC/MD staff screens), this must
+     * never leak other promotors' leases.
+     */
+    public SuccessResponse<List<MiningLeaseResponse>> getMyTerminatedApplicationsForActiveSite(
+            Long userId, Pageable pageable, String search) {
+
+        List<String> archivedStatuses = List.of(
+                "TERMINATED",
+                "TEMPORARY CLOSURE APPROVED"
+        );
+
+        Page<MiningLeaseApplication> page;
+
+        if (search == null || search.isBlank()) {
+
+            page = miningLeaseApplicationRepository
+                    .findByApplicantUserIdAndCurrentStatusIn(
+                            userId,
+                            archivedStatuses,
+                            pageable
+                    );
+
+        } else {
+
+            page = miningLeaseApplicationRepository
+                    .findByStatusInAndSearch(
+                            archivedStatuses,
+                            search,
+                            pageable
+                    );
+        }
+
+        Page<MiningLeaseResponse> responsePage =
+                page.map(mapper::toResponse);
+
+        return SuccessResponse.fromPage(
+                "Assigned applications fetched successfully",
+                responsePage
+        );
+    }
+}

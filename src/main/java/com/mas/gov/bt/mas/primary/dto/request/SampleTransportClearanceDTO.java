@@ -1,0 +1,32 @@
+package com.mas.gov.bt.mas.primary.dto.request;
+
+import lombok.*;
+
+import java.util.List;
+
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class SampleTransportClearanceDTO {
+
+    private String applicantName;
+    private String contactNo;
+    private String emailAddress;
+    private String applicantScope;
+
+    private List<SampleMineralDTO> minerals;
+
+    private String shippingPurpose;
+    private String shippingMode;
+    private String destination;
+    private String destinationCountry;
+
+    private String dzongkhagID;
+    private String gewogID;
+    private String villageID;
+
+    private String samplePhotoFileId;
+    private String othersFileId;
+}

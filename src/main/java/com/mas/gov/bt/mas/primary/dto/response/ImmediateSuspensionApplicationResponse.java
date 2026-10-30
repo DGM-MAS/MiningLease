@@ -1,0 +1,76 @@
+package com.mas.gov.bt.mas.primary.dto.response;
+
+import jakarta.persistence.Column;
+import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.time.LocalDateTime;
+
+@Getter
+@Setter
+@Data
+public class ImmediateSuspensionApplicationResponse {
+
+    private Long id;
+
+    private String nameOfMine;
+
+    private String applicationNumber;
+
+    private Long promoterUserId;
+
+    private String applicantCid;
+
+    private String applicantEmail;
+
+    private String applicantName;
+
+    private String dzongkhagName;
+
+    private String gewogName;
+
+    private String villageName;
+
+    private String placeOfActivity;
+
+    private String remarksRcMi;
+
+    private Long suspensionReasonId;
+    private String suspensionReasonName;
+
+    private LocalDateTime rcMiReviewedAt;
+
+    private LocalDateTime promoterReviewedAt;
+
+    private Long promoterFileId;
+
+    private String promoterRemarks;
+
+    private LocalDateTime miReviewedAt;
+
+    private Long miFileId;
+
+    private String miRemarks;
+
+    private String currentStatus;
+    private String currentStatusDisplayName;
+
+    private Long createdBy;
+
+    private LocalDateTime createdAt;
+
+    private LocalDateTime approvedAt;
+
+    private LocalDateTime rejectedAt;
+
+    private Long updatedBy;
+
+    private LocalDateTime updatedAt;
+
+    private Long regionId;
+
+    private String latestRemarks;
+
+
+}

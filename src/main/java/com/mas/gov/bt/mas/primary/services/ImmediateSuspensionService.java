@@ -1,0 +1,1016 @@
+package com.mas.gov.bt.mas.primary.services;
+
+import com.mas.gov.bt.mas.primary.utility.CustomRuntimeException;
+
+import com.mas.gov.bt.mas.primary.dto.UserWorkloadProjection;
+import com.mas.gov.bt.mas.primary.dto.request.*;
+import com.mas.gov.bt.mas.primary.dto.response.ImmediateSuspensionApplicationResponse;
+import com.mas.gov.bt.mas.primary.entity.*;
+import com.mas.gov.bt.mas.primary.exception.BusinessException;
+import com.mas.gov.bt.mas.primary.exception.ResourceNotFoundException;
+import com.mas.gov.bt.mas.primary.integration.MenuIdResolver;
+import com.mas.gov.bt.mas.primary.integration.NotificationClient;
+import com.mas.gov.bt.mas.primary.mapper.ImmediateSuspensionMapper;
+import com.mas.gov.bt.mas.primary.repository.*;
+import com.mas.gov.bt.mas.primary.utility.ErrorCodes;
+import com.mas.gov.bt.mas.primary.utility.SuccessResponse;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+@Service
+@Slf4j
+@RequiredArgsConstructor
+public class ImmediateSuspensionService {
+
+    private static final String SERVICE_CODE = "IMMEDIATE_SUSPENSION";
+    private static final String STOCK_LIFTING_CATEGORY   = "STOCK_LIFTING";
+    private static final int DEFAULT_TAT_DAYS = 2;
+
+    // Real sidebar menu ids (permissions.id) per recipient role for this service — used to target
+    // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
+    // NOT the same thing as SERVICE_CODE above, which is an unrelated t_application_master.service_code value.
+    // Resolved against the live permissions table at startup (see MenuIdResolver); the string
+    // literals below are only fallbacks if masters is unreachable.
+    private String MENU_ID_APPLICANT; // "Promoter Application List" (/Immediatesuspensionapplist)
+    private String MENU_ID_MI;        // "MI Application List" (/Immediatesuspensionmineinspectorapplist)
+
+    private final ImmediateSuspensionApplicationRepository immediateSuspensionApplicationRepository;
+
+    private final MiningLeaseApplicationRepository miningLeaseApplicationRepository;
+
+    private final QuarryLeaseApplicationRepository quarryLeaseApplicationRepository;
+
+    private final ApplicationMasterRepository applicationMasterRepository;
+
+    private final TaskManagementRepository taskManagementRepository;
+
+    private final NotificationClient notificationClient;
+
+    private final MenuIdResolver menuIdResolver;
+
+    private final ImmediateSuspensionMapper immediateSuspensionMapper;
+
+    private final ImmediateSuspensionReasonRepository immediateSuspensionReasonRepository;
+
+    private final SiteProvisioningService siteProvisioningService;
+
+    private final TerminationApplicationRepository terminationApplicationRepository;
+
+    private final SurfaceCollectionPermitRepository surfaceCollectionPermitRepository;
+
+    private final StockLiftingRepository stockLiftingRepository;
+
+    private final GewogLookupRepository  gewogLookupRepository;
+
+    @jakarta.annotation.PostConstruct
+    public void resolveMenuIds() {
+        MENU_ID_APPLICANT = menuIdResolver.resolve("/Immediatesuspensionapplist", "117");
+        MENU_ID_MI = menuIdResolver.resolve("/Immediatesuspensionmineinspectorapplist", "119");
+    }
+
+    @Transactional
+    public ImmediateSuspensionApplicationResponse submitImmediateSuspensionApplication(@Valid ImmediateSuspensionApplicationRequest request, Long userId) {
+        return switch (request.getApplicationFrom().toUpperCase()) {
+            case "M" -> processMiningSuspension(request, userId);
+            case "Q" -> processQuarrySuspension(request, userId);
+            case "S" -> processSurfaceCollectionSuspension(request, userId);
+            case "SL" -> processStockLiftingSuspension(request, userId);
+            default -> throw new BusinessException(ErrorCodes.BAD_REQUEST);
+        };
+    }
+
+    private ImmediateSuspensionApplicationResponse processStockLiftingSuspension(@Valid ImmediateSuspensionApplicationRequest request, Long userId) {
+        Optional<StockLiftingApplication> stockLiftingApplication = stockLiftingRepository.findByApplicationNo(request.getApplicationNumber());
+
+        ImmediateSuspensionApplication suspension = new ImmediateSuspensionApplication();
+
+        if (stockLiftingApplication.isPresent()) {
+
+            StockLiftingApplication application = stockLiftingApplication.get();
+
+            if (!"APPROVED".equalsIgnoreCase(application.getStatus())) {
+                throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION, "The Permit has to be in APPROVED state.");
+            }
+            application.setStatus("Under-Review-Suspension");
+
+            stockLiftingRepository.save(application);
+
+            Optional<ApplicationMaster> applicationMaster = applicationMasterRepository
+                    .findByApplicationNumberAndServiceCode(
+                            request.getApplicationNumber(),
+                            STOCK_LIFTING_CATEGORY
+                    );
+
+            ApplicationMaster applicationMaster1 = null;
+
+            if (applicationMaster.isPresent()) {
+                applicationMaster1 = applicationMaster.get();
+            }
+
+            Long regionId = null;
+            String regionName = "";
+            String dzongkhagName = "";
+            String gewogName = "";
+            String villageName = "";
+            String placeOfMiningActivity = "";
+            if (application.getDzongkhag() != null && !application.getDzongkhag().isEmpty()) {
+                dzongkhagName = application.getDzongkhag();
+            }
+
+            if (application.getGewog() != null && !application.getGewog().isEmpty()) {
+                gewogName = application.getGewog();
+                GewogLookup gewogLookup = gewogLookupRepository.findByGewogName(gewogName);
+                if (gewogLookup != null) {
+                    regionId = gewogLookup.getRegionalMaster().getId();
+                    regionName = gewogLookup.getRegionalMaster().getRegionName();
+                }
+
+            }
+
+            if (application.getPlaceVillage() != null && !application.getPlaceVillage().isEmpty()) {
+
+                villageName = application.getPlaceVillage();
+            }
+
+            suspension =
+                    buildSuspensionApplication(request,
+                            userId,
+                            application.getCreatedBy(),
+                            application.getApplicantName(),
+                            application.getApplicantCid(),
+                            application.getApplicantEmail(),
+                            application.getApplicationNo(),
+                            application.getNameOfStockLifting(),
+                            regionId,
+                            regionName,
+                            dzongkhagName,
+                            gewogName,
+                            villageName,
+                            placeOfMiningActivity
+                    );
+
+            assert applicationMaster1 != null;
+            applicationMaster1.setCurrentStatus("Under-Review-Suspension");
+            applicationMasterRepository.save(applicationMaster1);
+
+            suspension.setApplicationMaster(applicationMaster1);
+            immediateSuspensionApplicationRepository.save(suspension);
+
+
+            createTask(applicationMaster1, suspension, "APPLICANT", userId, application.getCreatedBy());
+
+            sendNotifications(application.getApplicantEmail(),
+                    application.getApplicantName(),
+                    application.getCreatedBy(),
+                    request.getApplicationNumber());
+
+        }
+        return immediateSuspensionMapper.toResponse(suspension);
+    }
+
+    // Used to process Mining lease application during application submission
+    @Transactional
+    private ImmediateSuspensionApplicationResponse processMiningSuspension(
+            ImmediateSuspensionApplicationRequest request, Long userId) {
+
+        MiningLeaseApplication miningLeaseApplication =
+                miningLeaseApplicationRepository
+                        .findByApplicationNumber(request.getApplicationNumber())
+                        .orElseThrow(() -> new BusinessException(ErrorCodes.BAD_REQUEST));
+
+        if (!"MINING LEASE APPROVED".equalsIgnoreCase(miningLeaseApplication.getCurrentStatus())) {
+            throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
+        }
+
+        String regionName = "";
+
+        if (miningLeaseApplication.getGewog() != null ) {
+            regionName = miningLeaseApplication.getGewog().getRegionalMaster().getRegionName();
+        }
+
+        assert miningLeaseApplication.getGewog() != null;
+        ImmediateSuspensionApplication suspension =
+                buildSuspensionApplication(
+                        request,
+                        userId,
+                        miningLeaseApplication.getApplicantUserId(),
+                        miningLeaseApplication.getApplicantName(),
+                        miningLeaseApplication.getApplicantCid(),
+                        miningLeaseApplication.getApplicantEmail(),
+                        miningLeaseApplication.getApplicationNumber(),
+                        miningLeaseApplication.getNameOfMine(),
+                        miningLeaseApplication.getRegionId(),
+                        regionName,
+                        miningLeaseApplication.getDzongkhag().getDzongkhagName(),
+                        miningLeaseApplication.getGewog().getGewogName(),
+                        miningLeaseApplication.getNearestVillage().getVillageName(),
+                        miningLeaseApplication.getPlaceOfMiningActivity());
+
+        ApplicationMaster master = updateApplicationMaster(miningLeaseApplication.getApplicationMaster());
+
+        suspension.setApplicationMaster(master);
+        immediateSuspensionApplicationRepository.save(suspension);
+
+        miningLeaseApplication.setCurrentStatus("Under-Review-Suspension");
+        miningLeaseApplicationRepository.save(miningLeaseApplication);
+
+        createTask(master, suspension, "APPLICANT", userId, miningLeaseApplication.getApplicantUserId());
+
+        sendNotifications(miningLeaseApplication.getApplicantEmail(),
+                miningLeaseApplication.getApplicantName(),
+                miningLeaseApplication.getApplicantUserId(),
+                request.getApplicationNumber());
+
+        return immediateSuspensionMapper.toResponse(suspension);
+    }
+
+    // Used to process Quarrying lease application during application submission
+    @Transactional
+    private ImmediateSuspensionApplicationResponse processQuarrySuspension(
+            ImmediateSuspensionApplicationRequest request, Long userId) {
+
+        QuarryLeaseApplication quarryLeaseApplication =
+                quarryLeaseApplicationRepository
+                        .findByApplicationNumber(request.getApplicationNumber())
+                        .orElseThrow(() -> new BusinessException(ErrorCodes.BAD_REQUEST));
+
+        if (!"QUARRY LEASE APPROVED".equalsIgnoreCase(quarryLeaseApplication.getCurrentStatus())) {
+            throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
+        }
+
+        String regionName = "";
+
+        if (quarryLeaseApplication.getDzongkhag() != null ) {
+            regionName = quarryLeaseApplication.getGewog().getRegionalMaster().getRegionName();
+        }
+
+        assert quarryLeaseApplication.getDzongkhag() != null;
+        ImmediateSuspensionApplication suspension =
+                buildSuspensionApplication(request, userId,
+                        quarryLeaseApplication.getApplicantUserId(),
+                        quarryLeaseApplication.getApplicantName(),
+                        quarryLeaseApplication.getApplicantCid(),
+                        quarryLeaseApplication.getApplicantEmail(),
+                        quarryLeaseApplication.getApplicationNumber(),
+                        quarryLeaseApplication.getNameOfQuarry(),
+                        quarryLeaseApplication.getRegionId(),
+                        regionName,
+                        quarryLeaseApplication.getDzongkhag().getDzongkhagName(),
+                        quarryLeaseApplication.getGewog().getGewogName(),
+                        quarryLeaseApplication.getNearestVillage().getVillageName(),
+                        quarryLeaseApplication.getPlaceOfMiningActivity()
+                );
+
+        ApplicationMaster master = updateApplicationMaster(quarryLeaseApplication.getApplicationMaster());
+
+        suspension.setApplicationMaster(master);
+        immediateSuspensionApplicationRepository.save(suspension);
+
+        quarryLeaseApplication.setCurrentStatus("Under-Review-Suspension");
+        quarryLeaseApplicationRepository.save(quarryLeaseApplication);
+
+        createTask(master, suspension, "APPLICANT", userId, quarryLeaseApplication.getApplicantUserId());
+
+        sendNotifications(quarryLeaseApplication.getApplicantEmail(),
+                quarryLeaseApplication.getApplicantName(),
+                quarryLeaseApplication.getApplicantUserId(),
+                request.getApplicationNumber());
+
+        return immediateSuspensionMapper.toResponse(suspension);
+    }
+
+    // Used to process Quarrying lease application during application submission
+    @Transactional
+    private ImmediateSuspensionApplicationResponse processSurfaceCollectionSuspension(
+            ImmediateSuspensionApplicationRequest request, Long userId) {
+
+        SurfaceCollectionPermitEntity surfaceCollectionPermitEntity =
+                surfaceCollectionPermitRepository
+                        .findByApplicationNo(request.getApplicationNumber())
+                        .orElseThrow(() -> new BusinessException(ErrorCodes.BAD_REQUEST));
+
+        if (!"PERMIT_ISSUED".equalsIgnoreCase(surfaceCollectionPermitEntity.getStatus())) {
+            throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION);
+        }
+
+        String regionName = "";
+        String dzongkhagName = "";
+        String gewogName = "";
+        String villageName = "";
+        String placeOfMiningActivity = "";
+        if (surfaceCollectionPermitEntity.getDzongkhag() != null && !surfaceCollectionPermitEntity.getDzongkhag().isEmpty()) {
+            dzongkhagName = surfaceCollectionPermitEntity.getDzongkhag();
+        }
+
+        if (surfaceCollectionPermitEntity.getGewog() != null && !surfaceCollectionPermitEntity.getGewog().isEmpty()) {
+            gewogName = surfaceCollectionPermitEntity.getGewog();
+            GewogLookup gewogLookup = gewogLookupRepository.findByGewogName(surfaceCollectionPermitEntity.getGewog());
+            regionName = gewogLookup.getRegionalMaster().getRegionName();
+        }
+
+        if (surfaceCollectionPermitEntity.getPlaceVillage() != null && !surfaceCollectionPermitEntity.getPlaceVillage().isEmpty()) {
+
+
+            villageName = surfaceCollectionPermitEntity.getPlaceVillage();
+        }
+
+        ImmediateSuspensionApplication suspension =
+                buildSuspensionApplication(request, userId,
+                        surfaceCollectionPermitEntity.getCreatedBy(),
+                        surfaceCollectionPermitEntity.getApplicantName(),
+                        surfaceCollectionPermitEntity.getApplicantCid(),
+                        surfaceCollectionPermitEntity.getEmail(),
+                        surfaceCollectionPermitEntity.getApplicationNo(),
+                        surfaceCollectionPermitEntity.getNameOfSurfaceCollection(),
+                        surfaceCollectionPermitEntity.getRegionId(),
+                        regionName,
+                        dzongkhagName,
+                        gewogName,
+                        villageName,
+                        placeOfMiningActivity
+                        );
+
+        Optional<ApplicationMaster> applicationMaster = applicationMasterRepository.findByApplicationNumberAndServiceCode(request.getApplicationNumber(), "SURFACE_COLLECTION_PERMIT");
+
+        ApplicationMaster applicationMasterEntity = applicationMaster.orElseThrow(() -> new BusinessException(ErrorCodes.BAD_REQUEST));
+
+        ApplicationMaster master = updateApplicationMaster(applicationMasterEntity);
+
+        suspension.setApplicationMaster(master);
+        immediateSuspensionApplicationRepository.save(suspension);
+
+        surfaceCollectionPermitEntity.setStatus("Under-Review-Suspension");
+        surfaceCollectionPermitRepository.save(surfaceCollectionPermitEntity);
+
+        createTask(master, suspension, "APPLICANT", userId, surfaceCollectionPermitEntity.getCreatedBy());
+
+        sendNotifications(surfaceCollectionPermitEntity.getEmail(),
+                surfaceCollectionPermitEntity.getApplicantName(),
+                surfaceCollectionPermitEntity.getCreatedBy(),
+                request.getApplicationNumber());
+
+        return immediateSuspensionMapper.toResponse(suspension);
+    }
+
+    // Immediate Suspension data saving part where data from
+    // 1. Quarry
+    // 2. Mining
+    // 3. Stock lifting
+    // 4. Surface collection can be saved
+    private ImmediateSuspensionApplication buildSuspensionApplication(
+            ImmediateSuspensionApplicationRequest request,
+            Long userId,
+            Long promoterId,
+            String applicantName,
+            String cid,
+            String email,
+            String applicationNumber,
+            String nameOfMine,
+            Long regionId,
+            String regionName,
+            String dzongkhagName,
+            String gewogName,
+            String villageName,
+            String placeOfActivity) {
+
+        ImmediateSuspensionApplication suspension = new ImmediateSuspensionApplication();
+
+        suspension.setApplicationNumber(applicationNumber);
+        suspension.setNameOfMine(nameOfMine);
+        suspension.setApplicationFrom(request.getApplicationFrom());
+        suspension.setPromoterUserId(promoterId);
+        suspension.setApplicantName(applicantName);
+        suspension.setApplicantCid(cid);
+        suspension.setApplicantEmail(email);
+        suspension.setRemarksRcMi(request.getRcMiRemark());
+        suspension.setRcMiReviewedAt(LocalDateTime.now());
+        suspension.setCreatedBy(userId);
+        suspension.setCreatedAt(LocalDateTime.now());
+        suspension.setCurrentStatus("SUBMITTED");
+        suspension.setRegionId(regionId);
+        suspension.setRegionName(regionName);
+        suspension.setDzongkhagName(dzongkhagName);
+        suspension.setGewogName(gewogName);
+        suspension.setVillageName(villageName);
+        suspension.setPlaceOfActivity(placeOfActivity);
+
+        ImmediateSuspensionReasonMaster reason =
+                immediateSuspensionReasonRepository
+                        .findById(request.getSuspensionReasonId())
+                        .orElseThrow(() -> new BusinessException(ErrorCodes.BAD_REQUEST));
+
+        suspension.setSuspensionReasonMaster(reason);
+        suspension.setSuspensionReasonId(reason.getId());
+
+        return suspension;
+    }
+
+    // Application master table would be updated when a new action is being taken.
+    // This row belongs to the ORIGINAL lease/permit (site-tagging, sidebar
+    // gating, and "my applications" all key off its serviceCode) — an immediate
+    // suspension is a status overlay on that same record, not a new service, so
+    // serviceCode/applicantUserId must stay exactly as the lease itself set them.
+    private ApplicationMaster updateApplicationMaster(ApplicationMaster master) {
+
+        master.setCurrentStatus("SUBMITTED");
+
+        return applicationMasterRepository.save(master);
+    }
+
+    // Notification logic
+    private void sendNotifications(String email, String name, Long userId, String appNo) {
+
+        if (email != null) {
+            notificationClient.sendMiningLeaseMailToDirectorAssigned(
+                    email,
+                    name,
+                    appNo);
+        }
+
+        if (userId != null) {
+            String title = "Immediate Suspension application has been issued related to your lease.";
+            String message = "Application No. " + appNo;
+
+            notificationClient.sendUserNotification(title, message, userId, MENU_ID_APPLICANT, "CITIZEN", false, appNo);
+        }
+    }
+
+    @Transactional
+    private void createTask(ApplicationMaster master, ImmediateSuspensionApplication application, String role, Long userId, Long directorId) {
+        LocalDateTime now = LocalDateTime.now();
+
+        TaskManagement task = new TaskManagement();
+        task.setApplicationNumber(application.getApplicationNumber());
+        task.setServiceCode(SERVICE_CODE);
+        task.setAssignedToRole(role);
+        task.setAssignedByUserId(userId);
+        task.setAssignedToUserId(directorId);
+        task.setAssignedAt(now);
+        task.setTaskStatus(master.getCurrentStatus());
+
+        task.setDeadlineDate(now.plusDays(DEFAULT_TAT_DAYS));
+        task.setCreatedBy(userId);
+
+        taskManagementRepository.save(task);
+        log.info("Created task for role {}", role);
+    }
+
+    public long countAssignedToPromoter(Long userId) {
+        return immediateSuspensionApplicationRepository.countAssignedToUserPromoter(userId);
+    }
+
+    @Transactional(readOnly = true)
+    public SuccessResponse<List<ImmediateSuspensionApplicationResponse>> getAssignedToPromoter(Long userId, Pageable pageable, String search) {
+        Page<ImmediateSuspensionApplication> page;
+
+        if (search == null || search.isBlank()) {
+
+            page = immediateSuspensionApplicationRepository
+                    .findAssignedToUserPromoter(userId, pageable);
+
+        } else {
+
+            page = immediateSuspensionApplicationRepository
+                    .findAssignedToUserAndSearchPromoter(
+                            userId,
+                            search.trim(),
+                            pageable
+                    );
+        }
+
+        Page<ImmediateSuspensionApplicationResponse> responsePage =
+                page.map(immediateSuspensionMapper::toResponse);
+
+        return SuccessResponse.fromPage(
+                "Assigned applications fetched successfully",
+                responsePage
+        );
+    }
+
+    public ImmediateSuspensionApplicationResponse reviewApplicationPromoter(@Valid PromoterImmediateSuspensionRequest request, Long userId) {
+        log.info("Reviewing Termination application by Promoter: {}", userId);
+
+        ImmediateSuspensionApplication app = findApplicationById(request.getId());
+        ApplicationMaster master = app.getApplicationMaster();
+
+        if (request.getStatus() != null) {
+
+            if (request.getStatus().equals("Rectification")) {
+                LocalDateTime now = LocalDateTime.now();
+                app.setCurrentStatus("RECTIFICATION BY PROMOTER");
+                app.setPromoterReviewedAt(now);
+                app.setPromoterRemarks(request.getRemarks());
+                app.setPromoterFileId(request.getFileId());
+
+                if (master != null) {
+                    master.setCurrentStatus("RECTIFICATION BY PROMOTER");
+                    applicationMasterRepository.save(master);
+                }
+
+                if (app.getApplicantEmail() != null) {
+                    notificationClient.sendImmediateSuspensionRevisionRequestPromoterNotification(
+                            app.getApplicantEmail(),
+                            app.getApplicantName(),
+                            app.getApplicationNumber(),
+                            app.getCurrentStatus(),
+                            "Rectification Submitted");
+                }
+                if (app.getCreatedBy() != null) {
+                    String title = "Immediate Suspension Rectification Submitted";
+                    String message = "Promoter has resubmitted rectification for suspension application "
+                            + app.getApplicationNumber() + ". Please review.";
+                    notificationClient.sendUserNotification(title, message, app.getCreatedBy(), MENU_ID_MI, "STAFF", true, app.getApplicationNumber());
+                }
+
+                assert master != null;
+                createTask(master, app, "RC/MI", userId, app.getCreatedBy());
+            } else {
+                throw new IllegalArgumentException("Application status not recognized");
+            }
+            immediateSuspensionApplicationRepository.save(app);
+        }
+        return immediateSuspensionMapper.toResponse(app);
+    }
+
+    private ImmediateSuspensionApplication findApplicationById(Long id) {
+        return immediateSuspensionApplicationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Application not found with ID: " + id));
+    }
+
+    public ImmediateSuspensionApplicationResponse assignApplicationDirector(@Valid AssignedTaskRC request, Long userId) {
+        ImmediateSuspensionApplication immediateSuspensionApplication;
+
+        immediateSuspensionApplication = findApplicationById(request.getId());
+        ApplicationMaster applicationMaster ;
+
+        applicationMaster = immediateSuspensionApplication.getApplicationMaster();
+
+        if (request.getMiFocalId() != null ) {
+            immediateSuspensionApplication.setCurrentStatus("MI ASSIGNED");
+            immediateSuspensionApplication.setRemarksRcMi(request.getRemarksRC());
+            immediateSuspensionApplication.setRcMiReviewedAt(LocalDateTime.now());
+            applicationMaster.setCurrentStatus("MI ASSIGNED");
+        }
+        applicationMasterRepository.save(applicationMaster);
+        immediateSuspensionApplicationRepository.save(immediateSuspensionApplication);
+
+        if (request.getMiFocalId() != null) {
+            createTask(
+                    applicationMaster,
+                    immediateSuspensionApplication,
+                    "MI",
+                    userId,
+                    request.getMiFocalId());
+
+            UserWorkloadProjection userMI = immediateSuspensionApplicationRepository.findUserDetailsMI(request.getMiFocalId());
+
+            if (immediateSuspensionApplication.getApplicantEmail() != null) {
+                notificationClient.sendStatusUpdateNotification(
+                        immediateSuspensionApplication.getApplicantEmail(),
+                        immediateSuspensionApplication.getApplicantName(),
+                        immediateSuspensionApplication.getApplicationNumber(),
+                        immediateSuspensionApplication.getCurrentStatus(),
+                        "MI ASSIGNED");
+            }
+
+            if (userMI != null) {
+                notificationClient.sendAssignmentNotification(
+                        userMI.getEmail(),
+                        userMI.getUsername(),
+                        immediateSuspensionApplication.getApplicationNumber(),
+                        "MI ASSIGNED");
+
+                String title = "A new immediate suspension application has been assigned.";
+                String message = "A new immediate suspension application has been assigned.";
+                String serviceId = MENU_ID_MI;
+                notificationClient.sendUserNotification(title, message, userMI.getUserId(), serviceId, "STAFF", true, immediateSuspensionApplication.getApplicationNumber());
+            }
+        }
+        return immediateSuspensionMapper.toResponse(immediateSuspensionApplication);
+
+    }
+
+    public long countAssignedToMI(Long userId) {
+        return immediateSuspensionApplicationRepository.countAssignedToUserMI(userId);
+    }
+
+    public SuccessResponse<List<ImmediateSuspensionApplicationResponse>> getAssignedToMI(Long userId, Pageable pageable, String search) {
+        Page<ImmediateSuspensionApplication> page;
+
+        if (search == null || search.isBlank()) {
+
+            page = immediateSuspensionApplicationRepository
+                    .findAssignedToUserMI(userId, pageable);
+
+        } else {
+
+            page = immediateSuspensionApplicationRepository
+                    .findAssignedToUserAndSearchMI(
+                            userId,
+                            search.trim(),
+                            pageable
+                    );
+        }
+
+        Page<ImmediateSuspensionApplicationResponse> responsePage =
+                page.map(immediateSuspensionMapper::toResponse);
+
+        return SuccessResponse.fromPage(
+                "Assigned applications fetched successfully",
+                responsePage
+        );
+    }
+
+    public ImmediateSuspensionApplicationResponse reviewApplicationMI(@Valid PromoterImmediateSuspensionRequest request, Long userId) {
+        log.info("Reviewing Termination application by MI: {}", userId);
+
+        ImmediateSuspensionApplication app = findApplicationById(request.getId());
+        ApplicationMaster master = app.getApplicationMaster();
+
+        app.setLatestRemarks(request.getRemarks());
+
+        if (request.getStatus() != null) {
+
+            if (request.getStatus().equals("Rectification")) {
+                LocalDateTime now = LocalDateTime.now();
+                app.setCurrentStatus("RECTIFICATION NEEDED");
+                app.setMiReviewedAt(now);
+                app.setMiRemarks(request.getRemarks());
+                app.setMiFileId(request.getFileId());
+                app.setPromoterFileId(null);
+
+                if (master != null) {
+                    master.setCurrentStatus("RECTIFICATION NEEDED");
+                    applicationMasterRepository.save(master);
+                }
+
+                if (app.getApplicantEmail() != null) {
+                    notificationClient.sendImmediateSuspensionRevisionRequestPromoterNotification(
+                            app.getApplicantEmail(),
+                            app.getApplicantName(),
+                            app.getApplicationNumber(),
+                            app.getCurrentStatus(),
+                            "Rectification Needed");
+                }
+                if (app.getPromoterUserId() != null) {
+                    String title = "Immediate Suspension Rectification Needed";
+                    String message = "Your immediate suspension application " + app.getApplicationNumber()
+                            + " requires rectification. Please review and resubmit.";
+                    notificationClient.sendUserNotification(title, message, app.getPromoterUserId(), MENU_ID_APPLICANT, "CITIZEN", true, app.getApplicationNumber());
+                }
+
+                assert master != null;
+                createTask(master, app, "APPLICANT", userId, app.getPromoterUserId());
+            } else if (request.getStatus().equals("Lifting")) {
+                LocalDateTime now = LocalDateTime.now();
+                app.setCurrentStatus("SUSPENSION LIFTING");
+                app.setMiReviewedAt(now);
+                app.setMiFileId(request.getFileId());
+                app.setMiRemarks(request.getRemarks());
+
+                if (master != null) {
+                    master.setCurrentStatus("SUSPENSION LIFTING");
+                    applicationMasterRepository.save(master);
+                }
+
+                if (app.getApplicantEmail() != null) {
+                    notificationClient.sendUpliftingSuspensionNotification(
+                            app.getApplicantEmail(),
+                            app.getApplicantName(),
+                            app.getApplicationNumber());
+                }
+                if (app.getPromoterUserId() != null) {
+                    String title = "Immediate Suspension Being Lifted";
+                    String message = "The suspension for application " + app.getApplicationNumber()
+                            + " is being lifted, pending final review.";
+                    notificationClient.sendUserNotification(title, message, app.getPromoterUserId(), MENU_ID_APPLICANT, "CITIZEN", false, app.getApplicationNumber());
+                }
+
+                assert master != null;
+                createTask(master, app, "APPLICANT", userId, app.getCreatedBy());
+            } else {
+                throw new IllegalArgumentException("Application status not recognized");
+            }
+            immediateSuspensionApplicationRepository.save(app);
+        }
+        return immediateSuspensionMapper.toResponse(app);
+    }
+
+    @Transactional
+    public ImmediateSuspensionApplicationResponse reviewApplicationRCME(@Valid RcMeImmediateSuspensionRequest request, Long userId) {
+        log.info("Reviewing Termination application by RC/ME: {}", userId);
+
+        ImmediateSuspensionApplication app = findApplicationById(request.getId());
+        ApplicationMaster master = app.getApplicationMaster();
+
+        app.setLatestRemarks(request.getRemarks());
+
+        if (request.getStatus() != null) {
+
+            switch (request.getStatus()) {
+                case "Suspended" -> {
+                    LocalDateTime now = LocalDateTime.now();
+                    app.setCurrentStatus("SUSPENDED");
+                    app.setPromoterReviewedAt(now);
+
+                    String leaseType = app.getApplicationFrom().equalsIgnoreCase("M") ? "MINING_LEASE" : "QUARRY_LEASE";
+
+                    if (app.getApplicationFrom().equalsIgnoreCase("M")) {
+                        Optional<MiningLeaseApplication> miningLeaseApplication =
+                                miningLeaseApplicationRepository.findByApplicationNumber(app.getApplicationNumber());
+
+                        if (miningLeaseApplication.isEmpty()) {
+                            throw new CustomRuntimeException("Invalid application number: " + app.getApplicationNumber());
+                        }
+
+                        MiningLeaseApplication miningLeaseApplication1 = miningLeaseApplication.get();
+
+                        miningLeaseApplication1.setCurrentStatus("SUSPENDED");
+                        miningLeaseApplicationRepository.save(miningLeaseApplication1);
+                    } else if (app.getApplicationFrom().equalsIgnoreCase("Q")) {
+                        Optional<QuarryLeaseApplication> application =
+                                quarryLeaseApplicationRepository.findByApplicationNumber(app.getApplicationNumber());
+
+                        if (application.isEmpty()) {
+                            throw new CustomRuntimeException("Invalid application number: " + app.getApplicationNumber());
+                        }
+
+                        QuarryLeaseApplication quarryLeaseApplication = application.get();
+                        quarryLeaseApplication.setCurrentStatus("SUSPENDED");
+                        quarryLeaseApplicationRepository.save(quarryLeaseApplication);
+                    }
+
+                    siteProvisioningService.setSiteActive(leaseType, app.getApplicationNumber(), false);
+
+                    if (master != null) {
+                        master.setCurrentStatus("SUSPENDED");
+                        applicationMasterRepository.save(master);
+                    }
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendApplicationSuspendedNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber());
+                    }
+                    if (app.getPromoterUserId() != null) {
+                        String title = "Lease Suspended";
+                        String message = "Your lease under application " + app.getApplicationNumber()
+                                + " has been suspended.";
+                        notificationClient.sendUserNotification(title, message, app.getPromoterUserId(), MENU_ID_APPLICANT, "CITIZEN", false, app.getApplicationNumber());
+                    }
+
+                    assert master != null;
+                    createTask(master, app, "APPLICANT", userId, app.getPromoterUserId());
+                }
+                case "Rectification" -> {
+                    LocalDateTime now = LocalDateTime.now();
+                    app.setCurrentStatus("RECTIFICATION NEEDED");
+                    app.setRcMiReviewedAt(now);
+                    app.setRemarksRcMi(request.getRemarks());
+                    app.setPromoterFileId(null);
+
+                    if (master != null) {
+                        master.setCurrentStatus("RECTIFICATION NEEDED");
+                        applicationMasterRepository.save(master);
+                    }
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendImmediateSuspensionRevisionRequestPromoterNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber(),
+                                app.getCurrentStatus(),
+                                "Rectification Needed");
+                    }
+                    if (app.getPromoterUserId() != null) {
+                        String title = "Immediate Suspension Rectification Needed";
+                        String message = "Your immediate suspension application " + app.getApplicationNumber()
+                                + " requires rectification. Please review and resubmit.";
+                        notificationClient.sendUserNotification(title, message, app.getPromoterUserId(), MENU_ID_APPLICANT, "CITIZEN", true, app.getApplicationNumber());
+                    }
+
+                    assert master != null;
+                    createTask(master, app, "APPLICANT", userId, app.getPromoterUserId());
+                }
+                case "Lifting" -> {
+                    LocalDateTime now = LocalDateTime.now();
+                    app.setCurrentStatus("SUSPENSION LIFTED");
+                    app.setPromoterReviewedAt(now);
+
+                    String leaseType = app.getApplicationFrom().equalsIgnoreCase("M") ? "MINING_LEASE" : "QUARRY_LEASE";
+                    siteProvisioningService.setSiteActive(leaseType, app.getApplicationNumber(), true);
+
+                    if (master != null) {
+                        master.setCurrentStatus("SUSPENSION LIFTED");
+                        applicationMasterRepository.save(master);
+                    }
+
+                    if (app.getApplicantEmail() != null) {
+                        notificationClient.sendUpliftingSuspensionNotification(
+                                app.getApplicantEmail(),
+                                app.getApplicantName(),
+                                app.getApplicationNumber());
+                    }
+                    if (app.getPromoterUserId() != null) {
+                        String title = "Immediate Suspension Lifted";
+                        String message = "The suspension for application " + app.getApplicationNumber()
+                                + " has been lifted; your lease is active again.";
+                        notificationClient.sendUserNotification(title, message, app.getPromoterUserId(), MENU_ID_APPLICANT, "CITIZEN", false, app.getApplicationNumber());
+                    }
+
+                    assert master != null;
+                    createTask(master, app, "APPLICANT", userId, app.getCreatedBy());
+                }
+                default -> throw new IllegalArgumentException("Application status not recognized");
+            }
+            immediateSuspensionApplicationRepository.save(app);
+        }
+        return immediateSuspensionMapper.toResponse(app);
+    }
+
+    public long countAssignedToRCME(Long currentUserId) {
+        return immediateSuspensionApplicationRepository.countAssignedToUserRCME(currentUserId);
+    }
+
+    public SuccessResponse<List<ImmediateSuspensionApplicationResponse>> getAllApplications(Long currentUserId, Pageable pageable, String search) {
+        Page<ImmediateSuspensionApplication> page;
+
+        if (search == null || search.isBlank()) {
+
+            page = immediateSuspensionApplicationRepository
+                    .findAssignedToUserRCME(currentUserId, pageable);
+
+        } else {
+
+            page = immediateSuspensionApplicationRepository
+                    .findAssignedToUserAndSearchRCME(
+                            currentUserId,
+                            search.trim(),
+                            pageable
+                    );
+        }
+
+        Page<ImmediateSuspensionApplicationResponse> responsePage =
+                page.map(immediateSuspensionMapper::toResponse);
+
+        return SuccessResponse.fromPage(
+                "Assigned applications fetched successfully",
+                responsePage
+        );
+    }
+
+    public long countArchivedApplications(Long userId) {
+        List<String> archivedStatuses = List.of("SUSPENSION LIFTED", "SUSPENDED");
+        List<Long> role_id = terminationApplicationRepository.findUserDetails(userId);
+        if (role_id != null && role_id.contains(22L)) {
+            return immediateSuspensionApplicationRepository.countArchivedAssignedToUserMI(userId, archivedStatuses);
+        }
+        return immediateSuspensionApplicationRepository.countArchivedAssignedToUser(userId, archivedStatuses);
+    }
+
+    public long countMyArchivedApplications(Long userId) {
+        List<String> archivedStatuses = List.of("CMS HEAD APPROVED", "TERMINATION CANCELED");
+        return immediateSuspensionApplicationRepository.countByApplicantUserIdAndStatusIn(userId, archivedStatuses);
+    }
+
+    public Page<ImmediateSuspensionApplicationResponse> getArchivedApplications(Pageable pageable, String search, Long userId) {
+        List<String> archivedStatuses = List.of("SUSPENSION LIFTED", "SUSPENDED");
+        Page<ImmediateSuspensionApplication> applications;
+        List<Long> role_id = terminationApplicationRepository.findUserDetails(userId);
+        if (role_id != null && role_id.contains(22L)){
+
+            if (search == null || search.isBlank()) {
+                applications = immediateSuspensionApplicationRepository.findArchivedAssignedToUserMI(
+                        userId,
+                        archivedStatuses,
+                        pageable);
+            } else {
+
+                applications = immediateSuspensionApplicationRepository.findArchivedAssignedToUserAndSearchMI(
+                        userId,
+                        search.trim(),
+                        archivedStatuses,
+                        pageable
+                );
+            }
+
+        }else {
+            if (search == null || search.isBlank()) {
+                applications = immediateSuspensionApplicationRepository.findArchivedAssignedToUser(
+                        userId,
+                        archivedStatuses,
+                        pageable);
+            }
+            else {
+
+                applications = immediateSuspensionApplicationRepository.findArchivedAssignedToUserAndSearch(
+                        userId,
+                        search.trim(),
+                        archivedStatuses,
+                        pageable
+                );
+            }
+        }
+        return applications.map(immediateSuspensionMapper::toListResponse);
+    }
+
+    public Page<ImmediateSuspensionApplicationResponse> getMyArchivedApplications(Long userId, Pageable pageable, String search) {
+        List<String> archivedStatuses = List.of("CMS HEAD APPROVED", "TERMINATION CANCELED");
+        Page<ImmediateSuspensionApplication> applications ;
+
+        if (search == null || search.isBlank()) {
+            applications =  immediateSuspensionApplicationRepository.findByApplicantUserIdAndStatusIn(userId, archivedStatuses, pageable);
+        } else {
+            applications = immediateSuspensionApplicationRepository.findByApplicantUserIdAndSearch(userId, archivedStatuses, search.trim(), pageable);
+        }
+
+        return applications.map(immediateSuspensionMapper::toListResponse);
+    }
+
+    public SuccessResponse<List<ImmediateSuspensionApplicationResponse>> getAllApplicationAdmin(Pageable pageable, String search) {
+        Page<ImmediateSuspensionApplication> page;
+
+        if (search == null || search.isBlank()) {
+            page = immediateSuspensionApplicationRepository.findAll(pageable);
+        } else {
+            page = immediateSuspensionApplicationRepository.findAllBySearch(search.trim(), pageable);
+        }
+
+        return SuccessResponse.fromPage("Applications fetched successfully", page.map(immediateSuspensionMapper::toResponse));
+    }
+
+    public ImmediateSuspensionApplicationResponse getApplicationByNumber(String applicationNo) {
+        ImmediateSuspensionApplication application = immediateSuspensionApplicationRepository.findByApplicationNumber(applicationNo)
+                .orElseThrow(() -> new ResourceNotFoundException("Application not found: " + applicationNo));
+
+        return immediateSuspensionMapper.toResponse(application);
+    }
+
+    public ImmediateSuspensionApplicationResponse assignApplicationMI(@Valid ReAssignedTaskMI request, Long userId) {
+        ImmediateSuspensionApplication immediateSuspensionApplication;
+
+        immediateSuspensionApplication = findApplicationById(request.getId());
+        ApplicationMaster applicationMaster ;
+        applicationMaster = immediateSuspensionApplication.getApplicationMaster();
+        if (request.getMIFocalId() != null ) {
+            immediateSuspensionApplication.setCurrentStatus("MI ASSIGNED");
+            immediateSuspensionApplication.setMiRemarks(request.getRemarksMI());
+            immediateSuspensionApplication.setMiReviewedAt(LocalDateTime.now());
+            applicationMaster.setCurrentStatus("MI ASSIGNED");
+        }
+        applicationMasterRepository.save(applicationMaster);
+        immediateSuspensionApplicationRepository.save(immediateSuspensionApplication);
+
+        List<TaskManagement> task = taskManagementRepository.findByApplicationNumberAndTaskStatusAndAssignedToRoleAndServiceCode(immediateSuspensionApplication.getApplicationNumber(),"MI ASSIGNED","MI", SERVICE_CODE);
+
+        TaskManagement taskManagement = new TaskManagement();
+
+        if (task != null) {
+            taskManagement = task.getFirst();
+        }
+
+        taskManagement.setAssignedToUserId(request.getMIFocalId());
+        taskManagement.setAssignedByUserId(userId);
+        taskManagement.setAssignedAt(LocalDateTime.now());
+        taskManagement.setReassignmentCount(taskManagement.getReassignmentCount() + 1);
+        taskManagement.setActionRemarks(request.getRemarksMI());
+
+        taskManagementRepository.save(taskManagement);
+
+        UserWorkloadProjection userMI = immediateSuspensionApplicationRepository.findUserDetailsMI(request.getMIFocalId());
+
+            if (immediateSuspensionApplication.getApplicantEmail() != null) {
+                notificationClient.sendStatusUpdateNotification(
+                        immediateSuspensionApplication.getApplicantEmail(),
+                        immediateSuspensionApplication.getApplicantName(),
+                        immediateSuspensionApplication.getApplicationNumber(),
+                        immediateSuspensionApplication.getCurrentStatus(),
+                        "ME ASSIGNED");
+            }
+
+            if (userMI != null) {
+                notificationClient.sendAssignmentNotification(
+                        userMI.getEmail(),
+                        userMI.getUsername(),
+                        immediateSuspensionApplication.getApplicationNumber(),
+                        "ME ASSIGNED");
+
+                String title = "A new immediate suspension application has been assigned.";
+                String message = "A new immediate suspension application has been assigned.";
+                String serviceId = MENU_ID_MI;
+                notificationClient.sendUserNotification(title, message, userMI.getUserId(), serviceId, "STAFF", true, immediateSuspensionApplication.getApplicationNumber());
+            }
+        return immediateSuspensionMapper.toResponse(immediateSuspensionApplication);
+
+    }
+}

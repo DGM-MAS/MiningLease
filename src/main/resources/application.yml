@@ -1,0 +1,205 @@
+app:
+  masters:
+    base-url: ${APP_MASTERS_BASE_URL}
+    citizen-register-url: ${APP_MASTERS_CITIZEN_REGISTER_URL}
+  self:
+    base-url: ${APP_SELF_BASE_URL}
+  notification:
+    api-url: ${APP_NOTIFICATION_API_URL}
+    email-builder-url: ${APP_NOTIFICATION_EMAIL_BUILDER_URL}
+  menu-resolution:
+    api-url: ${APP_MENU_RESOLUTION_API_URL}
+  frontend:
+    base-url: ${APP_FRONTEND_BASE_URL}
+  sms:
+    base-url: ${APP_SMS_BASE_URL}
+
+# Kill switch for the site-scoped Transport Permit menu rework — same flag/rationale as
+# mas-royalty-service's own masmenu.tp-site-scoping.enabled. Guards the manual-entry
+# (ManualMiningEntryServiceImpl) and Surface Collection auction (SurfaceCollectionReviewServiceImpl)
+# site-stamping calls in this repo. Flip to false to revert to pre-rework behavior (TPs visible
+# under every site) — no data migration needed, site_id is just left null.
+masmenu:
+  tp-site-scoping:
+    enabled: true
+
+# Set to false to bypass payment and let applications flow through directly (dev/testing only)
+payment:
+  enabled: true
+
+  notification:
+    cleanup:
+      enabled: true
+      retain-days: 7
+      batch-size: 100
+
+  email:
+    enabled: true
+    from-address: ${APP_EMAIL_FROM_ADDRESS}
+    from-name: Mines Administrative System
+    support-email: ${APP_EMAIL_SUPPORT_EMAIL}
+    retry-attempts: 3
+
+server:
+  port: 8085
+  address: 0.0.0.0
+#  address: 127.0.0.1  # Uncomment to accept connections only from this host (gateway on same machine); in Kubernetes use NetworkPolicy instead
+  tomcat:
+    relaxed-query-chars: "|,{,},[,],^,@,$,&,+,="
+
+spring:
+  cloud:
+    inetutils:
+      preferred-networks:
+        - 10.10
+        - 172
+        - 192.168
+  jackson:
+    time-zone: Asia/Thimphu
+  data:
+    web:
+      pageable:
+        one-indexed-parameters: true
+
+  application:
+    name: mas-backend-mining-lease
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    type: com.zaxxer.hikari.HikariDataSource
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 600000
+      max-lifetime: 600000
+      keepalive-time: 60000
+      connection-timeout: 30000
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        show_sql: false
+        format_sql: false
+        default_schema: mas_db
+#        physical_naming_strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+
+  file:
+    upload-dir: ${SPRING_FILE_UPLOAD_DIR}
+
+  qr:
+    qr-link: ${SPRING_QR_QR_LINK}
+
+  mail:
+    host: ${SPRING_MAIL_HOST}
+    port: ${SPRING_MAIL_PORT}
+    username: ${SPRING_MAIL_USERNAME}
+    password: ${SPRING_MAIL_PASSWORD}
+    protocol: smtp
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 10000
+          timeout: 30000
+          writetimeout: 30000
+          ssl:
+            trust: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_TRUST}
+            protocols: TLSv1.2
+
+  cache:
+    type: none  # Using in-memory token blacklist
+
+internal:
+  api-key: ${INTERNAL_API_KEY}
+
+# BIRMS MOENR Service Configuration (Ministry of Energy and Natural Resources)
+birms:
+  login:
+    url: ${BIRMS_LOGIN_URL}
+  moenr:
+    username: ${BIRMS_MOENR_USERNAME}
+    password: ${BIRMS_MOENR_PASSWORD}
+    login:
+      url: ${BIRMS_MOENR_LOGIN_URL}
+    payment-advice:
+      url: ${BIRMS_MOENR_PAYMENT_ADVICE_URL}
+    payment-detail-advice-no:
+      url: ${BIRMS_MOENR_PAYMENT_DETAIL_ADVICE_NO_URL}
+    payment-detail-reference-no:
+      url: ${BIRMS_MOENR_PAYMENT_DETAIL_REFERENCE_NO_URL}
+    cancel-payment-advice:
+      url: ${BIRMS_MOENR_CANCEL_PAYMENT_ADVICE_URL}
+    get-receipt-ref-no:
+      url: ${BIRMS_MOENR_GET_RECEIPT_REF_NO_URL}
+    get-receipt-base64:
+      url: ${BIRMS_MOENR_GET_RECEIPT_BASE64_URL}
+
+ecss:
+  base-url: ${ECSS_BASE_URL}
+  token: ${ECSS_TOKEN}
+
+data-hub:
+  get-access-token:
+    url: ${DATA_HUB_GET_ACCESS_TOKEN_URL}
+    client-id: ${DATA_HUB_GET_ACCESS_TOKEN_CLIENT_ID}
+    client-secret: ${DATA_HUB_GET_ACCESS_TOKEN_CLIENT_SECRET}
+  citizen-details:
+    url: ${DATA_HUB_CITIZEN_DETAILS_URL}
+  rbp-scs-details:
+    url: ${DATA_HUB_RBP_SCS_DETAILS_URL}
+  ibls-business-license:
+    url: ${DATA_HUB_IBLS_BUSINESS_LICENSE_URL}
+
+management:
+  # Actuator listens on its own port. The Kubernetes Service for each backend maps a
+  # single app port, so nothing outside the pod can reach /actuator once it moves here —
+  # this is what closed ZAP's "Spring Actuator Information Leak" on promotor-reporting.
+  # No Deployment defines a liveness/readiness probe, so nothing depends on the old path.
+  server:
+    port: 9085
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+  health:
+    mail:
+      enabled: false
+
+# Swagger/OpenAPI Configuration
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    doc-expansion: none
+    default-models-expand-depth: -1
+    persist-authorization: true
+    filter: true
+    try-it-out-enabled: true
+    display-request-duration: true
+    deep-linking: true
+    custom-javascript: /swagger-custom.js
+  show-actuator: false
+  packages-to-scan: com.mas.gov.bt.mas.primary.controller
+  paths-to-match: /api/**
+
+# JWT Configuration (HS512 symmetric key) - must match auth server
+jwt:
+  secret: ${JWT_SECRET}
+
+# Production overrides live in application-prod.yml (every value from the ConfigMap/Secret).

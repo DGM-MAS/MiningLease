@@ -1,0 +1,92 @@
+# Production profile (SPRING_PROFILES_ACTIVE=prod). Every environment-specific value comes from the
+# mas-backend-mining-lease-config ConfigMap / mas-backend-mining-lease-secret Secret. No defaults on
+# purpose: a missing key must fail the pod at startup, not silently fall back to a committed value.
+app:
+  masters:
+    base-url: ${APP_MASTERS_BASE_URL}
+    citizen-register-url: ${APP_MASTERS_CITIZEN_REGISTER_URL}
+  self:
+    base-url: ${APP_SELF_BASE_URL}
+  notification:
+    api-url: ${APP_NOTIFICATION_API_URL}
+    email-builder-url: ${APP_NOTIFICATION_EMAIL_BUILDER_URL}
+  menu-resolution:
+    api-url: ${APP_MENU_RESOLUTION_API_URL}
+  frontend:
+    base-url: ${APP_FRONTEND_BASE_URL}
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        show_sql: false
+        format_sql: false
+  file:
+    upload-dir: ${SPRING_FILE_UPLOAD_DIR}
+  qr:
+    qr-link: ${SPRING_QR_QR_LINK}
+  mail:
+    host: ${SPRING_MAIL_HOST}
+    port: ${SPRING_MAIL_PORT}
+    username: ${SPRING_MAIL_USERNAME}
+    password: ${SPRING_MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          ssl:
+            trust: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_TRUST}
+
+internal:
+  api-key: ${INTERNAL_API_KEY}
+
+jwt:
+  secret: ${JWT_SECRET}
+
+birms:
+  login:
+    url: ${BIRMS_LOGIN_URL}
+  moenr:
+    username: ${BIRMS_MOENR_USERNAME}
+    password: ${BIRMS_MOENR_PASSWORD}
+    login:
+      url: ${BIRMS_MOENR_LOGIN_URL}
+    payment-advice:
+      url: ${BIRMS_MOENR_PAYMENT_ADVICE_URL}
+    payment-detail-advice-no:
+      url: ${BIRMS_MOENR_PAYMENT_DETAIL_ADVICE_NO_URL}
+    payment-detail-reference-no:
+      url: ${BIRMS_MOENR_PAYMENT_DETAIL_REFERENCE_NO_URL}
+    cancel-payment-advice:
+      url: ${BIRMS_MOENR_CANCEL_PAYMENT_ADVICE_URL}
+    get-receipt-ref-no:
+      url: ${BIRMS_MOENR_GET_RECEIPT_REF_NO_URL}
+    get-receipt-base64:
+      url: ${BIRMS_MOENR_GET_RECEIPT_BASE64_URL}
+
+ecss:
+  base-url: ${ECSS_BASE_URL}
+  token: ${ECSS_TOKEN}
+
+data-hub:
+  get-access-token:
+    url: ${DATA_HUB_GET_ACCESS_TOKEN_URL}
+    client-id: ${DATA_HUB_GET_ACCESS_TOKEN_CLIENT_ID}
+    client-secret: ${DATA_HUB_GET_ACCESS_TOKEN_CLIENT_SECRET}
+  citizen-details:
+    url: ${DATA_HUB_CITIZEN_DETAILS_URL}
+  rbp-scs-details:
+    url: ${DATA_HUB_RBP_SCS_DETAILS_URL}
+  ibls-business-license:
+    url: ${DATA_HUB_IBLS_BUSINESS_LICENSE_URL}
+
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false
