@@ -696,4 +696,32 @@ SELECT
             @Param("cutoff") LocalDate cutoff,
             @Param("statuses") List<String> statuses
     );
+
+    /**
+     * Active leases whose environmental clearance expires in [:from, :toExclusive) that
+     * have not yet been reminded for their current EC, and that have no EC renewal
+     * application currently in progress.
+     */
+    @Query("""
+    SELECT a
+    FROM MiningLeaseApplication a
+    WHERE a.currentStatus IN :statuses
+      AND a.ecExpiryDate IS NOT NULL
+      AND a.ecExpiryDate >= :from
+      AND a.ecExpiryDate < :toExclusive
+      AND (a.ecRenewalReminderSentForExpiryDate IS NULL
+           OR a.ecRenewalReminderSentForExpiryDate <> a.ecExpiryDate)
+      AND NOT EXISTS (
+          SELECT 1
+          FROM EnvironmentClearanceRenewal r
+          WHERE r.siteApplicationNo = a.applicationNumber
+            AND r.status NOT IN :closedRenewalStatuses
+      )
+""")
+    List<MiningLeaseApplication> findLeasesDueForEcRenewalReminder(
+            @Param("from") java.util.Date from,
+            @Param("toExclusive") java.util.Date toExclusive,
+            @Param("statuses") List<String> statuses,
+            @Param("closedRenewalStatuses") List<String> closedRenewalStatuses
+    );
 }
