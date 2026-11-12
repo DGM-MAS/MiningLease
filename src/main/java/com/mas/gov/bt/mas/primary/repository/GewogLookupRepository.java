@@ -11,4 +11,6 @@ public interface GewogLookupRepository extends JpaRepository<GewogLookup, Intege
     Optional<Object> findByGewogId(@Size(max = 100, message = "Gewog must not exceed 100 characters") String gewog);
 
     Optional<GewogLookup> findByGewogSerialNo(Integer i);
+
+    GewogLookup findByGewogName(String gewog);
 }

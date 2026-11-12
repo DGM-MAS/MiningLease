@@ -277,6 +277,12 @@ public class MiningLeaseApplication {
     @Column(name = "lease_period_years")
     private Integer leasePeriodYears;
 
+    // The lease end date for which the "renew your lease" reminder was last sent.
+    // Compared against leaseEndDate, so a renewal (which moves leaseEndDate)
+    // automatically re-arms the reminder for the new term.
+    @Column(name = "renewal_reminder_sent_for_end_date")
+    private LocalDate renewalReminderSentForEndDate;
+
     // ========== Fees ==========
     @Column(name = "application_fees_required")
     private Boolean applicationFeesRequired;

@@ -54,9 +54,9 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
 
     private final LookupHelper lookupHelper;
 
-    private final MiningLeaseApplicationRepository miningLeaseApplicationRepository;
+//    private final MiningLeaseApplicationRepository miningLeaseApplicationRepository;
 
-    private final HouseholdPermitCapConfigRefRepository capConfigRepository;
+//    private final HouseholdPermitCapConfigRefRepository capConfigRepository;
 
     private static final String SERVICE_CODE = "SURFACE_COLLECTION_AUCTION";
 
@@ -69,7 +69,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
 
     private static final int DEFAULT_TAT_DAYS = 2;
 
-    private static final int DEFAULT_MAX_APPLICATIONS = 2;
+//    private static final int DEFAULT_MAX_APPLICATIONS = 2;
 
     private final CitizenRegistrationClient citizenRegistrationClient;
 
@@ -216,42 +216,42 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
      * application form, before they fill anything in. Also reused by
      * submitGR as the authoritative server-side guard.
      */
-    public CapCheckResponse checkCap(Long userId) {
-        String[] grouping = resolveGroupingKey(userId);
-        int maxAllowed = getMaxAllowedForService(SERVICE_CODE, grouping[2]);
-        Integer total = auctionRepository.countMiningLeasesForGrouping(grouping[0], grouping[1]);
-        int current = total != null ? total : 0;
-        boolean allowed = current < maxAllowed;
-        String message = allowed ? null
-                : "Only " + maxAllowed + " Surface collection auction application(s) are permitted per " +
-                  ("CID".equals(grouping[0]) ? "applicant" : "household/entity") + ".";
-        return new CapCheckResponse(allowed, current, maxAllowed, message);
-    }
+//    public CapCheckResponse checkCap(Long userId) {
+//        String[] grouping = resolveGroupingKey(userId);
+//        int maxAllowed = getMaxAllowedForService(SERVICE_CODE, grouping[2]);
+//        Integer total = auctionRepository.countMiningLeasesForGrouping(grouping[0], grouping[1]);
+//        int current = total != null ? total : 0;
+//        boolean allowed = current < maxAllowed;
+//        String message = allowed ? null
+//                : "Only " + maxAllowed + " Surface collection auction application(s) are permitted per " +
+//                  ("CID".equals(grouping[0]) ? "applicant" : "household/entity") + ".";
+//        return new CapCheckResponse(allowed, current, maxAllowed, message);
+//    }
 
-    private int getMaxAllowedForService(String serviceType, String registrationType) {
-        String rt = isNotBlank(registrationType) ? registrationType : "INDIVIDUAL";
-        return capConfigRepository.findByServiceTypeAndRegistrationType(serviceType, rt)
-                .map(c -> c.getMaxAllowed() != null ? c.getMaxAllowed() : DEFAULT_MAX_APPLICATIONS)
-                .orElse(DEFAULT_MAX_APPLICATIONS);
-    }
+//    private int getMaxAllowedForService(String serviceType, String registrationType) {
+//        String rt = isNotBlank(registrationType) ? registrationType : "INDIVIDUAL";
+//        return capConfigRepository.findByServiceTypeAndRegistrationType(serviceType, rt)
+//                .map(c -> c.getMaxAllowed() != null ? c.getMaxAllowed() : DEFAULT_MAX_APPLICATIONS)
+//                .orElse(DEFAULT_MAX_APPLICATIONS);
+//    }
 
-    private String[] resolveGroupingKey(Long userId) {
-        return miningLeaseApplicationRepository.findGroupingInfoByUserId(userId)
-                .map(info -> {
-                    String rt = info.getRegistrationType();
-                    if ("INDIVIDUAL".equals(rt) && isNotBlank(info.getHouseholdNumber())) {
-                        return new String[]{"INDIVIDUAL", info.getHouseholdNumber(), rt};
-                    }
-                    if ("BUSINESS_LICENSE".equals(rt) && isNotBlank(info.getLicenseNo())) {
-                        return new String[]{"BUSINESS_LICENSE", info.getLicenseNo(), rt};
-                    }
-                    if ("REGISTERED_COMPANY".equals(rt) && isNotBlank(info.getCompanyRegistrationNumber())) {
-                        return new String[]{"REGISTERED_COMPANY", info.getCompanyRegistrationNumber(), rt};
-                    }
-                    return new String[]{"CID", info.getCid(), rt};
-                })
-                .orElse(new String[]{"CID", null, "INDIVIDUAL"});
-    }
+//    private String[] resolveGroupingKey(Long userId) {
+//        return miningLeaseApplicationRepository.findGroupingInfoByUserId(userId)
+//                .map(info -> {
+//                    String rt = info.getRegistrationType();
+//                    if ("INDIVIDUAL".equals(rt) && isNotBlank(info.getHouseholdNumber())) {
+//                        return new String[]{"INDIVIDUAL", info.getHouseholdNumber(), rt};
+//                    }
+//                    if ("BUSINESS_LICENSE".equals(rt) && isNotBlank(info.getLicenseNo())) {
+//                        return new String[]{"BUSINESS_LICENSE", info.getLicenseNo(), rt};
+//                    }
+//                    if ("REGISTERED_COMPANY".equals(rt) && isNotBlank(info.getCompanyRegistrationNumber())) {
+//                        return new String[]{"REGISTERED_COMPANY", info.getCompanyRegistrationNumber(), rt};
+//                    }
+//                    return new String[]{"CID", info.getCid(), rt};
+//                })
+//                .orElse(new String[]{"CID", null, "INDIVIDUAL"});
+//    }
 
     private boolean isNotBlank(String value) {
         return value != null && !value.isBlank();
@@ -389,12 +389,8 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
 
         SurfaceCollectionAuctionApplication entity = getAuction(auctionId);
 
-        Long regionId;
-
         DzongkhagLookup dzongkhagLookup =
                 lookupHelper.fetchLookup(dto.getDzongkhagId(), dzongkhagLookupRepository, "Dzongkhag");
-
-        regionId = dzongkhagLookup.getRegion().getId();
 
         GewogLookup gewogLookup =
                 lookupHelper.fetchLookup(dto.getGewogId(), gewogLookupRepository, "Gewog");
@@ -402,8 +398,9 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
         VillageLookup villageLookup =
                 lookupHelper.fetchLookup(dto.getVillageId(), villageLookupRepository, "Village");
 
+
         RegionMaster regionMaster =
-                lookupHelper.fetchLookup(dzongkhagLookup.getRegion().getId(), regionMasterRepository, "RegionMaster");
+                lookupHelper.fetchLookup(gewogLookup.getRegionalMaster().getId(), regionMasterRepository, "RegionMaster");
 
         CitizenRegisterRequest registerRequest = toCitizenRegisterRequest(dto);
         if (!isValidRegisterRequest(registerRequest)) {
@@ -453,6 +450,7 @@ public class SurfaceCollectionAuctionServiceImpl implements SurfaceCollectionAuc
         // Application master and create task for director
         // =====================================================
         ApplicationMaster applicationMaster = entity.getApplicationMaster();
+
         applicationMaster.setCurrentStatus("BG_PENDING");
         // Was left pointing at whichever staff user filed the original auction listing —
         // must be the winning bidder's own citizen account, since citizen-facing menu/
