@@ -176,4 +176,7 @@ public interface TemporaryClosureRepository extends JpaRepository<TemporaryClosu
     AND q.currentStatus IN :archivedStatuses
 """)
     long countArchivedAssignedToUser(Long userId, List<String> archivedStatuses);
+
+    // Approved closures whose licence has not been reinstated yet (reinstatement scheduler).
+    List<TemporaryClosureEntity> findByCurrentStatusAndReinstatedAtIsNull(String currentStatus);
 }

@@ -37,6 +37,9 @@ public class TemporaryClosureService {
     private static final String SURFACE_COLLECTION_CATEGORY   = "SURFACE_COLLECTION_PERMIT";
     private static final String STOCK_LIFTING_CATEGORY   = "STOCK_LIFTING";
 
+    private static final String CLOSURE_APPROVED_STATUS = "TEMPORARY CLOSURE APPROVED";
+    private static final String HOUSEHOLD_ACTIVE_STATUS = "ACTIVE";
+
     // Real sidebar menu ids (permissions.id) per recipient role — used to target
     // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
     // NOT the same thing as SERVICE_ID above, which is an unrelated t_application_master.service_id
@@ -65,7 +68,7 @@ public class TemporaryClosureService {
 
     private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
 
-    private final DzongkhagLookupRepository dzongkhagLookupRepository;
+    private final GewogLookupRepository gewogLookupRepository;
 
     @jakarta.annotation.PostConstruct
     private void resolveMenuIds() {
@@ -94,6 +97,7 @@ public class TemporaryClosureService {
 
         if (miningLeaseApplication.isPresent()) {
             miningLeaseApplication1 = miningLeaseApplication.get();
+            requireActiveForClosure("MINING_LEASE", miningLeaseApplication1.getCurrentStatus());
             miningLeaseApplication1.setCurrentStatus("UNDER-REVIEW-CLOSURE");
             applicationType = "MINING_LEASE";
             siteName = miningLeaseApplication1.getNameOfMine();
@@ -102,6 +106,7 @@ public class TemporaryClosureService {
         }
         if (quarryLeaseApplication.isPresent()) {
             quarryLeaseApplication1 = quarryLeaseApplication.get();
+            requireActiveForClosure("QUARRY_LEASE", quarryLeaseApplication1.getCurrentStatus());
             quarryLeaseApplication1.setCurrentStatus("UNDER-REVIEW-CLOSURE");
             applicationType = "QUARRY_LEASE";
             siteName = quarryLeaseApplication1.getNameOfQuarry();
@@ -109,6 +114,7 @@ public class TemporaryClosureService {
         }
         if (surfaceCollectionAuctionApplication.isPresent()) {
             surfaceCollectionPermitEntity = surfaceCollectionAuctionApplication.get();
+            requireActiveForClosure("SURFACE_COLLECTION_PERMIT", surfaceCollectionPermitEntity.getStatus());
             surfaceCollectionPermitEntity.setStatus("UNDER-REVIEW-CLOSURE");
             applicationType  = "SURFACE_COLLECTION_PERMIT";
             siteName = surfaceCollectionPermitEntity.getNameOfSurfaceCollection();
@@ -116,6 +122,7 @@ public class TemporaryClosureService {
         }
         if (stockLiftingApplication.isPresent()) {
             stockLiftingApplicationEntity = stockLiftingApplication.get();
+            requireActiveForClosure("STOCK_LIFTING", stockLiftingApplicationEntity.getStatus());
             stockLiftingApplicationEntity.setStatus("UNDER-REVIEW-CLOSURE");
             applicationType  = "STOCK_LIFTING";
             siteName = stockLiftingApplicationEntity.getNameOfStockLifting();
@@ -227,10 +234,14 @@ public class TemporaryClosureService {
 
             case "STOCK_LIFTING" -> {
                 assert stockLiftingApplicationEntity != null;
-                Optional<DzongkhagLookup> dzongkhagLookup = dzongkhagLookupRepository.findById(stockLiftingApplicationEntity.getDzongkhagId());
-                DzongkhagLookup dzongkhagLookupStockLifting = dzongkhagLookup.orElse(null);
-                assert dzongkhagLookupStockLifting != null;
-                regionId = dzongkhagLookupStockLifting.getRegion().getId();
+                // Stock lifting stores the gewog name; the region comes from the gewog lookup.
+                String gewogName = stockLiftingApplicationEntity.getGewog();
+                GewogLookup gewogLookup = gewogName != null && !gewogName.isBlank()
+                        ? gewogLookupRepository.findByGewogName(gewogName.trim())
+                        : null;
+                regionId = gewogLookup != null && gewogLookup.getRegionalMaster() != null
+                        ? gewogLookup.getRegionalMaster().getId()
+                        : null;
             }
 
             default -> throw new BusinessException(
@@ -615,8 +626,7 @@ public class TemporaryClosureService {
                         case "STOCK_LIFTING" -> {
 
                             StockLiftingApplication application =
-                                    stockLiftingRepository
-                                            .findByStockLiftingPermitNo(app.getApplicationId())
+                                    findStockLifting(app.getApplicationId())
                                             .orElseThrow(() -> new BusinessException(
                                                     ErrorCodes.RECORD_NOT_FOUND,
                                                     "Stock lifting application not found: "
@@ -748,6 +758,195 @@ public class TemporaryClosureService {
             temporaryClosureRepository.save(app);
         }
         return TemporaryClosureMapper.toResponse(app);
+    }
+
+    /**
+     * The status a licence must be in to be "active" — the only state from which a
+     * temporary closure can be applied for, and the state it returns to when the
+     * closure ends. Same values TerminationService uses for its eligibility check.
+     */
+    private String activeStatusFor(String applicationType) {
+        return switch (applicationType.trim().toUpperCase()) {
+            case "MINING_LEASE" -> "MINING LEASE APPROVED";
+            case "QUARRY_LEASE" -> "QUARRY LEASE APPROVED";
+            case "SURFACE_COLLECTION_PERMIT" -> "PERMIT_ISSUED";
+            case "STOCK_LIFTING" -> "APPROVED";
+            default -> throw new BusinessException(
+                    ErrorCodes.INVALID_INPUT_DATA,
+                    "Unsupported application type: " + applicationType
+            );
+        };
+    }
+
+    private void requireActiveForClosure(String applicationType, String currentStatus) {
+        String required = activeStatusFor(applicationType);
+        if (!required.equalsIgnoreCase(currentStatus)) {
+            throw new BusinessException(
+                    ErrorCodes.BUSINESS_RULE_VIOLATION,
+                    "Temporary closure can only be applied for an active licence (status "
+                            + required + "). Current status: " + currentStatus + "."
+            );
+        }
+    }
+
+    /** The closure stores the stock lifting application number; older rows may hold the permit number. */
+    private Optional<StockLiftingApplication> findStockLifting(String applicationId) {
+        return stockLiftingRepository.findByApplicationNo(applicationId)
+                .or(() -> stockLiftingRepository.findByStockLiftingPermitNo(applicationId));
+    }
+
+    /** Approved closures that have not been reinstated yet (candidates for the reinstatement job). */
+    @Transactional(readOnly = true)
+    public List<TemporaryClosureEntity> findApprovedClosuresNotReinstated() {
+        return temporaryClosureRepository.findByCurrentStatusAndReinstatedAtIsNull(CLOSURE_APPROVED_STATUS);
+    }
+
+    /**
+     * Ends an approved temporary closure: reverses what RC approval did
+     * (licence status, application master, site, household permit threshold),
+     * notifies the promoter and marks the closure as reinstated.
+     *
+     * Called by TemporaryClosureReinstatementScheduler once the declared duration has passed.
+     * Returns false when the licence was not restored.
+     */
+    @Transactional
+    public boolean reinstateAfterClosure(Long closureId) {
+
+        TemporaryClosureEntity app = findApplicationById(closureId);
+
+        if (!CLOSURE_APPROVED_STATUS.equals(app.getCurrentStatus()) || app.getReinstatedAt() != null) {
+            return false;
+        }
+
+        String applicationType = app.getApplicationType();
+        String applicationId = app.getApplicationId();
+        String activeStatus = activeStatusFor(applicationType);
+
+        /*
+         * Licence record. Only restored while it is still closed: if it was
+         * terminated/suspended in the meantime, that later status must win.
+         */
+        boolean restored = switch (applicationType.trim().toUpperCase()) {
+
+            case "MINING_LEASE" -> miningLeaseApplicationRepository
+                    .findByApplicationNumber(applicationId)
+                    .filter(l -> CLOSURE_APPROVED_STATUS.equals(l.getCurrentStatus()))
+                    .map(l -> {
+                        l.setCurrentStatus(activeStatus);
+                        miningLeaseApplicationRepository.save(l);
+                        return true;
+                    })
+                    .orElse(false);
+
+            case "QUARRY_LEASE" -> queryLeaseApplicationRepository
+                    .findByApplicationNumber(applicationId)
+                    .filter(l -> CLOSURE_APPROVED_STATUS.equals(l.getCurrentStatus()))
+                    .map(l -> {
+                        l.setCurrentStatus(activeStatus);
+                        queryLeaseApplicationRepository.save(l);
+                        return true;
+                    })
+                    .orElse(false);
+
+            case "SURFACE_COLLECTION_PERMIT" -> surfaceCollectionPermitRepository
+                    .findByApplicationNo(applicationId)
+                    .filter(l -> CLOSURE_APPROVED_STATUS.equals(l.getStatus()))
+                    .map(l -> {
+                        l.setStatus(activeStatus);
+                        surfaceCollectionPermitRepository.save(l);
+                        return true;
+                    })
+                    .orElse(false);
+
+            case "STOCK_LIFTING" -> findStockLifting(applicationId)
+                    .filter(l -> CLOSURE_APPROVED_STATUS.equals(l.getStatus()))
+                    .map(l -> {
+                        l.setStatus(activeStatus);
+                        stockLiftingRepository.save(l);
+                        return true;
+                    })
+                    .orElse(false);
+
+            default -> throw new BusinessException(
+                    ErrorCodes.INVALID_INPUT_DATA,
+                    "Unsupported application type: " + applicationType
+            );
+        };
+
+        // Either way this closure is finished; never pick it up again.
+        app.setReinstatedAt(LocalDateTime.now());
+        temporaryClosureRepository.save(app);
+
+        if (!restored) {
+            log.warn("Temporary closure {} for {} {} has ended, but the licence is no longer in status '{}'; "
+                            + "licence, site and household records left unchanged",
+                    app.getId(), applicationType, applicationId, CLOSURE_APPROVED_STATUS);
+            return false;
+        }
+
+        ServiceTypeMapping serviceTypes = getServiceTypeMapping(applicationType);
+
+        /*
+         * Application master (the licence's own master row)
+         */
+        ApplicationMaster master = app.getApplicationMaster();
+        if (master != null && CLOSURE_APPROVED_STATUS.equals(master.getCurrentStatus())) {
+            master.setCurrentStatus(activeStatus);
+            applicationMasterRepository.save(master);
+        }
+
+        /*
+         * Re-enable site (uses siteServiceType)
+         */
+        siteProvisioningService.setSiteActive(serviceTypes.siteServiceType(), applicationId, true);
+
+        /*
+         * Household permit threshold (uses householdServiceType)
+         */
+        householdPermitThresholdRepository
+                .findByApplicationNoAndServiceType(applicationId, serviceTypes.householdServiceType())
+                .ifPresentOrElse(
+                        threshold -> {
+                            threshold.setStatus(HOUSEHOLD_ACTIVE_STATUS);
+                            householdPermitThresholdRepository.save(threshold);
+                        },
+                        () -> log.warn("No household permit threshold row for {} {} while ending temporary closure",
+                                serviceTypes.householdServiceType(), applicationId)
+                );
+
+        /*
+         * Notifications (best-effort: a notification failure must not undo the reinstatement)
+         */
+        String title = "Temporary Closure Ended";
+        String message = "The temporary closure period for application " + applicationId
+                + " has ended. Your licence is active again.";
+        try {
+            if (app.getApplicantUserId() != null) {
+                notificationClient.sendUserNotification(
+                        title,
+                        message,
+                        app.getApplicantUserId(),
+                        MENU_ID_APPLICANT,
+                        "CITIZEN",
+                        false,
+                        applicationId
+                );
+            }
+            if (app.getApplicantEmail() != null && !app.getApplicantEmail().isBlank()) {
+                notificationClient.sendEmail(
+                        app.getApplicantEmail(),
+                        title + " - " + applicationId,
+                        "Dear " + (app.getApplicantName() != null ? app.getApplicantName() : "Promoter")
+                                + ",\n\n" + message
+                );
+            }
+        } catch (Exception e) {
+            log.warn("Reinstatement notification failed for temporary closure {}", app.getId(), e);
+        }
+
+        log.info("Temporary closure {} ended; {} {} reinstated to '{}'",
+                app.getId(), applicationType, applicationId, activeStatus);
+        return true;
     }
 
     private record ServiceTypeMapping(
