@@ -50,7 +50,7 @@ public class NotificationClient {
     @Value("${app.sms.enabled:true}")
     private boolean smsEnabled;
 
-    @Value("${app.sms.base-url:http://172.30.16.136/g2csms/push.php}")
+    @Value("${app.sms.base-url}")
     private String smsBaseUrl;
 
     @Value("${app.sms.country-code:975}")
