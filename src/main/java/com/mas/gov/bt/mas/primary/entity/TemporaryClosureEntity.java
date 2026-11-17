@@ -103,4 +103,9 @@ public class TemporaryClosureEntity {
     @Column(name = "latest_remarks")
     private String latestRemarks;
 
+    // Set when the declared closure period has ended and the licence was made
+    // active again (TemporaryClosureReinstatementScheduler). Null = closure still running.
+    @Column(name = "reinstated_at")
+    private LocalDateTime reinstatedAt;
+
 }

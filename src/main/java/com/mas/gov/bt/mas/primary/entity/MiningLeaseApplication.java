@@ -201,6 +201,12 @@ public class MiningLeaseApplication {
     @Column(name = "ec_expiry_date", length = 30)
     private Date ecExpiryDate;
 
+    // The EC expiry date for which the "renew your EC" reminder was last sent.
+    // Compared against ecExpiryDate, so an EC renewal (which moves ecExpiryDate)
+    // automatically re-arms the reminder for the new EC.
+    @Column(name = "ec_renewal_reminder_sent_for_expiry_date")
+    private Date ecRenewalReminderSentForExpiryDate;
+
     @Column(name = "approved_area", length = 100)
     private String approvedArea;
 
@@ -276,6 +282,12 @@ public class MiningLeaseApplication {
 
     @Column(name = "lease_period_years")
     private Integer leasePeriodYears;
+
+    // The lease end date for which the "renew your lease" reminder was last sent.
+    // Compared against leaseEndDate, so a renewal (which moves leaseEndDate)
+    // automatically re-arms the reminder for the new term.
+    @Column(name = "renewal_reminder_sent_for_end_date")
+    private LocalDate renewalReminderSentForEndDate;
 
     // ========== Fees ==========
     @Column(name = "application_fees_required")

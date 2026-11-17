@@ -70,7 +70,7 @@ public class MineRestorationService {
     private final MiningLeaseApplicationRepository miningLeaseApplicationRepository;
     private final NotificationClient notificationClient;
 
-    private final DzongkhagLookupRepository dzongkhagLookupRepository;
+    private final GewogLookupRepository gewogLookupRepository;
 
     private final ApplicationMasterRepository applicationMasterRepository;
 
@@ -210,18 +210,24 @@ public class MineRestorationService {
                     restoration.setLeaseEndDate(validityDate.toLocalDate());
                 }
 
-                Optional<DzongkhagLookup> dzongkhagLookup =
-                        dzongkhagLookupRepository.findById(
-                                stockLiftingApplication.getDzongkhagId()
-                        );
+                // Stock lifting stores the gewog name; the region comes from the gewog lookup.
+                String gewogName = stockLiftingApplication.getGewog();
+                GewogLookup gewogLookup = gewogName != null && !gewogName.isBlank()
+                        ? gewogLookupRepository.findByGewogName(gewogName.trim())
+                        : null;
 
-                DzongkhagLookup dzongkhagLookupStockLifting = dzongkhagLookup.orElse(null);
+                if (gewogLookup == null || gewogLookup.getRegionalMaster() == null) {
+                    throw new BusinessException(
+                            ErrorCodes.RECORD_NOT_FOUND,
+                            "Region could not be determined from gewog '" + gewogName
+                                    + "' for stock lifting application "
+                                    + stockLiftingApplication.getApplicationNo()
+                    );
+                }
 
-                assert dzongkhagLookupStockLifting != null;
+                regionId = gewogLookup.getRegionalMaster().getId();
 
-                regionId = dzongkhagLookupStockLifting.getRegion().getId();
-
-                restoration.setRegionId(dzongkhagLookupStockLifting.getRegion().getId());
+                restoration.setRegionId(regionId);
 
             }
 
