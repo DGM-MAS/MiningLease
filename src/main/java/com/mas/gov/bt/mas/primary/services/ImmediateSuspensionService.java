@@ -104,6 +104,9 @@ public class ImmediateSuspensionService {
 
             stockLiftingRepository.save(application);
 
+            // Suspension takes effect on submission: take the site out of service.
+            siteProvisioningService.setSiteActive(siteLeaseTypeFor("SL"), application.getApplicationNo(), false);
+
             Optional<ApplicationMaster> applicationMaster = applicationMasterRepository
                     .findByApplicationNumberAndServiceCode(
                             request.getApplicationNumber(),
@@ -223,6 +226,9 @@ public class ImmediateSuspensionService {
         miningLeaseApplication.setCurrentStatus("Under-Review-Suspension");
         miningLeaseApplicationRepository.save(miningLeaseApplication);
 
+        // Suspension takes effect on submission: take the site out of service.
+        siteProvisioningService.setSiteActive(siteLeaseTypeFor("M"), miningLeaseApplication.getApplicationNumber(), false);
+
         createTask(master, suspension, "APPLICANT", userId, miningLeaseApplication.getApplicantUserId());
 
         sendNotifications(miningLeaseApplication.getApplicantEmail(),
@@ -277,6 +283,9 @@ public class ImmediateSuspensionService {
 
         quarryLeaseApplication.setCurrentStatus("Under-Review-Suspension");
         quarryLeaseApplicationRepository.save(quarryLeaseApplication);
+
+        // Suspension takes effect on submission: take the site out of service.
+        siteProvisioningService.setSiteActive(siteLeaseTypeFor("Q"), quarryLeaseApplication.getApplicationNumber(), false);
 
         createTask(master, suspension, "APPLICANT", userId, quarryLeaseApplication.getApplicantUserId());
 
@@ -351,6 +360,9 @@ public class ImmediateSuspensionService {
         surfaceCollectionPermitEntity.setStatus("Under-Review-Suspension");
         surfaceCollectionPermitRepository.save(surfaceCollectionPermitEntity);
 
+        // Suspension takes effect on submission: take the site out of service.
+        siteProvisioningService.setSiteActive(siteLeaseTypeFor("S"), surfaceCollectionPermitEntity.getApplicationNo(), false);
+
         createTask(master, suspension, "APPLICANT", userId, surfaceCollectionPermitEntity.getCreatedBy());
 
         sendNotifications(surfaceCollectionPermitEntity.getEmail(),
@@ -359,6 +371,115 @@ public class ImmediateSuspensionService {
                 request.getApplicationNumber());
 
         return immediateSuspensionMapper.toResponse(suspension);
+    }
+
+    /**
+     * site_master.lease_type for the service a suspension was raised against
+     * (applicationFrom: M = mining lease, Q = quarry lease, S = surface collection, SL = stock lifting).
+     * Surface collection sites are stored as SURFACE_COLLECTION, not SURFACE_COLLECTION_PERMIT.
+     */
+    private String siteLeaseTypeFor(String applicationFrom) {
+        if (applicationFrom == null) {
+            throw new BusinessException(ErrorCodes.BAD_REQUEST);
+        }
+        return switch (applicationFrom.trim().toUpperCase()) {
+            case "M" -> "MINING_LEASE";
+            case "Q" -> "QUARRY_LEASE";
+            case "S" -> "SURFACE_COLLECTION";
+            case "SL" -> STOCK_LIFTING_CATEGORY;
+            default -> throw new BusinessException(ErrorCodes.BAD_REQUEST);
+        };
+    }
+
+    /** Licence statuses that mean the licence is still held by an immediate suspension. */
+    private static final List<String> UNDER_SUSPENSION_STATUSES =
+            List.of("Under-Review-Suspension", "SUSPENDED");
+
+    /**
+     * The status a licence returns to when its suspension is lifted — the same
+     * status each service requires before a suspension can be submitted.
+     */
+    private String activeStatusFor(String applicationFrom) {
+        return switch (applicationFrom.trim().toUpperCase()) {
+            case "M" -> "MINING LEASE APPROVED";
+            case "Q" -> "QUARRY LEASE APPROVED";
+            case "S" -> "PERMIT_ISSUED";
+            case "SL" -> "APPROVED";
+            default -> throw new BusinessException(ErrorCodes.BAD_REQUEST);
+        };
+    }
+
+    /** Sets the licence record's status for any of the four services. Throws if the licence is missing. */
+    private void setLicenceStatus(String applicationFrom, String applicationNumber, String status) {
+        switch (applicationFrom.trim().toUpperCase()) {
+            case "M" -> {
+                MiningLeaseApplication licence = miningLeaseApplicationRepository
+                        .findByApplicationNumber(applicationNumber)
+                        .orElseThrow(() -> new CustomRuntimeException("Invalid application number: " + applicationNumber));
+                licence.setCurrentStatus(status);
+                miningLeaseApplicationRepository.save(licence);
+            }
+            case "Q" -> {
+                QuarryLeaseApplication licence = quarryLeaseApplicationRepository
+                        .findByApplicationNumber(applicationNumber)
+                        .orElseThrow(() -> new CustomRuntimeException("Invalid application number: " + applicationNumber));
+                licence.setCurrentStatus(status);
+                quarryLeaseApplicationRepository.save(licence);
+            }
+            case "S" -> {
+                SurfaceCollectionPermitEntity licence = surfaceCollectionPermitRepository
+                        .findByApplicationNo(applicationNumber)
+                        .orElseThrow(() -> new CustomRuntimeException("Invalid application number: " + applicationNumber));
+                licence.setStatus(status);
+                surfaceCollectionPermitRepository.save(licence);
+            }
+            case "SL" -> {
+                StockLiftingApplication licence = stockLiftingRepository
+                        .findByApplicationNo(applicationNumber)
+                        .orElseThrow(() -> new CustomRuntimeException("Invalid application number: " + applicationNumber));
+                licence.setStatus(status);
+                stockLiftingRepository.save(licence);
+            }
+            default -> throw new BusinessException(ErrorCodes.BAD_REQUEST);
+        }
+    }
+
+    /** Current status of the licence record for any of the four services, or null if it does not exist. */
+    private String currentLicenceStatus(String applicationFrom, String applicationNumber) {
+        return switch (applicationFrom.trim().toUpperCase()) {
+            case "M" -> miningLeaseApplicationRepository.findByApplicationNumber(applicationNumber)
+                    .map(MiningLeaseApplication::getCurrentStatus).orElse(null);
+            case "Q" -> quarryLeaseApplicationRepository.findByApplicationNumber(applicationNumber)
+                    .map(QuarryLeaseApplication::getCurrentStatus).orElse(null);
+            case "S" -> surfaceCollectionPermitRepository.findByApplicationNo(applicationNumber)
+                    .map(SurfaceCollectionPermitEntity::getStatus).orElse(null);
+            case "SL" -> stockLiftingRepository.findByApplicationNo(applicationNumber)
+                    .map(StockLiftingApplication::getStatus).orElse(null);
+            default -> throw new BusinessException(ErrorCodes.BAD_REQUEST);
+        };
+    }
+
+    /**
+     * Returns the licence to its active status when the suspension is lifted.
+     * Skipped (returns false) if the licence has since moved out of the suspension
+     * statuses, e.g. into termination, so that later status is kept.
+     */
+    private boolean restoreLicenceStatusAfterLifting(String applicationFrom, String applicationNumber, String activeStatus) {
+        String current = currentLicenceStatus(applicationFrom, applicationNumber);
+
+        if (current == null) {
+            throw new CustomRuntimeException("Invalid application number: " + applicationNumber);
+        }
+
+        boolean underSuspension = UNDER_SUSPENSION_STATUSES.stream().anyMatch(s -> s.equalsIgnoreCase(current));
+        if (!underSuspension) {
+            log.warn("Suspension lifted for {} but its licence status is '{}'; licence status left unchanged",
+                    applicationNumber, current);
+            return false;
+        }
+
+        setLicenceStatus(applicationFrom, applicationNumber, activeStatus);
+        return true;
     }
 
     // Immediate Suspension data saving part where data from
@@ -722,32 +843,10 @@ public class ImmediateSuspensionService {
                     app.setCurrentStatus("SUSPENDED");
                     app.setPromoterReviewedAt(now);
 
-                    String leaseType = app.getApplicationFrom().equalsIgnoreCase("M") ? "MINING_LEASE" : "QUARRY_LEASE";
+                    String leaseType = siteLeaseTypeFor(app.getApplicationFrom());
 
-                    if (app.getApplicationFrom().equalsIgnoreCase("M")) {
-                        Optional<MiningLeaseApplication> miningLeaseApplication =
-                                miningLeaseApplicationRepository.findByApplicationNumber(app.getApplicationNumber());
-
-                        if (miningLeaseApplication.isEmpty()) {
-                            throw new CustomRuntimeException("Invalid application number: " + app.getApplicationNumber());
-                        }
-
-                        MiningLeaseApplication miningLeaseApplication1 = miningLeaseApplication.get();
-
-                        miningLeaseApplication1.setCurrentStatus("SUSPENDED");
-                        miningLeaseApplicationRepository.save(miningLeaseApplication1);
-                    } else if (app.getApplicationFrom().equalsIgnoreCase("Q")) {
-                        Optional<QuarryLeaseApplication> application =
-                                quarryLeaseApplicationRepository.findByApplicationNumber(app.getApplicationNumber());
-
-                        if (application.isEmpty()) {
-                            throw new CustomRuntimeException("Invalid application number: " + app.getApplicationNumber());
-                        }
-
-                        QuarryLeaseApplication quarryLeaseApplication = application.get();
-                        quarryLeaseApplication.setCurrentStatus("SUSPENDED");
-                        quarryLeaseApplicationRepository.save(quarryLeaseApplication);
-                    }
+                    // Licence record for all four services (mining, quarry, surface collection, stock lifting).
+                    setLicenceStatus(app.getApplicationFrom(), app.getApplicationNumber(), "SUSPENDED");
 
                     siteProvisioningService.setSiteActive(leaseType, app.getApplicationNumber(), false);
 
@@ -807,11 +906,18 @@ public class ImmediateSuspensionService {
                     app.setCurrentStatus("SUSPENSION LIFTED");
                     app.setPromoterReviewedAt(now);
 
-                    String leaseType = app.getApplicationFrom().equalsIgnoreCase("M") ? "MINING_LEASE" : "QUARRY_LEASE";
+                    String leaseType = siteLeaseTypeFor(app.getApplicationFrom());
                     siteProvisioningService.setSiteActive(leaseType, app.getApplicationNumber(), true);
 
+                    // Put the licence and its own master row back into the active status.
+                    // Only done while the licence is still under this suspension, so a later
+                    // termination or temporary closure is never overwritten.
+                    String activeStatus = activeStatusFor(app.getApplicationFrom());
+                    boolean restored = restoreLicenceStatusAfterLifting(
+                            app.getApplicationFrom(), app.getApplicationNumber(), activeStatus);
+
                     if (master != null) {
-                        master.setCurrentStatus("SUSPENSION LIFTED");
+                        master.setCurrentStatus(restored ? activeStatus : "SUSPENSION LIFTED");
                         applicationMasterRepository.save(master);
                     }
 
