@@ -625,7 +625,7 @@ SELECT
       ON c.cid = h.applicant_cid
     WHERE c.household_number = :householdNumber
       AND h.service_type = 'MINING_LEASE'
-      AND h.status = 'ACTIVE'
+      AND h.status IN ('ACTIVE', 'UNDER-REVIEW-TERMINATION')
 )
 +
 (
@@ -646,7 +646,8 @@ SELECT
     FROM mas_db.t_household_permit_threshold h
     WHERE h.applicant_cid = :applicantCid
       AND h.service_type = :serviceType
-      AND h.status = 'ACTIVE'
+      -- A licence under termination review still holds its slot until the decision.
+      AND h.status IN ('ACTIVE', 'UNDER-REVIEW-TERMINATION')
     """,
             nativeQuery = true)
     Integer countByApplicantCidAndServiceType(@Param("applicantCid") String applicantCid,

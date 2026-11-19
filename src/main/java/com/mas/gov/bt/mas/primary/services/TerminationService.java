@@ -94,6 +94,10 @@ public class TerminationService {
 
             LeaseApplicationRef leaseRef = resolveAndMarkUnderReview(appNo);
 
+            // While the termination is under review the site is out of service and the
+            // household permit row carries the under-review status.
+            markSiteAndHouseholdUnderReview(appNo, leaseRef.applicationType());
+
             TerminationApplicationEntity entity = new TerminationApplicationEntity();
 
             entity.setTerminationId(terminationId);
@@ -159,6 +163,38 @@ public class TerminationService {
     }
 
 
+
+    private static final String UNDER_REVIEW_TERMINATION_STATUS = "UNDER-REVIEW-TERMINATION";
+
+    /**
+     * On submission: deactivates the site and sets the household permit threshold row
+     * to UNDER-REVIEW-TERMINATION. The CMS Head decision later moves both on
+     * (TERMINATED, or back to active when the termination is cancelled).
+     *
+     * applicationType is the value resolveAndMarkUnderReview returns:
+     * MINING_LEASE, QUARRY_LEASE, SURFACE_COLLECTION_PERMIT or STOCK_LIFTING.
+     */
+    private void markSiteAndHouseholdUnderReview(String appNo, String applicationType) {
+
+        // Surface collection sites are stored as SURFACE_COLLECTION; every other
+        // service uses the same value for site and household.
+        String siteServiceType = SURFACE_COLLECTION_CATEGORY.equals(applicationType)
+                ? "SURFACE_COLLECTION"
+                : applicationType;
+
+        siteProvisioningService.setSiteActive(siteServiceType, appNo, false);
+
+        householdPermitThresholdRepository
+                .findByApplicationNoAndServiceType(appNo, applicationType)
+                .ifPresentOrElse(
+                        threshold -> {
+                            threshold.setStatus(UNDER_REVIEW_TERMINATION_STATUS);
+                            householdPermitThresholdRepository.save(threshold);
+                        },
+                        () -> log.warn("No household permit threshold row for {} {} at termination submission",
+                                applicationType, appNo)
+                );
+    }
 
     /** Common fields the rest of submitTerminationApplication needs, regardless of lease type. */
     private record LeaseApplicationRef(String applicantName, String applicantEmail, ApplicationMaster applicationMaster, String siteName, String applicationType) {}
@@ -440,7 +476,9 @@ public class TerminationService {
             HouseholdPermitThresholdEntity thresholdEntity =
                     threshold.get();
 
-            thresholdEntity.setStatus(status);
+            // Household rows use ACTIVE for a live permit (that is what the permit cap counts),
+            // not the licence status, so a cancelled termination goes back to ACTIVE.
+            thresholdEntity.setStatus("TERMINATED".equalsIgnoreCase(status) ? "TERMINATED" : "ACTIVE");
 
             householdPermitThresholdRepository.save(thresholdEntity);
 
