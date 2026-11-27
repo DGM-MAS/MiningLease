@@ -87,6 +87,8 @@ public class MineRestorationService {
 
     private final HouseholdPermitThresholdRepository householdPermitThresholdRepository;
 
+    private final SiteProvisioningService siteProvisioningService;
+
     @jakarta.annotation.PostConstruct
     private void resolveMenuIds() {
         MENU_ID_APPLICANT       = menuIdResolver.resolve("/MineRestorationappliantlist", MENU_ID_APPLICANT);
@@ -1119,6 +1121,10 @@ public class MineRestorationService {
         restoration.setCurrentStatus(STATUS_ERB_RELEASED);
         restoration.setUpdatedBy(userId);
 
+        // Restoration is complete and the bond released: close the licence's site
+        // and move the licence, its application master and household row to ERB_RELEASED.
+        closeLicenceAfterErbRelease(restoration.getMiningLeaseApplicationNumber());
+
         // Sync progress report
         MineRestorationProgressReport progressReport = progressReportRepository
                 .findByRestorationApplicationNumberAndStatus(restoration.getApplicationNumber(), STATUS_COMPLETION_REPORT_SUBMITTED)
@@ -1449,11 +1455,15 @@ public class MineRestorationService {
         };
     }
 
+    /** Site and household service types of the licence a restoration was raised against. */
+    private record LicenceServiceTypes(String siteServiceType, String householdServiceType) {}
+
     /**
-     * Updates the underlying lease application's status once a termination is decided, trying
-     * Mining Lease first and falling back to Quarry Lease, mirroring resolveAndMarkUnderReview.
+     * Sets the status of the licence a restoration was raised against (mining lease,
+     * quarry lease, surface collection permit or stock lifting) and of its household
+     * permit threshold row. Returns the licence's site and household service types.
      */
-    private void updateLeaseApplicationStatus(String appNo, String miningStatus, String quarryStatus) {
+    private LicenceServiceTypes updateLeaseApplicationStatus(String appNo, String miningStatus, String quarryStatus) {
         String siteServiceType = null;
         String householdServiceType = null;
         String status = null;
@@ -1469,7 +1479,6 @@ public class MineRestorationService {
             siteServiceType = "MINING_LEASE";
             householdServiceType = "MINING_LEASE";
             status = miningStatus;
-            return;
         }
 
         Optional<QuarryLeaseApplication> application = queryLeaseApplicationRepository.findByApplicationNumber(appNo);
@@ -1482,7 +1491,6 @@ public class MineRestorationService {
             householdServiceType = "QUARRY_LEASE";
             status = quarryStatus;
         }
-
 
         Optional<SurfaceCollectionPermitEntity> surfaceCollectionPermitEntity
                 = surfaceCollectionPermitRepository.findByApplicationNo(appNo);
@@ -1507,7 +1515,7 @@ public class MineRestorationService {
 
             siteServiceType = STOCK_LIFTING_CATEGORY;
             householdServiceType = STOCK_LIFTING_CATEGORY;
-            status = miningStatus;
+            status = quarryStatus;
         }
 
         /*
@@ -1520,19 +1528,54 @@ public class MineRestorationService {
             );
         }
 
-        Optional<HouseholdPermitThresholdEntity> householdPermitThresholdEntity
-                = householdPermitThresholdRepository.findByApplicationNoAndServiceType
-                ( appNo,householdServiceType  );
+        String householdStatus = status;
+        String householdType = householdServiceType;
+        householdPermitThresholdRepository
+                .findByApplicationNoAndServiceType(appNo, householdServiceType)
+                .ifPresentOrElse(
+                        threshold -> {
+                            threshold.setStatus(householdStatus);
+                            householdPermitThresholdRepository.save(threshold);
+                        },
+                        () -> log.warn("No household permit threshold row for {} {}; household status not updated",
+                                householdType, appNo)
+                );
 
-        if (householdPermitThresholdEntity.isPresent()) {
-            HouseholdPermitThresholdEntity thresholdEntity = householdPermitThresholdEntity.get();
-            thresholdEntity.setStatus(status);
+        return new LicenceServiceTypes(siteServiceType, householdServiceType);
+    }
 
-            householdPermitThresholdRepository.save(thresholdEntity);
-        }else {
-            throw new BusinessException(ErrorCodes.BUSINESS_RULE_VIOLATION, "The application is not present in household permit table.");
+    /**
+     * Final step of a restoration whose ERB was released: the licence is closed.
+     * Moves the licence, its own application master row and its household permit row
+     * to ERB_RELEASED, and takes the site out of site_master's active sites.
+     */
+    private void closeLicenceAfterErbRelease(String appNo) {
+
+        LicenceServiceTypes types = updateLeaseApplicationStatus(appNo, STATUS_ERB_RELEASED, STATUS_ERB_RELEASED);
+
+        ApplicationMaster master = switch (types.householdServiceType()) {
+            case "MINING_LEASE" -> miningLeaseApplicationRepository.findByApplicationNumber(appNo)
+                    .map(MiningLeaseApplication::getApplicationMaster).orElse(null);
+            case "QUARRY_LEASE" -> queryLeaseApplicationRepository.findByApplicationNumber(appNo)
+                    .map(QuarryLeaseApplication::getApplicationMaster).orElse(null);
+            // Surface collection (SURFACE_COLLECTION_PERMIT) and stock lifting (STOCK_LIFTING)
+            // masters are keyed by their service code.
+            default -> applicationMasterRepository
+                    .findByApplicationNumberAndServiceCode(appNo, types.householdServiceType())
+                    .orElse(null);
+        };
+
+        if (master != null) {
+            master.setCurrentStatus(STATUS_ERB_RELEASED);
+            master.setCompletedAt(LocalDateTime.now());
+            applicationMasterRepository.save(master);
+        } else {
+            log.warn("No application master found for {} {}; master status not updated",
+                    types.householdServiceType(), appNo);
         }
 
+        siteProvisioningService.setSiteActive(types.siteServiceType(), appNo, false);
 
+        log.info("Licence {} closed after ERB release (site deactivated)", appNo);
     }
 }
