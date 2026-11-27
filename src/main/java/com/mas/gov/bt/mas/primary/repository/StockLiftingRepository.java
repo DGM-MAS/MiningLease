@@ -26,4 +26,29 @@ public interface StockLiftingRepository extends JpaRepository<StockLiftingApplic
     Optional<StockLiftingApplication> findByStockLiftingPermitNo(String appNo);
 
     Optional<StockLiftingApplication> findByApplicationNo(String appNo);
+
+    /**
+     * Stock lifting applications whose validity ends in [:from, :toExclusive) that have
+     * not yet been sent the Mine Restoration Plan reminder for their current validity
+     * date, and for which no MRP has been submitted yet (a saved draft does not count).
+     */
+    @Query("""
+        SELECT a
+        FROM StockLiftingApplication a
+        WHERE a.validityDate IS NOT NULL
+          AND a.validityDate >= :from
+          AND a.validityDate < :toExclusive
+          AND (a.mrpReminderSentForEndDate IS NULL
+               OR a.mrpReminderSentForEndDate <> a.validityDate)
+          AND NOT EXISTS (
+              SELECT 1
+              FROM MineRestorationApplication r
+              WHERE r.miningLeaseApplicationNumber = a.applicationNo
+                AND r.currentStatus <> :draftStatus
+          )
+    """)
+    List<StockLiftingApplication> findApplicationsDueForMrpReminder(
+            @Param("from") LocalDateTime from,
+            @Param("toExclusive") LocalDateTime toExclusive,
+            @Param("draftStatus") String draftStatus);
 }

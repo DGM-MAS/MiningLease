@@ -33,4 +33,29 @@ public interface SurfaceCollectionPermitRepository extends JpaRepository<Surface
     List<SurfaceCollectionPermitEntity> findByIsManualEntry(String isManualEntry);
 
     List<SurfaceCollectionPermitEntity> findByIsManualEntryAndManualEntryBy(String isManualEntry, Long manualEntryBy);
+
+    /**
+     * Permits whose validity ends in [:from, :toExclusive) that have not yet been sent
+     * the Mine Restoration Plan reminder for their current validity end date, and for
+     * which no MRP has been submitted yet (a saved draft does not count).
+     */
+    @Query("""
+        SELECT e
+        FROM SurfaceCollectionPermitEntity e
+        WHERE e.permitValidityTo IS NOT NULL
+          AND e.permitValidityTo >= :from
+          AND e.permitValidityTo < :toExclusive
+          AND (e.mrpReminderSentForEndDate IS NULL
+               OR e.mrpReminderSentForEndDate <> e.permitValidityTo)
+          AND NOT EXISTS (
+              SELECT 1
+              FROM MineRestorationApplication r
+              WHERE r.miningLeaseApplicationNumber = e.applicationNo
+                AND r.currentStatus <> :draftStatus
+          )
+    """)
+    List<SurfaceCollectionPermitEntity> findPermitsDueForMrpReminder(
+            @Param("from") java.util.Date from,
+            @Param("toExclusive") java.util.Date toExclusive,
+            @Param("draftStatus") String draftStatus);
 }

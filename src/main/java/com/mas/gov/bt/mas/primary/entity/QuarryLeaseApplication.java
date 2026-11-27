@@ -249,6 +249,11 @@ public class QuarryLeaseApplication {
     @Column(name = "lease_end_date")
     private LocalDate leaseEndDate;
 
+    // The lease end date for which the "submit your Mine Restoration Plan"
+    // reminder (3 years before lease end) was last sent. Re-armed by renewal.
+    @Column(name = "mrp_reminder_sent_for_end_date")
+    private LocalDate mrpReminderSentForEndDate;
+
     @Column(name = "lease_period_years")
     private Integer leasePeriodYears;
 
