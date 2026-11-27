@@ -249,8 +249,7 @@ public class MineRestorationService {
             restoration.setCurrentStatus(STATUS_MRP_DRAFT);
         } else {
 
-            // Validate TERMINATED status + Application Master status
-            // + two-month submission deadline
+            // Validate Application Master + two-month submission deadline
             LocalDateTime deadline =
                     validateMRPSubmissionEligibility(
                             miningLeaseApplication,
@@ -328,16 +327,13 @@ public class MineRestorationService {
             SurfaceCollectionPermitEntity surfaceCollectionPermitEntity,
             StockLiftingApplication stockLiftingApplication) {
 
-        String leaseStatus;
         ApplicationMaster applicationMaster;
 
         if (miningLeaseApplication != null) {
 
-            leaseStatus = miningLeaseApplication.getCurrentStatus();
             applicationMaster = miningLeaseApplication.getApplicationMaster();
 
         }else if (surfaceCollectionPermitEntity != null) {
-            leaseStatus = surfaceCollectionPermitEntity.getStatus();
 
             Optional<ApplicationMaster> applicationMaster1 = applicationMasterRepository.findByApplicationNumberAndServiceCode(surfaceCollectionPermitEntity.getApplicationNo(), "SURFACE_COLLECTION_PERMIT");
 
@@ -347,7 +343,6 @@ public class MineRestorationService {
 
         }
         else if(stockLiftingApplication != null) {
-            leaseStatus = stockLiftingApplication.getStatus();
 
             Optional<ApplicationMaster> applicationMasterStockLifting = applicationMasterRepository
                     .findByApplicationNumberAndServiceCode(
@@ -365,25 +360,12 @@ public class MineRestorationService {
         }
         else {
 
-            leaseStatus = quarryLeaseApplication.getCurrentStatus();
             applicationMaster = quarryLeaseApplication.getApplicationMaster();
         }
 
         // ---------------------------------------------------------
-        // 1. Lease/Application must be TERMINATED
-        // ---------------------------------------------------------
-
-        if (!"TERMINATED".equalsIgnoreCase(leaseStatus)) {
-
-            throw new BusinessException(
-                    ErrorCodes.INVALID_STATE,
-                    "Mine Restoration Plan can only be submitted for a terminated application."
-            );
-        }
-
-
-        // ---------------------------------------------------------
-        // 2. Application Master must exist
+        // 1. Application Master must exist
+        // (Applications of any status may avail Mine Restoration.)
         // ---------------------------------------------------------
 
         if (applicationMaster == null) {
@@ -396,28 +378,7 @@ public class MineRestorationService {
 
 
         // ---------------------------------------------------------
-        // 3. Application Master status must be valid
-        // ---------------------------------------------------------
-
-        String masterStatus = applicationMaster.getCurrentStatus();
-
-        boolean validMasterStatus =
-                "TERMINATED".equalsIgnoreCase(masterStatus)
-                        || "TEMPORARY CLOSURE APPROVED".equalsIgnoreCase(masterStatus);
-
-        if (!validMasterStatus) {
-
-            throw new BusinessException(
-                    ErrorCodes.INVALID_STATE,
-                    "Mine Restoration Plan cannot be submitted because the Application Master status is "
-                            + masterStatus
-                            + "."
-            );
-        }
-
-
-        // ---------------------------------------------------------
-        // 4. Approved date must exist
+        // 2. Approved date must exist
         // ---------------------------------------------------------
 
         LocalDateTime approvedAt = applicationMaster.getApprovedAt();
@@ -432,7 +393,7 @@ public class MineRestorationService {
 
 
         // ---------------------------------------------------------
-        // 5. Calculate MRP submission deadline
+        // 3. Calculate MRP submission deadline
         // ---------------------------------------------------------
 
         LocalDateTime deadline = approvedAt.plusMonths(2);
