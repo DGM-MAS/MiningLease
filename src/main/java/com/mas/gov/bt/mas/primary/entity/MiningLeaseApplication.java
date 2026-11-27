@@ -289,6 +289,11 @@ public class MiningLeaseApplication {
     @Column(name = "renewal_reminder_sent_for_end_date")
     private LocalDate renewalReminderSentForEndDate;
 
+    // The lease end date for which the "submit your Mine Restoration Plan"
+    // reminder (3 years before lease end) was last sent. Re-armed by renewal.
+    @Column(name = "mrp_reminder_sent_for_end_date")
+    private LocalDate mrpReminderSentForEndDate;
+
     // ========== Fees ==========
     @Column(name = "application_fees_required")
     private Boolean applicationFeesRequired;

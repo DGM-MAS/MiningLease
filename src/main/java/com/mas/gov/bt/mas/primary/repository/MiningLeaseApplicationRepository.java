@@ -699,6 +699,32 @@ SELECT
     );
 
     /**
+     * Leases ending in [:from, :to] that have not yet been sent the Mine Restoration
+     * Plan reminder for their current lease term, and for which no MRP has been
+     * submitted yet (a saved draft does not count).
+     */
+    @Query("""
+    SELECT a
+    FROM MiningLeaseApplication a
+    WHERE a.leaseEndDate IS NOT NULL
+      AND a.leaseEndDate >= :from
+      AND a.leaseEndDate <= :to
+      AND (a.mrpReminderSentForEndDate IS NULL
+           OR a.mrpReminderSentForEndDate <> a.leaseEndDate)
+      AND NOT EXISTS (
+          SELECT 1
+          FROM MineRestorationApplication r
+          WHERE r.miningLeaseApplicationNumber = a.applicationNumber
+            AND r.currentStatus <> :draftStatus
+      )
+""")
+    List<MiningLeaseApplication> findLeasesDueForMrpReminder(
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to,
+            @Param("draftStatus") String draftStatus
+    );
+
+    /**
      * Active leases whose environmental clearance expires in [:from, :toExclusive) that
      * have not yet been reminded for their current EC, and that have no EC renewal
      * application currently in progress.

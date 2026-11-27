@@ -235,6 +235,12 @@ public class SurfaceCollectionPermitEntity {
     @Column(name = "permit_validity_to")
     private Date permitValidityTo;
 
+    // The permit_validity_to for which the "submit your Mine Restoration Plan"
+    // reminder (3 years before validity ends) was last sent. Same type as
+    // permitValidityTo so the two compare exactly; re-armed when validity moves.
+    @Column(name = "mrp_reminder_sent_for_end_date")
+    private Date mrpReminderSentForEndDate;
+
     @Column(name = "ec_status", length = 30)
     private String eCStatus;
 

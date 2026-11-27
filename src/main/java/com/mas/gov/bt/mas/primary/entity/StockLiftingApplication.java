@@ -84,6 +84,12 @@ public class StockLiftingApplication {
     @Column(name = "validity_date")
     private LocalDateTime validityDate;
 
+    // The validity_date for which the "submit your Mine Restoration Plan" reminder
+    // (3 years before validity ends) was last sent. Same type as validityDate so the
+    // two compare exactly; re-armed when validity moves.
+    @Column(name = "mrp_reminder_sent_for_end_date")
+    private LocalDateTime mrpReminderSentForEndDate;
+
     // mas_db.stock_lifting_application is shared with mas-royalty-service, which owns
     // this column as numeric(12,2) — was mismapped here as String, which made Hibernate's
     // startup schema validation fail (crash-loop) the moment the two disagreed.

@@ -350,4 +350,30 @@ public interface QuarryLeaseApplicationRepository extends JpaRepository<QuarryLe
     List<QuarryLeaseApplication> findByIsManualEntry(String isManualEntry);
 
     List<QuarryLeaseApplication> findByIsManualEntryAndManualEntryBy(String isManualEntry, Long manualEntryBy);
+
+    /**
+     * Leases ending in [:from, :to] that have not yet been sent the Mine Restoration
+     * Plan reminder for their current lease term, and for which no MRP has been
+     * submitted yet (a saved draft does not count).
+     */
+    @Query("""
+    SELECT a
+    FROM QuarryLeaseApplication a
+    WHERE a.leaseEndDate IS NOT NULL
+      AND a.leaseEndDate >= :from
+      AND a.leaseEndDate <= :to
+      AND (a.mrpReminderSentForEndDate IS NULL
+           OR a.mrpReminderSentForEndDate <> a.leaseEndDate)
+      AND NOT EXISTS (
+          SELECT 1
+          FROM MineRestorationApplication r
+          WHERE r.miningLeaseApplicationNumber = a.applicationNumber
+            AND r.currentStatus <> :draftStatus
+      )
+""")
+    List<QuarryLeaseApplication> findLeasesDueForMrpReminder(
+            @Param("from") java.time.LocalDate from,
+            @Param("to") java.time.LocalDate to,
+            @Param("draftStatus") String draftStatus
+    );
 }
