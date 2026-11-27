@@ -70,3 +70,4 @@ megalinter-reports/
 *.pdf
 *.pptx
 *.ppt
+*.csv
