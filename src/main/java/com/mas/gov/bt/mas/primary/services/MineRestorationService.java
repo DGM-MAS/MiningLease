@@ -38,6 +38,9 @@ public class MineRestorationService {
 
     private static final String STOCK_LIFTING_CATEGORY   = "STOCK_LIFTING";
 
+    /** MRP must be submitted at least 2.5 years (30 months) before the lease end date. */
+    private static final int MRP_SUBMISSION_MONTHS_BEFORE_LEASE_END = 30;
+
     // Real sidebar menu ids (permissions.id) per recipient role for this service — used to target
     // notification.serviceId so the sidebar dot/click-through lands on the correct menu item.
     // NOT the same thing as SERVICE_CODE above, which is an unrelated t_application_master.service_code value.
@@ -249,8 +252,8 @@ public class MineRestorationService {
             restoration.setCurrentStatus(STATUS_MRP_DRAFT);
         } else {
 
-            // Validate Application Master + two-month submission deadline
-            LocalDateTime deadline =
+            // MRP must be submitted at least 2.5 years before the lease end date
+            LocalDate deadline =
                     validateMRPSubmissionEligibility(
                             miningLeaseApplication,
                             quarryLeaseApplication,
@@ -321,95 +324,89 @@ public class MineRestorationService {
         return toResponse(restoration);
     }
 
-    private LocalDateTime validateMRPSubmissionEligibility(
+    /**
+     * MRP must be submitted no later than 2.5 years (30 months) before the
+     * end date of the lease / permit it relates to. Applications in any status
+     * may avail Mine Restoration; only the end date governs eligibility.
+     *
+     * @return the last date on which the MRP may be submitted
+     */
+    private LocalDate validateMRPSubmissionEligibility(
             MiningLeaseApplication miningLeaseApplication,
             QuarryLeaseApplication quarryLeaseApplication,
             SurfaceCollectionPermitEntity surfaceCollectionPermitEntity,
             StockLiftingApplication stockLiftingApplication) {
 
-        ApplicationMaster applicationMaster;
-
-        if (miningLeaseApplication != null) {
-
-            applicationMaster = miningLeaseApplication.getApplicationMaster();
-
-        }else if (surfaceCollectionPermitEntity != null) {
-
-            Optional<ApplicationMaster> applicationMaster1 = applicationMasterRepository.findByApplicationNumberAndServiceCode(surfaceCollectionPermitEntity.getApplicationNo(), "SURFACE_COLLECTION_PERMIT");
-
-            ApplicationMaster applicationMasterEntity = applicationMaster1.orElseThrow(() -> new BusinessException(ErrorCodes.BAD_REQUEST));
-
-            applicationMaster = applicationMasterEntity;
-
-        }
-        else if(stockLiftingApplication != null) {
-
-            Optional<ApplicationMaster> applicationMasterStockLifting = applicationMasterRepository
-                    .findByApplicationNumberAndServiceCode(
-                            stockLiftingApplication.getApplicationNo(),
-                            STOCK_LIFTING_CATEGORY
-                    );
-
-            ApplicationMaster applicationMaster1 = null;
-
-            if (applicationMasterStockLifting.isPresent()) {
-                applicationMaster1 = applicationMasterStockLifting.get();
-            }
-
-            applicationMaster = applicationMaster1;
-        }
-        else {
-
-            applicationMaster = quarryLeaseApplication.getApplicationMaster();
-        }
-
         // ---------------------------------------------------------
-        // 1. Application Master must exist
-        // (Applications of any status may avail Mine Restoration.)
+        // 1. Lease / permit end date must be available
         // ---------------------------------------------------------
 
-        if (applicationMaster == null) {
+        LocalDate leaseEndDate = resolveLeaseEndDate(
+                miningLeaseApplication,
+                quarryLeaseApplication,
+                surfaceCollectionPermitEntity,
+                stockLiftingApplication
+        );
 
-            throw new BusinessException(
-                    ErrorCodes.RECORD_NOT_FOUND,
-                    "Application Master record was not found."
-            );
-        }
-
-
-        // ---------------------------------------------------------
-        // 2. Approved date must exist
-        // ---------------------------------------------------------
-
-        LocalDateTime approvedAt = applicationMaster.getApprovedAt();
-
-        if (approvedAt == null) {
+        if (leaseEndDate == null) {
 
             throw new BusinessException(
                     ErrorCodes.INVALID_STATE,
-                    "Application Master approval date is not available."
+                    "The lease end date is not recorded for this application. "
+                            + "Please contact the Department to update the lease end date "
+                            + "before submitting the Mine Restoration Plan."
             );
         }
 
-
         // ---------------------------------------------------------
-        // 3. Calculate MRP submission deadline
+        // 2. MRP must be submitted at least 2.5 years before end date
         // ---------------------------------------------------------
 
-        LocalDateTime deadline = approvedAt.plusMonths(2);
+        LocalDate deadline = leaseEndDate.minusMonths(MRP_SUBMISSION_MONTHS_BEFORE_LEASE_END);
 
-        LocalDateTime now = LocalDateTime.now();
-
-        if (now.isAfter(deadline)) {
+        if (LocalDate.now().isAfter(deadline)) {
 
             throw new BusinessException(
                     ErrorCodes.INVALID_STATE,
-                    "The deadline for submitting the Mine Restoration Plan has passed. "
-                            + "The deadline was " + deadline.toLocalDate() + "."
+                    "The Mine Restoration Plan must be submitted at least 2.5 years before the lease end date ("
+                            + leaseEndDate + "). The deadline was " + deadline + "."
             );
         }
 
         return deadline;
+    }
+
+    /**
+     * End date of whichever lease / permit the restoration relates to, or null
+     * when it is not recorded.
+     */
+    private LocalDate resolveLeaseEndDate(
+            MiningLeaseApplication miningLeaseApplication,
+            QuarryLeaseApplication quarryLeaseApplication,
+            SurfaceCollectionPermitEntity surfaceCollectionPermitEntity,
+            StockLiftingApplication stockLiftingApplication) {
+
+        if (miningLeaseApplication != null) {
+            return miningLeaseApplication.getLeaseEndDate();
+        }
+        if (quarryLeaseApplication != null) {
+            return quarryLeaseApplication.getLeaseEndDate();
+        }
+        if (surfaceCollectionPermitEntity != null) {
+            Date permitValidityTo = surfaceCollectionPermitEntity.getPermitValidityTo();
+            return permitValidityTo == null
+                    ? null
+                    : permitValidityTo.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        }
+        if (stockLiftingApplication != null) {
+            LocalDateTime validityDate = stockLiftingApplication.getValidityDate();
+            return validityDate == null ? null : validityDate.toLocalDate();
+        }
+
+        throw new BusinessException(
+                ErrorCodes.RECORD_NOT_FOUND,
+                "No lease or permit was found for this application number."
+        );
     }
 
     @Transactional
@@ -454,6 +451,19 @@ public class MineRestorationService {
                                 + "The deadline was " + deadline + "."
                 );
             }
+        }
+
+        // A DRAFT being submitted here is a first submission, so the
+        // 2.5-years-before-lease-end rule applies (revisions are governed
+        // only by the reviewer's resubmission deadline above).
+        if (STATUS_MRP_DRAFT.equals(restoration.getCurrentStatus())) {
+            String leaseApplicationNumber = restoration.getMiningLeaseApplicationNumber();
+            validateMRPSubmissionEligibility(
+                    miningLeaseApplicationRepository.findByApplicationNumber(leaseApplicationNumber).orElse(null),
+                    queryLeaseApplicationRepository.findByApplicationNumber(leaseApplicationNumber).orElse(null),
+                    surfaceCollectionPermitRepository.findByApplicationNo(leaseApplicationNumber).orElse(null),
+                    stockLiftingRepository.findByApplicationNo(leaseApplicationNumber).orElse(null)
+            );
         }
 
 
